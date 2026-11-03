@@ -64,7 +64,8 @@ the web page). Pin tables, power notes and the optional service button are in th
 
 A 3D-printable case in three lid variants: **Button** (a Choc key, wired as the service button, and a NeoPixel),
 **LED** (a NeoPixel behind a diffuser) and **Slim** (a plain lid). One `.3mf` file per variant holds all its printed
-parts; the bill of materials, print settings, assembly and wiring are in [case/](case/README.md).
+parts, and an optional bracket mounts it under a desk or on a wall; the bill of materials, print settings, mounting,
+assembly and wiring are in [case/](case/README.md).
 
 <p align="center">
   <img src="docs/img/case_variants_sheet.png" alt="The case's three variants: Button, LED and Slim, assembled and exploded" width="70%">
@@ -189,7 +190,7 @@ components/feedback/  speaker and status light
 test/host/            unit tests of the pure modules
 tools/                build helpers, the page packer and checks, mock_box.py, dock_check
 docs/                 the manual, the flashing guide, screenshots, the case renders (docs/img)
-case/                 the 3D-printable case: one .3mf per variant (Button, LED, Slim)
+case/                 the 3D-printable case: one .3mf per variant (Button, LED, Slim) and the mount bracket
 firmware/             prebuilt release files (the installer flashes them)
 installer/            the browser installer (GitHub Pages: .github/workflows/pages.yml)
 ```

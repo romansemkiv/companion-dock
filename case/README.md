@@ -19,6 +19,7 @@ of its variant, ready for the slicer.
 | `ESP32P4_Case_BTN.3mf` | base, Button lid, keycap, mount bracket (optional) |
 | `ESP32P4_Case_LED.3mf` | base, LED lid, diffuser |
 | `ESP32P4_Case_Slim.3mf` | base, Slim lid |
+| [`ESP32P4_Case-MountBracket.3mf`](ESP32P4_Case-MountBracket.3mf) | the mount bracket alone (optional, for any variant; the Button file has it too) |
 
 ## Specs
 
@@ -41,6 +42,16 @@ Every variant has:
 The clearances were checked against Waveshare's 3D model of the board: no part of any variant touches the board. In
 the LED and Slim lids the ceiling clears the USB-A port by 1.1 mm and the tops of Dupont plugs on the 40-pin header by
 0.6 mm.
+
+## Mounting
+
+The optional bracket screws to a desk underside or a wall with two M3.5 / #6 countersunk screws. The case slides in
+from the port end: lips on the bracket ride in a band on the base's sides, and a flex latch clicks it in place
+against the rear stop. Press the latch to slide the case out.
+
+| Under a desk | On a wall |
+|---|---|
+| ![The case in its bracket under a desk](../docs/img/mount_table.png) | ![The case in its bracket on a wall](../docs/img/mount_wall.png) |
 
 ## Bill of materials
 
