@@ -281,6 +281,20 @@ raises the limit to **4** after a warning ("Allow up to 4 Stream Decks?": with m
 box can restart; a powered USB hub gives the extra decks their own power; at your own risk), and restarts the box;
 *Back to 2 decks…* undoes it. The setting is `deckLimit` (`Device.SetConfig`, 2 or 4), behind the settings PIN.
 
+The box has one USB-A port, so two or more decks go through a USB 2.0 high-speed hub. How many decks the power
+allows (estimates from the ratings, see [the PoE power budget](#hardware) and [Measurements](#measurements)):
+
+| The decks are powered by | Budget for the hub and the decks | Decks |
+|---|---|---|
+| PoE (802.3af), through an unpowered hub | about 1.5 A (7.5 W), what is left once the board has its share | **2** at full draw. 3 or 4 often work with the limit at 4, at your own risk |
+| USB-C, a 5 V supply of 3 A or more (Wi-Fi only), through an unpowered hub | about 2 A, the USB-A switch's limit | **3** at full draw, 4 often |
+| A powered hub (with its own power supply), the box on PoE or USB-C | the hub's supply | **4**, the firmware's maximum |
+
+*Full draw* is 500 mA per deck, the most a deck asks for when it enumerates (XL, Original v2); a Stream Deck + XL
+is rated 900 mA and counts as almost two. An unpowered hub takes its own share from the same budget. A full-speed
+deck (some Minis, the Pedal) doesn't work behind a high-speed hub, so it only works plugged into the box directly,
+on its own.
+
 A deck beyond the limit is ignored as long as it stays plugged in: it gets no dock and no screen, Companion never
 sees it, the problem list says "Too many Stream Decks (max 2): <serial> ignored", and Home's banner says "Deck
 limit reached (2). Unplug one, or allow up to 4 on Device." When a deck has been unplugged since, so there is room

@@ -60,6 +60,26 @@ The NeoPixel takes 5 V and GND from the board's header and its data input on GPI
 the web page). Pin tables, power notes and the optional service button are in the
 [manual](docs/manual.md#hardware).
 
+### How many Stream Decks
+
+The box has one USB-A port, so two or more decks go through a USB 2.0 high-speed hub. The firmware takes
+**2 decks** by default and **4** at most: *Allow up to 4 decks…* on the web page's Device page. Every Elgato deck
+counts, the Pedal too. How many you can really run depends on what powers them:
+
+| The decks are powered by | Budget for the hub and the decks | Decks |
+|---|---|---|
+| PoE (802.3af), through an unpowered hub | about 1.5 A (7.5 W), what is left once the board has its share | **2** at full draw. 3 or 4 often work with the limit at 4, at your own risk |
+| USB-C, a 5 V supply of 3 A or more (Wi-Fi only), through an unpowered hub | about 2 A, the USB-A port's current limit | **3** at full draw, 4 often |
+| A powered hub (with its own power supply), the box on PoE or USB-C | the hub's supply | **4**, the firmware's maximum |
+
+*Full draw* is 500 mA per deck, the most a deck asks for when it is plugged in (XL, Original v2). A Stream Deck + XL
+is rated 900 mA and counts as almost two. An unpowered hub takes its own share from the same budget. With more than
+the budget, the decks drop out or the box restarts.
+
+These numbers are estimates from the ratings: the board's and the decks' real draw are still to be measured, and
+hubs with several decks haven't been tested on a box yet. A full-speed deck (some Minis, the Pedal) doesn't work
+behind a high-speed hub, so it only works plugged into the box directly, on its own.
+
 ### Case
 
 A 3D-printable case in three lid variants: **Button** (a Choc key, wired as the service button, and a NeoPixel),
@@ -203,10 +223,9 @@ installer/            the browser installer (GitHub Pages: .github/workflows/pag
 - Hubs and several decks at once haven't been verified on hardware yet. A full-speed deck (some Minis, the Pedal)
   doesn't work behind a high-speed hub, because the P4's USB host has no transaction translator; plug it into the
   box directly.
-- **Power.** 802.3af PoE leaves about 7.5 W (1.5 A at 5 V) for the decks once the board has its share, and a deck
-  can draw up to 500 mA (the + XL up to 900 mA). So the box takes **2 decks** by default. The web page can allow
-  **4** at your own risk: with more than PoE can feed, the decks can drop out or the box can restart. A powered USB
-  hub gives the extra decks their own power. Real measurements are still to be done.
+- **Power.** PoE alone runs **2 decks** at full draw, so the box takes 2 by default; the web page can allow **4**
+  at your own risk, and a powered USB hub gives the extra decks their own power. The table is in
+  [How many Stream Decks](#how-many-stream-decks). Real measurements are still to be done.
 - **The hotspot** has a random password by default, and the decks show it, so anyone who can see a deck can join.
   It can be made open or turned off. Anyone on the hotspot or the network can change settings unless a settings
   PIN is set.
