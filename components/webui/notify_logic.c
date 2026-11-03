@@ -36,3 +36,13 @@ char *notify_status_key(cJSON *st)
     for (int i = 2; i >= 0; i--) put_back(&t[i]);
     return key;
 }
+
+uint32_t notify_fnv1a(uint32_t h, const void *p, size_t n)
+{
+    const unsigned char *b = p;
+    for (size_t i = 0; i < n; i++) {
+        h ^= b[i];
+        h *= 16777619u;
+    }
+    return h;
+}

@@ -1,5 +1,8 @@
 /* NotifyStatus's comparison of two statuses (notify.c), pure (host-tested). */
 #pragma once
+#include <stddef.h>
+#include <stdint.h>
+
 #include "cJSON.h"
 
 #ifdef __cplusplus
@@ -11,6 +14,11 @@ extern "C" {
  * for the print and put back at their places, so st is as it was and no copy is made). NULL when it can't be
  * printed; cJSON_free it. */
 char *notify_status_key(cJSON *st);
+
+/* 32-bit FNV-1a of the n bytes at p, chained from h (NOTIFY_FNV_SEED to start): Sys.GetStatus.rev's fingerprints of
+ * the Companions found and the firmware slots. p may be NULL when n is 0. */
+#define NOTIFY_FNV_SEED 2166136261u
+uint32_t notify_fnv1a(uint32_t h, const void *p, size_t n);
 
 #ifdef __cplusplus
 }

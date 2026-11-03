@@ -271,6 +271,7 @@ static cJSON *m_set_auth(const cJSON *p, rpc_err_t *err)
     if (pw) new_session_locked(tok);
     unlock();
     ESP_LOGW(TAG, "%s from %s", pw ? (had ? "settings PIN changed" : "settings PIN set") : "settings PIN removed", caller_src());
+    webui_settings_saved(); /* the open pages show it */
     webui_deck_push_settings(); /* the decks lock their five actions with it, and unlock with it */
     cJSON *r = cJSON_CreateObject();
     cJSON_AddBoolToObject(r, "auth_en", pw != NULL);

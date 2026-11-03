@@ -86,6 +86,11 @@ size_t logbuf_read(char *out, size_t max, uint32_t *seq);
 esp_err_t notify_start(void);
 /* A client connected or signed in: the next check pushes even an unchanged status. */
 void notify_kick(void);
+/* Check for a status to push now, not at the next second (a settings save: rev.cfg). Any task. */
+void notify_soon(void);
+/* A settings save went through (a *.SetConfig, the settings PIN): Sys.GetStatus.rev.cfg counts it and the open pages
+ * read their settings again. Any task. */
+void webui_settings_saved(void);
 
 /* ---- web.c ---- */
 

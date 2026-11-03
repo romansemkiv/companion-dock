@@ -6,7 +6,8 @@
  * stack), compares it with the last one pushed, leaving out the fields that change by themselves
  * (uptime_s, heap, message.remaining_s), and pushes
  *   {"src":"<device id>","dst":"user","method":"NotifyStatus","params":{"sys":{...Sys.GetStatus...}}}
- * when it differs. A client that connects or signs in gets the next one whatever it is (notify_kick). */
+ * when it differs. A client that connects or signs in gets the next one whatever it is (notify_kick). A settings
+ * save checks at once instead of at the next second (notify_soon). */
 #include <stdatomic.h>
 #include <stdlib.h>
 #include <string.h>
@@ -29,7 +30,14 @@ static atomic_bool s_queued;
 static atomic_bool s_have_last; /* s_last is set: one more run frees it once nobody listens */
 static atomic_bool s_fresh;     /* push the next status even when it did not change */
 
+static TaskHandle_t s_task;
+
 void notify_kick(void) { atomic_store(&s_fresh, true); }
+
+void notify_soon(void)
+{
+    if (s_task) xTaskNotifyGive(s_task);
+}
 
 /* On the HTTP server task. */
 static void work(void *arg)
@@ -79,7 +87,7 @@ static void notify_task(void *arg)
 {
     (void)arg;
     for (;;) {
-        vTaskDelay(pdMS_TO_TICKS(PERIOD_MS));
+        ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(PERIOD_MS)); /* a second, or notify_soon */
         if ((web_ws_listening() || atomic_load(&s_have_last)) && !atomic_exchange(&s_queued, true) && web_queue_work(work, NULL) != ESP_OK)
             atomic_store(&s_queued, false);
     }
@@ -87,7 +95,7 @@ static void notify_task(void *arg)
 
 esp_err_t notify_start(void)
 {
-    if (xTaskCreateWithCaps(notify_task, "notify", STACK, NULL, 3, NULL, MALLOC_CAP_SPIRAM) != pdPASS) {
+    if (xTaskCreateWithCaps(notify_task, "notify", STACK, NULL, 3, &s_task, MALLOC_CAP_SPIRAM) != pdPASS) {
         ESP_LOGE(TAG, "no memory for the task");
         return ESP_ERR_NO_MEM;
     }

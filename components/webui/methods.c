@@ -42,6 +42,7 @@
 #include "rpc/rpc.h"
 #include "satclient/satclient.h"
 #include "slotsync/slotsync.h"
+#include "notify_logic.h"
 #include "surfaces/surfaces.h"
 #include "usbdeck/usbdeck.h"
 #include "web_logic.h"
@@ -80,6 +81,14 @@ box_config_t *webui_cfg(void) { return s_cfg; }
 static void signal_changed(void)
 {
     if (s_changed) s_changed();
+}
+
+static atomic_uint s_cfg_rev; /* Sys.GetStatus.rev.cfg: the settings saves since the start */
+
+void webui_settings_saved(void)
+{
+    atomic_fetch_add(&s_cfg_rev, 1u);
+    notify_soon();
 }
 
 /* {"restart_required": false[, "dry_run": true]}: settings apply without a restart. */
@@ -140,6 +149,7 @@ static bool apply_cfg_hook(cfg_apply_fn fn, cfg_hook_fn hook, void *hook_ctx, co
         return false;
     }
     if (write) {
+        webui_settings_saved(); /* the open pages read it again */
         webui_deck_push_settings(); /* the decks' screens show some of it */
         signal_changed();
     }
@@ -496,8 +506,42 @@ static cJSON *firmware_json(void)
     return o;
 }
 
+/* Sys.GetStatus.rev.found: the Companions Companion.List gives, and the one pinned (its "pinned" flags). */
+static uint32_t found_rev(void)
+{
+    char pin[sizeof s_cfg->companion_pin_id];
+    webui_cfg_lock();
+    strlcpy(pin, s_cfg->companion_pin_id, sizeof pin);
+    webui_cfg_unlock();
+    uint32_t h = notify_fnv1a(NOTIFY_FNV_SEED, pin, strlen(pin) + 1);
+    int n = 0;
+    companion_instance_t *inst = instances(&n);
+    for (int i = 0; i < n; i++) {
+        h = notify_fnv1a(h, inst[i].id, strlen(inst[i].id) + 1);
+        h = notify_fnv1a(h, inst[i].host, strlen(inst[i].host) + 1);
+        h = notify_fnv1a(h, &inst[i].port, sizeof inst[i].port);
+        h = notify_fnv1a(h, inst[i].version, strlen(inst[i].version) + 1);
+    }
+    free(inst);
+    return h;
+}
+
+/* Sys.GetStatus.rev.slots: what Ota.GetStatus says about the slots (the sync, the other slot, pending verify). */
+static uint32_t slots_rev(void)
+{
+    slotsync_status_t s;
+    slotsync_get(&s);
+    const int32_t num[] = {(int32_t)s.state, s.pct, s.other_foreign, s.other_valid, s.flash_busy, webui_pending_verify()};
+    uint32_t h = notify_fnv1a(NOTIFY_FNV_SEED, num, sizeof num);
+    const char *const str[] = {s.running, s.other, s.other_project, s.other_version, s.other_date, s.other_time};
+    for (size_t i = 0; i < sizeof str / sizeof str[0]; i++) h = notify_fnv1a(h, str[i], strlen(str[i]) + 1);
+    return h;
+}
+
 /* Sys.GetStatus -> {name, uptime_s, mode, net, companion, dock, decks, deckLimit, decksIgnored, problems, message,
- * maintenance, firmware, c6, heap, lastReset}. deckLimit: this run's; decksIgnored: the decks attached over it
+ * maintenance, firmware, c6, heap, lastReset, rev}. rev: what an open page reads again when it changes: cfg, the
+ * settings saves since the start (any *.SetConfig, Companion.Choose, the settings PIN; 0 after a restart), found and
+ * slots, fingerprints of Companion.List and of Ota.GetStatus's slots. deckLimit: this run's; decksIgnored: the decks attached over it
  * (each one also in decks with ignored true, until it is unplugged). maintenance: the decks' maintenance screen is on demand. mode: this run's surface mode; dock: the Network Docks (docks_json); lastReset:
  * this start's reset reason with the last deliberate restart's, as one line (breadcrumb_summary:
  * "software restart: mode switch", "panic, last deliberate restart: mode switch pending"). */
@@ -549,6 +593,10 @@ static cJSON *m_sys_status(const cJSON *p, rpc_err_t *err)
     cJSON_AddNumberToObject(heap, "internal_free", (double)heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
     cJSON_AddNumberToObject(heap, "psram_free", (double)heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
     cJSON_AddStringToObject(r, "lastReset", breadcrumb_summary());
+    cJSON *rev = cJSON_AddObjectToObject(r, "rev");
+    cJSON_AddNumberToObject(rev, "cfg", (double)atomic_load(&s_cfg_rev));
+    cJSON_AddNumberToObject(rev, "found", (double)found_rev());
+    cJSON_AddNumberToObject(rev, "slots", (double)slots_rev());
     return r;
 }
 

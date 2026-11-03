@@ -156,10 +156,39 @@ static void test_key_ignores_self_changing_fields_only(void)
     cJSON_Delete(jc);
 }
 
+/* Sys.GetStatus.rev's fingerprints (the Companions found, the firmware slots): 32-bit FNV-1a, chained over the
+ * fields, so a part fed in pieces gives what the whole gives. */
+static void test_fnv1a(void)
+{
+    TEST_ASSERT_EQUAL_HEX32(0x811c9dc5u, NOTIFY_FNV_SEED);
+    TEST_ASSERT_EQUAL_HEX32(0x811c9dc5u, notify_fnv1a(NOTIFY_FNV_SEED, "", 0));
+    TEST_ASSERT_EQUAL_HEX32(0xe40c292cu, notify_fnv1a(NOTIFY_FNV_SEED, "a", 1));
+    TEST_ASSERT_EQUAL_HEX32(0xbf9cf968u, notify_fnv1a(NOTIFY_FNV_SEED, "foobar", 6));
+    TEST_ASSERT_EQUAL_HEX32(notify_fnv1a(NOTIFY_FNV_SEED, "foobar", 6), notify_fnv1a(notify_fnv1a(NOTIFY_FNV_SEED, "foo", 3), "bar", 3));
+    TEST_ASSERT_NOT_EQUAL(notify_fnv1a(NOTIFY_FNV_SEED, "ab", 2), notify_fnv1a(NOTIFY_FNV_SEED, "ba", 2));
+    TEST_ASSERT_EQUAL_HEX32(NOTIFY_FNV_SEED, notify_fnv1a(NOTIFY_FNV_SEED, NULL, 0));
+}
+
+/* rev is part of the comparison: a settings save (rev.cfg) alone pushes a status */
+static void test_key_keeps_rev(void)
+{
+    cJSON *a = cJSON_Parse("{\"name\":\"B\",\"uptime_s\":5,\"rev\":{\"cfg\":1,\"found\":7,\"slots\":9}}");
+    cJSON *b = cJSON_Parse("{\"name\":\"B\",\"uptime_s\":6,\"rev\":{\"cfg\":2,\"found\":7,\"slots\":9}}");
+    char *ka = notify_status_key(a), *kb = notify_status_key(b);
+    TEST_ASSERT_EQUAL_STRING("{\"name\":\"B\",\"rev\":{\"cfg\":1,\"found\":7,\"slots\":9}}", ka);
+    TEST_ASSERT_NOT_EQUAL(0, strcmp(ka, kb));
+    cJSON_free(ka);
+    cJSON_free(kb);
+    cJSON_Delete(a);
+    cJSON_Delete(b);
+}
+
 int main(void)
 {
     UNITY_BEGIN();
     RUN_TEST(test_key_and_frame_match_old);
     RUN_TEST(test_key_ignores_self_changing_fields_only);
+    RUN_TEST(test_fnv1a);
+    RUN_TEST(test_key_keeps_rev);
     return UNITY_END();
 }

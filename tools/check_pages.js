@@ -153,7 +153,7 @@ for (const file of files.filter((f) => path.basename(f) === 'index.html')) {
   need(/id:'modego',hidden:true\},btn\('',act\(\(\)=>switchMode\(radio\('smode'\)\)\)\)\)/.test(html) && html.includes('`Switch to ${v===\'dock\'?\'Network Dock\':\'Satellite\'} and restart…`'),
     'the mode cards have no "Switch to <mode> and restart…" button');
   need(/class:'btns sv'\},btn\('Save',act\(async\(\)=>\{const n=OK;await fn\(\);if\(OK>n\)r\._s=null\}\)/.test(html) && html.includes("'Unsaved changes'"), 'saveRow has no dirty state');
-  need(/r\.firstChild\.disabled=!r\._d;r\.lastChild\.hidden=!r\._d/.test(html) && /OK\+\+/.test(html), 'Save is not off until something changes');
+  need(/r\.firstChild\.disabled=!r\._d\|\|!!r\.firstChild\._busy;r\.lastChild\.hidden=!r\._d/.test(html) && /OK\+\+/.test(html), 'Save is not off until something changes (and while it saves)');
   need(/'Leave without saving\?'/.test(html) && /BACK=true;location\.hash=page/.test(html) && /addEventListener\('beforeunload',e=>\{if\(dirty\(\)\)/.test(html), 'no guard on leaving unsaved changes');
   need(/setAttribute\('aria-invalid','true'\);i\.setAttribute\('aria-describedby',id\+'-e'\);i\.focus\(\)/.test(html) && /removeAttribute\('aria-invalid'\)/.test(html), 'bad() does not mark, describe and focus the field');
   for (const id of ['chost', 'cport', 'dns', 'ssid', 'wpass', 'bssid', 'bpass', 'appass', 'bname', 'pwnew', 'pwold', 'msgtext', 'msgsec'])
@@ -472,6 +472,75 @@ async function smoke(file) {
         if (got !== exp) errs.push(`saveGesture, ${what}: ${got}, not ${exp}`);
       Object.assign(ctx, { document: docOrig, call: callOrig, bad: badOrig });
     }
+  }
+  // Live settings (R128): Sys.GetStatus.rev says what changed on the box since the page drew it: cfg counts the
+  // settings saved (here, in another browser, on a deck), found and slots fingerprint the Companions found and the
+  // firmware slots. The page reads again only what changed: a settings page its settings, drawn again panel by panel
+  // (plan: a panel drawn the same stays as it is, one drawn differently is swapped in, one holding edits stays and is
+  // marked "stale"; one changed and saved here is drawn fresh), the Companion page its list, the Firmware page its slots. Nothing is read again without a change,
+  // and no page polls these on a timer any more. The settings pages draw through show(), never fill(V(), ...), and bind
+  // no listener through $() after drawing (a panel kept from before would get it twice, a swapped one never).
+  {
+    const idx = fs.readFileSync(file, 'utf8');
+    const plan = vm.runInContext('typeof plan === "function" ? plan : null', ctx);
+    if (!plan) errs.push('R128: plan(old, now) is missing');
+    else for (const [o, n, want] of [
+      [[{ k: 'a' }, { k: 'b' }], [{ k: 'a' }, { k: 'b' }], ['keep', 'keep']],
+      [[{ k: 'a' }, { k: 'b', held: true }], [{ k: 'x' }, { k: 'y' }], ['swap', 'stale']],
+      [[{ k: 'a', held: true }], [{ k: 'a' }], ['keep']],
+      [[{ k: 'a', edited: true }], [{ k: 'a' }], ['swap']],   // saved here: drawn fresh (a typed password goes)
+      [[{ k: 'a', held: true, edited: true }], [{ k: 'a' }], ['keep']],
+      [[{ k: 'a' }], [{ k: 'a' }, { k: 'b' }], null],
+      [[], [], []]]) {
+      const got = plan(o, n);
+      if (JSON.stringify(got) !== JSON.stringify(want)) errs.push(`R128: plan(${JSON.stringify(o)}, ${JSON.stringify(n)}) gives ${JSON.stringify(got)}, not ${JSON.stringify(want)}`);
+    }
+    const revDiff = vm.runInContext('typeof revDiff === "function" ? revDiff : null', ctx);
+    if (!revDiff) errs.push('R128: revDiff(was, now) is missing');
+    else for (const [o, n, want] of [
+      [{ cfg: 1, found: 2, slots: 3 }, { cfg: 1, found: 2, slots: 3 }, []],
+      [{ cfg: 1, found: 2, slots: 3 }, { cfg: 2, found: 2, slots: 4 }, ['cfg', 'slots']],
+      [{ cfg: 1 }, { cfg: 1, found: 5 }, ['found']],
+      [null, { cfg: 1 }, []], [{ cfg: 1 }, undefined, []]]) {
+      const got = revDiff(o, n);
+      if (JSON.stringify(got) !== JSON.stringify(want)) errs.push(`R128: revDiff(${JSON.stringify(o)}, ${JSON.stringify(n)}) gives ${JSON.stringify(got)}, not ${JSON.stringify(want)}`);
+    }
+    if (!idx.includes('Unsaved changes. Also changed elsewhere: Save keeps yours.')) errs.push('R128: a panel kept with edits over a change elsewhere is not marked');
+    const reads = { companion: 'Companion.GetConfig', ethernet: 'Eth.GetConfig', wifi: 'Wifi.GetConfig', ap: 'Ap.GetConfig', device: 'Device.GetConfig', feedback: 'Feedback.GetConfig' };
+    for (const k of Object.keys(reads)) {
+      const src = vm.runInContext(`PAGES[${JSON.stringify(k)}].toString()`, ctx);
+      if (!/\bshow\(/.test(src) || /fill\(V\(\)/.test(src)) errs.push(`R128: the ${k} page does not draw through show()`);
+      if (/\$\('#[\w-]+'\)\.addEventListener/.test(src)) errs.push(`R128: the ${k} page binds a listener through $() after drawing`);
+    }
+    if (/setInterval\(async\(\)=>\{[^}]*Companion\.List/.test(idx)) errs.push('R128: the Companion page still polls Companion.List on a timer');
+    if (/setTimeout\(\(\)=>pollSlots/.test(idx)) errs.push('R128: the Firmware page still polls Ota.GetStatus on a timer');
+    const settle = async () => { for (let i = 0; i < 20; i++) await new Promise((r) => setImmediate(r)); };
+    const rpcR = ctx.rpc;
+    ctx.rpc = async (m, p) => (asked.add(m), rpcR(m, p));   // every call seen (the Ota.GetStatus stand-in above records none)
+    let up = 5000;
+    const status = (rev, extra) => Object.assign(base(), { uptime_s: up++, rev: Object.assign({ cfg: 1, found: 7, slots: 9 }, rev) }, extra);
+    const open = async (k, s) => { st = s; vm.runInContext('S={sys:null,at:0,key:""};INFO={};PG={}', ctx); ctx.onSys(st); ctx.location.hash = '#' + k; await vm.runInContext('go()', ctx); await settle(); };
+    const after = async (s) => { asked.clear(); st = s; ctx.onSys(st); await settle(); return new Set(asked); };
+    for (const [k, m] of Object.entries(reads)) {
+      await open(k, status({}));
+      let a = await after(status({}));
+      if (a.has(m)) errs.push(`R128: the ${k} page reads ${m} again with nothing changed on the box`);
+      a = await after(status({ cfg: 2 }));
+      if (!a.has(m)) errs.push(`R128: a settings change on the box (rev.cfg) does not make the ${k} page read ${m} again`);
+      if (!a.has('Device.GetInfo')) errs.push(`R128: a settings change on the box (rev.cfg) does not read Device.GetInfo again (the PIN, the sign-out button) on ${k}`);
+      a = await after(status({ cfg: 2, slots: 10 }));
+      if (a.has(m)) errs.push(`R128: the ${k} page reads ${m} again on a firmware slot change`);
+    }
+    await open('companion', status({}));
+    let a = await after(status({ found: 8 }));
+    if (!a.has('Companion.List') || a.has('Companion.GetConfig')) errs.push(`R128: a change in the Companions found (rev.found) reads ${[...a].join(', ') || 'nothing'}, not Companion.List alone`);
+    await open('firmware', status({}));
+    a = await after(status({ slots: 10 }));
+    if (!a.has('Ota.GetStatus')) errs.push('R128: a firmware slot change (rev.slots) does not make the Firmware page read Ota.GetStatus');
+    a = await after(status({ slots: 10 }));
+    if (a.has('Ota.GetStatus')) errs.push('R128: the Firmware page reads Ota.GetStatus again with nothing changed');
+    ctx.rpc = rpcR;
+    vm.runInContext('S={sys:null,at:0,key:""};INFO={};PG={};page="home"', ctx);
   }
   // the network signs after the Companion chip: Ethernet while linked, Wi-Fi and the hotspot always, in that
   // order, each a link to its page, its details in title and aria-label (the same), crossed grey (off) or red (not

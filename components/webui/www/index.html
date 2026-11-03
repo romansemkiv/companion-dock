@@ -283,7 +283,10 @@ function bad(id,m){const i=$('#'+id);if(!i){toast(m,true);return false}let e=$('
   e.textContent=m;i.setAttribute('aria-invalid','true');i.setAttribute('aria-describedby',id+'-e');i.focus();return false}
 /* Save rows: Save stays off until a field of its panel differs from what was loaded or last saved, "Unsaved changes" beside it */
 const fv=p=>[...p.querySelectorAll('input:not([type=file]),select,textarea')].map(e=>e.type==='radio'?e.checked?e.value:'':e.type==='checkbox'?e.checked:e.value).join('\n');
-function dirt(){for(const r of V().querySelectorAll('.sv')){const v=fv(r.closest('.panel'));if(r._s==null)r._s=v;r._d=v!==r._s;r.firstChild.disabled=!r._d;r.lastChild.hidden=!r._d}}
+/* r._x: the panel was kept over a change on the box (show()): 2 says so beside Save, 1 (it was saving) doesn't; once it is
+   clean again (saved, or put back) the page is drawn again */
+function dirt(){for(const r of V().querySelectorAll('.sv')){const v=fv(r.closest('.panel'));if(r._s==null)r._s=v;r._d=v!==r._s;r.firstChild.disabled=!r._d||!!r.firstChild._busy;r.lastChild.hidden=!r._d;
+  if(r._x&&!r._d){r._x=0;queue(PG,'cfg',redraw)}r.lastChild.textContent=r._x===2?'Unsaved changes. Also changed elsewhere: Save keeps yours.':'Unsaved changes'}}
 const dirty=()=>[...V().querySelectorAll('.sv')].some(r=>r._d);
 /* a few options as cards: opts [[value, title, description]]; radio(name) reads the choice */
 function choice(name,val,opts,label){return h('div',{class:'choice',role:'radiogroup','aria-label':label},opts.map(([v,t,d,n])=>{const i=h('input',{type:'radio',name,value:v});i.checked=v===val;
@@ -291,7 +294,7 @@ function choice(name,val,opts,label){return h('div',{class:'choice',role:'radiog
 const radio=name=>{const e=document.querySelector(`input[name="${name}"]:checked`);return e?e.value:''};
 const btn=(label,onclick,cls,icon,attrs)=>h('button',Object.assign({type:'button',class:cls||null,onclick},attrs),icon&&ic(icon,'sm'),label);
 /* a button that stays disabled while its action runs */
-const act=fn=>async e=>{const b=e.currentTarget;b.disabled=true;try{await fn()}catch(_){}finally{b.disabled=false;dirt();
+const act=fn=>async e=>{const b=e.currentTarget;b.disabled=true;b._busy=1;try{await fn()}catch(_){}finally{b._busy=0;b.disabled=false;dirt();
   if(b.isConnected&&document.activeElement===document.body&&!$('#app').inert)b.focus()}};   // a dialog closed while it was disabled
 const gv=id=>{const e=$('#'+id);return e.type==='checkbox'?e.checked:e.value};
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
@@ -434,11 +437,29 @@ function onSys(s){
   renderBrand();renderChips();
   if(changed&&LIVE[page])LIVE[page]();
   if(page==='device')renderMsg();
+  syncRev();
 }
 async function refreshStatus(){if(document.hidden||RS)return;try{onSys(await rpc('Sys.GetStatus'))}catch(_){renderChips()}}
-async function restarted(){try{await loadInfo()}catch(_){}renderChips();if(!editing())go();else if(LIVE[page])LIVE[page]()}
+async function restarted(){try{await loadInfo()}catch(_){}renderChips();
+  if(REV.cfg[page]&&PG.drawn){PG.rev={};if(LIVE[page])LIVE[page]();syncRev()}   // a settings page: read it all again (rev starts at 0 again), panel by panel
+  else if(!editing())go();else if(LIVE[page])LIVE[page]()}
 async function catchUp(){try{await loadInfo()}catch(_){}refreshStatus()}
 function editing(){const a=document.activeElement;return !!a&&V().contains(a)&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&!/^(checkbox|radio|button|submit|file)$/.test(a.type)}
+/* Sys.GetStatus.rev: what changed on the box since the page was drawn. cfg counts the settings saved (here, in another
+   browser, on a deck), found and slots fingerprint the Companions found and the firmware slots; the page reads again
+   only what changed, for the page shown (REV[part][page]), one read at a time per part. */
+const REVK=['cfg','found','slots'];
+const revDiff=(o,n)=>!o||!n?[]:REVK.filter(k=>o[k]!==n[k]);
+const REV={cfg:{},found:{companion:async pg=>{if((S.sys||{}).mode==='dock')return;const l=await rpc('Companion.List');
+  if(pg===PG&&JSON.stringify(l)!==JSON.stringify(pg.list)){pg.list=l;renderCList()}}},slots:{firmware:pg=>pollSlots(pg)}};
+for(const k of ['companion','ethernet','wifi','ap','device','feedback'])REV.cfg[k]=redraw;
+function syncRev(){const pg=PG,n=(S.sys||{}).rev;if(!pg.drawn)return;
+  for(const k of revDiff(pg.rev,n)){pg.rev[k]=n[k];if(k==='cfg')loadInfo().catch(()=>{});const f=REV[k][page];if(f)queue(pg,k,f)}}
+/* a change meanwhile reads once more after; a failed read is tried again at the next status */
+async function queue(pg,k,f){const q=pg.q||(pg.q={});if(q[k]){q[k]=2;return}
+  try{do{q[k]=1;await f(pg)}while(q[k]===2&&pg===PG)}catch(_){if(pg.rev)pg.rev[k]=null}finally{q[k]=0}}
+/* the page drawn again from the box's settings; show() keeps what is being edited */
+async function redraw(pg){if(pg!==PG||!pg.drawn)return;await PAGES[page](pg);if(pg===PG){if(LIVE[page])LIVE[page]();dirt()}}
 async function loadInfo(){INFO=await rpc('Device.GetInfo');$('#outbtn').hidden=!(INFO.auth_en&&TOK);$('#fwver').textContent='fw '+(INFO.version||'—');$('#devid').textContent=INFO.id||'';renderBrand()}
 function renderBrand(){const n=(S.sys&&S.sys.name)||INFO.name||'Companion Box';$('#devname').textContent=n;document.title=n+' · Companion Box'}
 
@@ -518,7 +539,8 @@ async function go(){
   const [i,t]=TITLES[page];fill($('#title'),ic(i,'lg'),t);
   clearInterval(PG.tick);clearTimeout(PG.timer);PG={};const pg=PG;   // the previous page's live state
   try{if(!S.sys)onSys(await rpc('Sys.GetStatus'));if(pg!==PG)return;
-    await PAGES[page](pg);if(pg===PG&&LIVE[page])LIVE[page]();dirt()}
+    pg.rev=Object.assign({},(S.sys||{}).rev);   // what the page is drawn from: a change from here on is read again (syncRev)
+    await PAGES[page](pg);if(pg===PG){if(LIVE[page])LIVE[page]();dirt();pg.drawn=1;syncRev()}}
   catch(e){if(pg===PG)fill(V(),panel('Error',[h('p',{class:'note'},'Could not load this page: '+errText(e)),btn('Retry',go,'ghost','arrow-clockwise')],null,'warning'))}
 }
 window.addEventListener('hashchange',go);
@@ -528,6 +550,24 @@ for(const ev of ['input','change'])V().addEventListener(ev,e=>{const t=e.target;
 /* ---------- pages ---------- */
 const saveRow=(fn,...more)=>{const r=h('div',{class:'btns sv'},btn('Save',act(async()=>{const n=OK;await fn();if(OK>n)r._s=null}),'','floppy-disk'),...more,
   h('span',{class:'unsaved',role:'status',hidden:true},'Unsaved changes'));return r};
+/* A settings page's panels into the view. Drawn again (redraw: settings changed on the box), each panel drawn differently
+   replaces the one shown, and so does one changed and saved here; one holding edits (unsaved changes, a field changed, the
+   focus in a text field) stays as the user left it, marked, until it is clean again (dirt). */
+const stamp=p=>{p._v=fv(p);p._k=p.outerHTML+'\n'+p._v};
+function held(p){const r=p.querySelector('.sv');return (r?!!r._d:fv(p)!==p._v)||(p.contains(document.activeElement)&&editing())}
+/* old: the panels shown {k: their drawing, held, edited: a field differs from the drawing}, now: as drawn again {k} ->
+   per panel 'keep', 'swap' or 'stale' (kept with its edits over a change); null when the panels differ in number */
+const plan=(old,now)=>old.length!==now.length?null:now.map((p,i)=>{const o=old[i];return o.held?(o.k===p.k?'keep':'stale'):o.k===p.k&&!o.edited?'keep':'swap'});
+/* the focus back on the swapped-in panel's twin of what had it: the same id, else the button with the same key */
+const refocus=(el,k)=>{const t=k[0]==='#'?el.querySelector(k):[...el.querySelectorAll('button')].find(b=>fkey(b)===k);if(t&&!t.disabled)t.focus({preventScroll:true})};
+function show(...kids){const v=V();
+  if(!PG.drawn){fill(v,...kids);v.querySelectorAll('.panel').forEach(stamp);return}
+  const box=add(h('div'),kids),now=[...box.querySelectorAll('.panel')],old=[...v.querySelectorAll('.panel')];now.forEach(stamp);
+  const pl=plan(old.map(p=>({k:p._k,held:held(p),edited:fv(p)!==p._v})),now.map(p=>({k:p._k})));
+  if(!pl){if(!old.some(held)){fill(v,...box.childNodes)}return}   // the page's panels changed in number: drawn anew unless something is held
+  pl.forEach((a,i)=>{const o=old[i];
+    if(a==='swap'){const f=document.activeElement,k=o.contains(f)&&(f.id?'#'+f.id:fkey(f));o.replaceWith(now[i]);if(k)refocus(now[i],k)}
+    else if(a==='stale'){const r=o.querySelector('.sv');if(r)r._x=[...r.querySelectorAll('button')].some(b=>b._busy)?1:2}})}
 /* the page is reached over this link: saving its settings may cut it off */
 const via=()=>{const s=S.sys||{},n=s.net||{},hn=location.hostname;return hn===AP_IP?'ap':n.ip&&hn===n.ip?n.route:'other'};
 
@@ -547,7 +587,7 @@ async companion(pg){
     h('div',{class:'btns',id:'modego',hidden:true},btn('',act(()=>switchMode(radio('smode'))))),h('div',{id:'modebn'})],null,'plug');
   conn_.addEventListener('change',()=>{const v=radio('smode');$('#modego').hidden=v===pg.cfg.mode;$('#modego button').textContent=`Switch to ${v==='dock'?'Network Dock':'Satellite'} and restart…`});
   if(dock){
-    fill(V(),conn_,panel('Network Docks',[h('p',{class:'note'},"Each deck has its own dock. Add each one in Companion once; Companion reconnects by itself after that, and the deck keeps its pages."),h('div',{id:'docks'})],h('span',{id:'dockpill'}),'keys'));
+    show(conn_,panel('Network Docks',[h('p',{class:'note'},"Each deck has its own dock. Add each one in Companion once; Companion reconnects by itself after that, and the deck keeps its pages."),h('div',{id:'docks'})],h('span',{id:'dockpill'}),'keys'));
   }else{
     const auto=cfg.companionAuto;
     const find=panel('Find Companion',[choice('cfind',auto?'auto':'manual',[['auto','Find automatically','Uses the Companion it finds on the network and keeps using it.'],['manual','Enter address','For Companion on another subnet.']],'How to find Companion'),
@@ -556,24 +596,24 @@ async companion(pg){
           fld('cport','Port',cfg.companionPort,'number',{class:'mono',min:1,max:65535}))),
         saveRow(saveComp)],null,'companion');
     find.addEventListener('change',e=>{if(e.target.name==='cfind'){const m=radio('cfind')==='manual';$('#comp-manual').hidden=!m;$('#comp-auto').hidden=m}});
-    fill(V(),conn_,h('div',{class:'grid'},find,panel('Status',h('div',{id:'cstat'}),null,'info')));
-    renderCList();
-    pg.tick=setInterval(async()=>{if(document.hidden)return;try{const l=await rpc('Companion.List');if(pg===PG&&JSON.stringify(l)!==JSON.stringify(pg.list)){pg.list=l;renderCList()}}catch(_){}},5000);
+    show(conn_,h('div',{class:'grid'},find,panel('Status',h('div',{id:'cstat'}),null,'info')));
+    renderCList();   // read again when the Companions found change (rev.found)
   }
 },
 async ethernet(pg){
   const c=await rpc('Eth.GetConfig');if(pg!==PG)return;pg.cfg=c;
   const ipf=(id,l,v,x)=>fld(id,l,v,'text',Object.assign({class:'mono',autocomplete:'off',spellcheck:'false',inputmode:'decimal',maxlength:15},x));
-  fill(V(),panel('Ethernet',[h('div',{id:'ethst',class:'kvw'}),chk('dhcp','Get address automatically (DHCP)',c.ethDhcp),
+  const p=panel('Ethernet',[h('div',{id:'ethst',class:'kvw'}),chk('dhcp','Get address automatically (DHCP)',c.ethDhcp),
     h('div',{id:'static',hidden:c.ethDhcp},ipf('ip','IP address',c.ethIp,{placeholder:'192.168.10.57'}),h('div',{class:'f2 eq'},ipf('mask','Subnet mask',c.ethMask||'255.255.255.0'),ipf('gw','Gateway',c.ethGw)),ipf('dns','DNS (optional)',c.ethDns)),
-    saveRow(saveEth)],h('span',{id:'ethpill'}),'network'));
-  $('#dhcp').addEventListener('change',e=>{$('#static').hidden=e.target.checked});
+    saveRow(saveEth)],h('span',{id:'ethpill'}),'network');
+  p.addEventListener('change',e=>{if(e.target.id==='dhcp')p.querySelector('#static').hidden=e.target.checked});
+  show(p);
 },
 async wifi(pg){
   const c=await rpc('Wifi.GetConfig');if(pg!==PG)return;pg.cfg=c;const off=c.wifiEnabled===false?'off':null;
   /* three cards: the state, the primary network, the backup network */
-  fill(V(),panel('Wi-Fi',[h('p',{class:'note'},'For places without a network cable. Power the box from its USB-C port.'),h('div',{id:'wfst',class:'kvw'}),
-    h('div',{class:'btns'},btn(off?'Turn Wi-Fi on':'Turn Wi-Fi off',act(()=>setWifiOn(!!off)),'ghost','wifi-high'),off&&h('span',{class:'note'},'Wi-Fi is off. The setup hotspot stays.'))],h('span',{id:'wfpill'}),'wifi-high'),
+  show(panel('Wi-Fi',[h('p',{class:'note'},'For places without a network cable. Power the box from its USB-C port.'),h('div',{id:'wfst',class:'kvw'}),
+    h('div',{class:'btns'},btn(off?'Turn Wi-Fi on':'Turn Wi-Fi off',act(()=>setWifiOn(!!off)),'ghost','wifi-high',{'data-k':'wifion'}),off&&h('span',{class:'note'},'Wi-Fi is off. The setup hotspot stays.'))],h('span',{id:'wfpill'}),'wifi-high'),
   panel('Primary network',h('div',{class:off},h('div',{id:'wmst',class:'kvw'}),
     fld('ssid','Network name',c.wifiSsid,'text',{autocomplete:'off',spellcheck:'false',maxlength:32,placeholder:'Studio Wi-Fi'}),
     h('div',{class:'btns',style:'margin:-4px 0 14px'},btn('Scan for networks',act(scanWifi),'ghost','wifi-high')),h('div',{id:'wfscan'}),
@@ -587,12 +627,12 @@ async wifi(pg){
 },
 async ap(pg){
   const c=await rpc('Ap.GetConfig');if(pg!==PG)return;pg.cfg=c;
-  fill(V(),panel('Setup hotspot',[chk('apon','Keep the hotspot on',c.apEnabled),h('div',{id:'apst',class:'kvw'}),
+  const p=panel('Setup hotspot',[chk('apon','Keep the hotspot on',c.apEnabled),h('div',{id:'apst',class:'kvw'}),
     chk('apsec','Hotspot password',c.apSecured),
     h('div',{id:'appw',hidden:!c.apSecured},pfld('appass','Password (8-63 characters)',c.apPass,{class:'mono',autocomplete:'off'})),
-    h('p',{class:'note',id:'apnote'}),saveRow(saveAp)],h('span',{id:'appill'}),'broadcast'));
-  $('#apon').addEventListener('change',()=>LIVE.ap());
-  $('#apsec').addEventListener('change',e=>{$('#appw').hidden=!e.target.checked;LIVE.ap()});
+    h('p',{class:'note',id:'apnote'}),saveRow(saveAp)],h('span',{id:'appill'}),'broadcast');
+  p.addEventListener('change',e=>{const t=e.target;if(t.id==='apsec')p.querySelector('#appw').hidden=!t.checked;if(t.id==='apon'||t.id==='apsec')LIVE.ap()});
+  show(p);
 },
 async firmware(pg){
   const o=await rpc('Ota.GetStatus');if(pg!==PG)return;pg.ota=o;
@@ -604,7 +644,7 @@ async firmware(pg){
     h('div',{class:'btns'},go_,btn('Restart',act(restartBox),'ghost','arrow-clockwise')),
     h('p',{class:'note',style:'margin:12px 0 0'},"If the new firmware doesn't start properly, the box goes back to the previous one by itself.")],null,'cloud-arrow-down'),
     panel('Firmware slots',h('div',{id:'slots'}),null,'floppy-disk'));
-  renderSlots();pg.timer=setTimeout(()=>pollSlots(pg),5000);
+  renderSlots();   // read again when the slots change (rev.slots)
 },
 async device(pg){
   const [c,a]=await Promise.all([rpc('Device.GetConfig'),rpc('Auth.GetStatus')]);if(pg!==PG)return;pg.cfg=c;pg.auth=a;
@@ -613,7 +653,7 @@ async device(pg){
   const rst=h('div',{class:'bn bad',id:'rstc',hidden:true,style:'margin:14px 0 0'},ic('warning'),h('span',null,'Reset the box to default settings?'),
     btn('Reset now',act(factoryReset),'danger'),btn('Cancel',()=>{rst.hidden=true},'ghost'));
   const last=(S.sys||{}).lastReset||INFO.lastReset;   // Uptime (moved from Home), kept live by onSys
-  fill(V(),h('div',{class:'grid'},panel('Status',h('dl',{class:'kv'},h('dt',null,'Running for'),h('dd',{id:'uptime'},fmtUp((S.sys||{}).uptime_s)),
+  show(h('div',{class:'grid'},panel('Status',h('dl',{class:'kv'},h('dt',null,'Running for'),h('dd',{id:'uptime'},fmtUp((S.sys||{}).uptime_s)),
       last&&[h('dt',null,'Last start'),h('dd',null,last)]),null,'circuitry'),
     panel('Find my box',[h('p',{class:'note'},'The box beeps for 3 seconds and its status light blinks white for 30 seconds, whatever the Speaker & LED settings say.'),
       h('div',{class:'btns'},btn('Find my box',act(findBox),'','speaker'))],null,'speaker'),
@@ -641,7 +681,7 @@ async device(pg){
       a.auth_en?pill('ok',a.pin?'PIN on':'Password on'):pill('','No PIN'),'key')),
     panel('Factory reset',[h('p',{class:'note'},'All settings go back to defaults, including Wi-Fi and the hotspot, which gets a new random password (shown on the decks). Decks keep their pages in Companion. Holding the service button (GPIO32) for 10 seconds does the same.'),
       h('div',{class:'btns'},btn('Factory reset',()=>{rst.hidden=false},'danger','trash')),rst],null,'trash'));
-  renderMsg();pg.tick=setInterval(renderMsg,1000);
+  renderMsg();clearInterval(pg.tick);pg.tick=setInterval(renderMsg,1000);
 },
 async feedback(pg){
   const c=await rpc('Feedback.GetConfig');if(pg!==PG)return;pg.cfg=c;
@@ -650,7 +690,7 @@ async feedback(pg){
   const row=(id,label,on,...evs)=>h('div',{class:'snd'},chk(id,label,on),evs.map(([e,t])=>btn(t||'',act(()=>testSound(e)),t?'ghost':'ghost icon','play',{title:'Play','aria-label':'Play: '+(t?label+', '+t:label)})));
   const pins=(c.ledPins||[]).includes(c.ledPin)?c.ledPins:[c.ledPin,...(c.ledPins||[])];
   const sel=h('select',{id:'ledpin'},pins.map(p=>h('option',{value:p},'GPIO'+p)));sel.value=String(c.ledPin);
-  fill(V(),h('div',{class:'grid'},
+  show(h('div',{class:'grid'},
     panel('Speaker',[chk('spkon','Speaker on',c.speakerEnabled),pct(range('spkvol',c.speakerVolume,0),'Volume'),
       row('sready','Ready, after a start',c.soundReady,['ready']),
       row('sconn','Companion connected',c.soundConnected,['connected']),
@@ -862,37 +902,35 @@ async function scanWifi(who='main'){
   catch(e){st={error:errText(e)}}
   if(pg===PG)fill($('#'+out),scanView(st,who))}
 const NAME32='At most 32 bytes (accented letters and symbols count 2-4)',PASS863='8-63 characters';
-const redrawWifi=pg=>PAGES.wifi(pg).then(()=>{if(pg===PG){LIVE.wifi();dirt()}}).catch(()=>{});
 async function saveWifi(){
-  const pg=PG,ssid=gv('ssid').trim(),pass=gv('wpass'),p={wifiSsid:ssid};
+  const ssid=gv('ssid').trim(),pass=gv('wpass'),p={wifiSsid:ssid};
   if(bytes(ssid)>32)return bad('ssid',NAME32);
   if(pass){if(pass.length<8||bytes(pass)>63)return bad('wpass',PASS863);p.wifiPass=pass}
   if(via()==='wifi'&&!await confirmAction({title:'Change the Wi-Fi network?',body:P('This page reaches the box over Wi-Fi, so it may lose the connection.'),ok:'Save'}))return;
-  await call('Wifi.SetConfig',p,ssid?'Saved. The box joins this network now.':'Saved. Wi-Fi is off.');redrawWifi(pg);
+  await call('Wifi.SetConfig',p,ssid?'Saved. The box joins this network now.':'Saved. Wi-Fi is off.');refreshStatus();
 }
 /* the station on or off, a button of its own (a switch never acts by itself); the hotspot keeps its own settings */
 async function setWifiOn(on){
-  const pg=PG;
   if(!on&&via()==='wifi'&&!await confirmAction({title:'Turn Wi-Fi off?',body:P('This page reaches the box over Wi-Fi: it loses the connection. The setup hotspot stays.'),ok:'Turn off'}))return;
   try{await call('Wifi.SetConfig',{wifiEnabled:on},on?'Wi-Fi on: the box joins the primary network.':'Wi-Fi off. The setup hotspot stays.')}catch(_){}
-  redrawWifi(pg);
+  refreshStatus();
 }
 /* the backup pair: the name empty means no backup; a missing password keeps the saved one */
 async function saveWifiBackup(){
-  const pg=PG,ssid=gv('bssid').trim(),pass=gv('bpass'),p={wifiBackupSsid:ssid};
+  const ssid=gv('bssid').trim(),pass=gv('bpass'),p={wifiBackupSsid:ssid};
   if(bytes(ssid)>32)return bad('bssid',NAME32);
   if(pass){if(pass.length<8||bytes(pass)>63)return bad('bpass',PASS863);p.wifiBackupPass=pass}
   if(via()==='wifi'&&!await confirmAction({title:'Change the backup network?',body:P('This page reaches the box over Wi-Fi, so it may lose the connection.'),ok:'Save'}))return;
-  await call('Wifi.SetConfig',p,ssid?'Saved. The box uses it when the primary network is out of reach.':'Saved. No backup network.');redrawWifi(pg);
+  await call('Wifi.SetConfig',p,ssid?'Saved. The box uses it when the primary network is out of reach.':'Saved. No backup network.');refreshStatus();
 }
 /* join that network now; it stays the one in use while it works */
 /* shown for the network not in use, kept up to date by LIVE.wifi (the status arrives later, and changes) */
 const useBtn=(net,set)=>set&&btn('Use this network',act(async()=>{
   if(await confirmAction({title:'Use this network now?',body:P('Wi-Fi drops for a moment while the box switches.'),ok:'Use it'}))await call('Wifi.Use',{net},'Switching.')}),'ghost','wifi-high',{id:'use-'+net,hidden:((S.sys||{}).net||{}).sta_net===net});
 async function forgetWifiPass(who='main'){
-  const pg=PG,bk=who==='backup';
+  const bk=who==='backup';
   if(!await confirmAction({title:bk?'Forget the backup password?':'Forget the Wi-Fi password?',body:P('The box then joins the network without a password, as an open network.'),ok:'Forget it'}))return;
-  await call('Wifi.SetConfig',bk?{wifiBackupPass:''}:{wifiPass:''},'Password forgotten.');redrawWifi(pg);
+  await call('Wifi.SetConfig',bk?{wifiBackupPass:''}:{wifiPass:''},'Password forgotten.');refreshStatus();
 }
 /* the hotspot: a password unless it is switched off; saved settings in, one line out */
 const apPassInfo=c=>c.apSecured?'On (WPA2)':'Open, no password';
@@ -942,13 +980,12 @@ function slotsView(o){const y=o.sync||{},x=y.other||{},fw=(S.sys||{}).firmware||
 function renderSlots(){const e=$('#slots'),o=PG.ota;if(!e||!o)return;const fw=(S.sys||{}).firmware||{};   // all slotsView reads
   const k=JSON.stringify([o.sync,o.running,o.version,o.pending_verify,fw.build,fw.project,INFO.version]);
   if(k!==PG.sk){PG.sk=k;fill(e,slotsView(o))}}
-async function pollSlots(pg){clearTimeout(pg.timer);const n=pg.ps=(pg.ps||0)+1;
-  if(!document.hidden)try{const o=await rpc('Ota.GetStatus');if(pg!==PG||n!==pg.ps)return;pg.ota=o;renderSlots()}catch(_){}
-  if(pg===PG&&n===pg.ps)pg.timer=setTimeout(()=>pollSlots(pg),((pg.ota||{}).sync||{}).state==='syncing'?1500:5000)}
+/* the slots read again: when they change on the box (rev.slots, the copy's progress too), after Sync now */
+async function pollSlots(pg){const n=pg.ps=(pg.ps||0)+1;const o=await rpc('Ota.GetStatus');if(pg===PG&&n===pg.ps){pg.ota=o;renderSlots()}}
 async function syncNow(){const y=(PG.ota||{}).sync||{},x=y.other||{},force=y.state==='other_newer';
   if(force&&!await confirmAction({title:'Replace the newer firmware?',kind:'danger',ok:'Replace it',body:[
     P(B(x.label),` holds ${x.version||'a firmware'}, built ${x.date} ${x.time}: newer than the running one.`),P('Sync overwrites it with a copy of the running firmware.')]}))return;
-  await call('Ota.Sync',force?{force}:{},'Sync started.');pollSlots(PG)}
+  await call('Ota.Sync',force?{force}:{},'Sync started.');pollSlots(PG).catch(()=>{})}
 async function bootOther(){const x=((PG.ota||{}).sync||{}).other||{};
   if(await confirmAction({title:'Boot the other slot?',icon:'play',ok:'Boot and restart',body:[P('The box restarts into ',B(x.label),` (${x.version||'?'}), a few seconds offline.`),
     P("It checks itself like an update: if it doesn't start properly, the box goes back to this firmware.")]}))
@@ -998,7 +1035,8 @@ async function saveDevice(){
   if(pw){const p={pass:pw};if(a.auth_en)p.old_pass=old;
     let keep=false;try{keep=!!localStorage.getItem('tok')}catch(_){}   // "keep me signed in" stays as it was
     const r=await call('Device.SetAuth',p);setTok(r.token,keep);wsSignIn();INFO.auth_en=true;$('#outbtn').hidden=false;
-    toast(a.auth_en?'Saved. The PIN is changed; other browsers sign in again.':'Saved. The settings PIN is on.');if(pg===PG)go();return}
+    for(const i of ['pwold','pwnew','pwrep']){const e=$('#'+i);if(e)e.value=''}   // the panel drawn again once the box says (rev.cfg)
+    toast(a.auth_en?'Saved. The PIN is changed; other browsers sign in again.':'Saved. The settings PIN is on.');refreshStatus();return}
   if(!did){for(const i of ['pwold','pwnew','pwrep']){const e=$('#'+i);if(e)e.value=''}OK++}   // nothing to save leaves it clean (no #pwold without a PIN)
   toast(did?'Saved.':'Nothing to save.');
 }
@@ -1009,7 +1047,9 @@ async function saveGesture(){const a=+gv('gk1'),b=+gv('gk2');if(a===b)return bad
 async function removePass(){
   const pg=PG,old=gv('pwold'),w=(pg.auth||{}).pin?'PIN':'password';if(!old)return bad('pwold',`Enter the current ${w} first`);
   if(!await confirmAction({title:`Remove the settings ${w}?`,body:P('Anyone on the network can then open this page and change the settings.'),ok:'Remove it'}))return;
-  await call('Device.SetAuth',{pass:null,old_pass:old},w==='PIN'?'PIN removed.':'Password removed.');setTok('');INFO.auth_en=false;$('#outbtn').hidden=true;if(pg===PG)go();
+  await call('Device.SetAuth',{pass:null,old_pass:old},w==='PIN'?'PIN removed.':'Password removed.');setTok('');INFO.auth_en=false;$('#outbtn').hidden=true;
+  const o=pg===PG&&$('#pwold');if(o){o.value='';const r=o.closest('.panel').querySelector('.sv');if(r)r._s=null}   // clean: drawn again without the PIN
+  refreshStatus();
 }
 function renderMsg(){const el=$('#msgst');if(!el)return;const m=(S.sys||{}).message||{};
   if(!m.active){el.textContent='No message on the decks.';return}
@@ -1084,7 +1124,7 @@ async function pollLog(pg){
     if(pre&&r.text){const atEnd=pre.scrollTop+pre.clientHeight>=pre.scrollHeight-20;
       pre.textContent+=r.text.replace(/\x1b\[[0-9;]*m/g,'');if(pre.textContent.length>200000)pre.textContent=pre.textContent.slice(-150000);
       if(atEnd)pre.scrollTop=pre.scrollHeight}}catch(_){}
-  pg.timer=setTimeout(()=>pollLog(pg),2000);
+  pg.timer=setTimeout(()=>pollLog(pg),1000);
 }
 
 /* ---------- start ---------- */
