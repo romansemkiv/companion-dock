@@ -1,0 +1,1097 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark light">
+<title>Companion Box</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='6' fill='%234cc2ff'/%3E%3Cg fill='%2304131c'%3E%3Ccircle cx='6' cy='6' r='2.4'/%3E%3Ccircle cx='12' cy='6' r='2.4'/%3E%3Ccircle cx='18' cy='6' r='2.4'/%3E%3Ccircle cx='6' cy='12' r='2.4'/%3E%3Ccircle cx='12' cy='12' r='2.4'/%3E%3Ccircle cx='18' cy='12' r='2.4'/%3E%3Ccircle cx='6' cy='18' r='2.4'/%3E%3Ccircle cx='12' cy='18' r='2.4'/%3E%3Ccircle cx='18' cy='18' r='2.4'/%3E%3C/g%3E%3C/svg%3E">
+<style>
+/* Tokens, shell and components (dark first, light under
+   prefers-color-scheme or data-theme=light). */
+:root{
+  --bg:#0b0e12;--panel:#11161c;--panel2:#161d25;--line:#1e2731;--line2:#2b3644;
+  --fg:#e6edf3;--mut:#8b98a8;--dim:#7a8796;--field-line:#617086;
+  --acc:#4cc2ff;--acc-ink:#04131c;--acc-soft:rgba(76,194,255,.12);
+  --ok:#3ddc84;--ok-soft:rgba(61,220,132,.13);--warn:#f5b942;--warn-soft:rgba(245,185,66,.14);--bad:#ff5d6c;--bad-soft:rgba(255,93,108,.13);--bad-ink:#1a0306;
+  --shadow:0 1px 0 rgba(255,255,255,.03) inset,0 8px 24px rgba(0,0,0,.25);
+  --mono:ui-monospace,SFMono-Regular,"Cascadia Mono","JetBrains Mono",Menlo,Consolas,monospace;
+  --sans:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",sans-serif;
+  color-scheme:dark;
+  --bar-h:60px;
+}
+@media (prefers-color-scheme:light){:root:not([data-theme=dark]){
+  --bg:#f3f5f8;--panel:#fff;--panel2:#f6f8fb;--line:#e3e8ee;--line2:#d3dae3;--fg:#0f1720;--mut:#5b6878;--dim:#647080;--field-line:#7a8594;--knob-ring:#7a8594;
+  --acc:#0067b0;--acc-ink:#fff;--acc-soft:rgba(10,132,214,.09);--ok:#0a7340;--ok-soft:rgba(19,154,85,.1);--warn:#8a5a00;--warn-soft:rgba(183,121,31,.1);
+  --bad:#b3202f;--bad-soft:rgba(214,52,71,.09);--bad-ink:#fff;--shadow:0 1px 2px rgba(15,23,32,.04),0 6px 18px rgba(15,23,32,.05);color-scheme:light}}
+:root[data-theme=light]{
+  --bg:#f3f5f8;--panel:#fff;--panel2:#f6f8fb;--line:#e3e8ee;--line2:#d3dae3;--fg:#0f1720;--mut:#5b6878;--dim:#647080;--field-line:#7a8594;--knob-ring:#7a8594;
+  --acc:#0067b0;--acc-ink:#fff;--acc-soft:rgba(10,132,214,.09);--ok:#0a7340;--ok-soft:rgba(19,154,85,.1);--warn:#8a5a00;--warn-soft:rgba(183,121,31,.1);
+  --bad:#b3202f;--bad-soft:rgba(214,52,71,.09);--bad-ink:#fff;--shadow:0 1px 2px rgba(15,23,32,.04),0 6px 18px rgba(15,23,32,.05);color-scheme:light}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0;background:var(--bg);color:var(--fg)}
+body{font:14px/1.5 var(--sans);-webkit-font-smoothing:antialiased}
+a{color:var(--acc);text-decoration:none}a:hover{text-decoration:underline}
+code,.mono{font-family:var(--mono);font-size:.92em;font-variant-numeric:tabular-nums}
+.dim{color:var(--dim)}.off{opacity:.5}
+.ic{width:18px;height:18px;flex:none;fill:currentColor;vertical-align:middle}
+.ic.sm{width:15px;height:15px}.ic.lg{width:22px;height:22px}
+
+/* shell */
+#app{display:grid;grid-template-columns:240px minmax(0,1fr);min-height:100vh;min-height:100dvh}
+#side{position:sticky;top:0;height:100vh;height:100dvh;overflow:auto;background:var(--panel);border-right:1px solid var(--line);display:flex;flex-direction:column}
+.brand{display:flex;gap:10px;align-items:center;padding:18px 16px 14px}
+.logo{width:34px;height:34px;border-radius:9px;display:grid;place-items:center;background:var(--acc-soft);color:var(--acc);border:1px solid var(--line2);flex:none}
+.brand b{display:block;font-size:14px;letter-spacing:.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:160px}
+.brand small{display:block;font:11px var(--mono);color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:160px}
+nav{padding:4px 10px 12px;flex:1}
+nav .grp{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.09em;color:var(--dim);margin:16px 8px 6px}
+nav a{display:flex;gap:10px;align-items:center;padding:7px 10px;margin:1px 0;border-radius:8px;color:var(--mut);font-weight:500}
+nav a:hover{background:var(--panel2);color:var(--fg);text-decoration:none}
+nav a.on{background:var(--acc-soft);color:var(--acc)}
+.side-foot{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:12px 16px;border-top:1px solid var(--line);font:11px var(--mono);color:var(--dim)}
+.side-foot span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+main{min-width:0;display:flex;flex-direction:column}
+header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;display:flex;align-items:center;gap:14px;min-height:var(--bar-h);padding:8px 28px;background:color-mix(in srgb,var(--bg) 86%,transparent);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+header.top h1{margin:0;font-size:17px;font-weight:600;display:flex;gap:10px;align-items:center;letter-spacing:-.005em;white-space:nowrap}
+.chips{margin-left:auto;display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.chip{display:inline-flex;align-items:center;gap:6px;height:26px;padding:0 10px;border-radius:999px;border:1px solid var(--line);background:var(--panel);font:11.5px var(--mono);color:var(--mut)}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--dim);flex:none}
+/* the network signs; the route's at full ink with an accent edge; crossed: one shared slash, grey or red */
+.sg{position:relative;color:var(--mut)}.sg:hover{text-decoration:none;border-color:var(--line2)}.sg.rt{color:var(--fg);border-color:var(--acc)}
+.sg.x .ic{color:var(--dim)}.sg.x:before{content:'';position:absolute;left:8px;top:12px;width:19px;height:2px;background:var(--dim);box-shadow:0 0 0 1.5px var(--panel);transform:rotate(-45deg)}.sg.bad:before{background:var(--bad)}
+.dot.acc{background:var(--acc);box-shadow:0 0 0 3px var(--acc-soft)}.dot.ok{background:var(--ok);box-shadow:0 0 0 3px var(--ok-soft)}.dot.warn{background:var(--warn);box-shadow:0 0 0 3px var(--warn-soft)}.dot.bad{background:var(--bad);box-shadow:0 0 0 3px var(--bad-soft)}
+#menu{display:none}
+#scrim{display:none}
+.wrap{padding:24px 28px 48px;max-width:1240px;width:100%}
+#view,.wrap,.panel,.pb{min-width:0}
+.spin{width:18px;height:18px;border-radius:50%;border:2px solid var(--line2);border-top-color:currentColor;animation:spin .8s linear infinite;flex:none}
+@keyframes spin{to{transform:rotate(360deg)}}
+.scanst{display:flex;align-items:center;gap:10px;color:var(--mut);font-size:13px;margin:0 0 14px;overflow-wrap:anywhere}
+.nets{list-style:none;margin:0 0 14px;padding:0;display:grid;gap:6px;max-height:300px;overflow:auto}
+.net{width:100%;height:auto;min-height:38px;padding:7px 12px;justify-content:flex-start;gap:10px;text-align:left;background:var(--panel);color:var(--fg);border-color:var(--line);font-weight:500}
+.net:hover,.net:focus-visible{background:var(--acc-soft);border-color:var(--acc);filter:none}
+.net .nm{flex:1;min-width:0;white-space:normal;overflow-wrap:anywhere}
+.net small{color:var(--mut);font:11.5px var(--mono)}
+.bars{display:inline-flex;align-items:flex-end;gap:2px;height:14px;flex:none}
+.bars i{width:3px;border-radius:1px;background:var(--line2)}
+.bars i:nth-child(1){height:4px}.bars i:nth-child(2){height:7px}.bars i:nth-child(3){height:10px}.bars i:nth-child(4){height:14px}
+.bars.b1 i:nth-child(-n+1),.bars.b2 i:nth-child(-n+2),.bars.b3 i:nth-child(-n+3),.bars.b4 i{background:var(--acc)}
+
+/* panels */
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);margin-bottom:16px}
+.panel>.ph{display:flex;align-items:center;flex-wrap:wrap;gap:6px 10px;min-height:48px;padding:6px 16px;border-bottom:1px solid var(--line)}
+.panel>.ph h2{margin:0;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.09em;color:var(--mut);display:flex;align-items:center;gap:8px}
+.panel>.ph .act{margin-left:auto;display:flex;flex-wrap:wrap;justify-content:flex-end;gap:8px;align-items:center;min-width:0}
+.panel>.pb{padding:16px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:16px;margin-bottom:16px}
+.grid>.panel{margin-bottom:0}
+.note{color:var(--mut);font-size:13px;margin:0 0 12px}
+.note code{color:var(--fg)}
+/* Home: the signal chain Network → Companion → Decks, a chevron on each divider; stacked on a phone */
+.chain{display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}
+.hop{position:relative;min-width:0;padding:14px 16px;display:flex;flex-direction:column;align-items:flex-start;gap:4px}
+.hop+.hop{border-left:1px solid var(--line)}
+.hop+.hop:before{content:"";position:absolute;left:-6px;top:50%;width:9px;height:9px;margin-top:-5px;border:solid var(--line2);border-width:1.5px 1.5px 0 0;background:var(--panel);transform:rotate(45deg)}
+.hop .lbl{display:flex;align-items:center;gap:8px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.09em;color:var(--mut)}
+.hop .val{font:600 16px/1.25 var(--mono);margin-top:4px;display:flex;align-items:center;gap:9px}
+.hop .sub{font-size:12px;color:var(--dim);font-family:var(--mono);overflow-wrap:anywhere;max-width:100%}
+.hop button{margin-top:8px}
+.ready{display:flex;align-items:center;flex-wrap:wrap;gap:6px 12px;margin-bottom:16px;padding:14px 16px;border:1px solid var(--line);border-radius:12px;background:var(--panel);box-shadow:var(--shadow)}
+.ready b{font-size:17px;font-weight:600}.ready span{color:var(--mut);font-size:13.5px}.ready .dot{width:9px;height:9px}
+.probs{border-top:1px solid var(--line);padding:10px 16px;font-size:13px}.probs summary{cursor:pointer;color:var(--mut)}.probs .plist{margin-top:10px}
+.ferr{display:block;color:var(--bad);font-size:12.5px;margin-top:5px}[aria-invalid=true],[aria-invalid=true]:focus{border-color:var(--bad)}.unsaved{color:var(--warn);font-size:12.5px}
+.pb h3{margin:0 0 6px;font-size:13.5px;font-weight:600}.pb .sep{border-top:1px solid var(--line);margin:18px -16px 16px}
+.bn.setup,.bn.bw{flex-wrap:wrap}.bn.setup>span,.bn.bw>span{flex:1 1 220px}.bn.setup b{display:block;font-size:15px;margin-bottom:2px}
+.kv{display:grid;grid-template-columns:max-content 1fr;gap:8px 18px;font-size:13.5px;margin:0}.kv:not(:last-child){margin-bottom:12px}
+.kvw:not(:empty){margin-bottom:14px}
+.kv dt{color:var(--mut)}.kv dd{margin:0;font-family:var(--mono);font-size:13px;overflow-wrap:anywhere;display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-width:0}
+
+/* forms */
+label.f{display:block;margin:0 0 12px}
+label.f>span{display:block;font-size:12px;color:var(--mut);margin-bottom:5px;font-weight:500}
+input,select,textarea{width:100%;height:36px;padding:0 11px;border:1px solid var(--field-line);border-radius:8px;background:var(--panel2);color:var(--fg);font:13.5px var(--sans);transition:border-color .15s,box-shadow .15s}
+input[type=number],input.mono{font-family:var(--mono)}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--acc);box-shadow:0 0 0 3px var(--acc-soft)}
+textarea{height:auto;min-height:84px;padding:9px 11px;resize:vertical;line-height:1.5}
+input[type=file]{height:auto;padding:8px}
+input[type=file]::file-selector-button{height:28px;margin-right:10px;padding:0 10px;border:1px solid var(--field-line);border-radius:6px;background:transparent;color:var(--fg);font:600 12.5px var(--sans);cursor:pointer}
+.sw{display:flex;align-items:center;gap:10px;margin:2px 0 14px;cursor:pointer;user-select:none;font-size:13.5px}
+.sw input{appearance:none;width:36px;height:20px;border-radius:999px;background:var(--field-line);position:relative;flex:none;border:0;padding:0;margin:0;cursor:pointer;transition:background .15s}
+.sw input:after{content:"";position:absolute;top:3px;left:3px;width:14px;height:14px;border-radius:50%;background:#fff;box-shadow:0 0 0 1px var(--knob-ring,transparent);transition:transform .15s}
+.sw input:checked{background:var(--acc)}.sw input:checked:after{transform:translateX(16px)}
+.sw input:focus-visible,input[type=range]:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+.choice{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px;margin:0 0 14px}
+.choice label{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border:1px solid var(--field-line);border-radius:10px;cursor:pointer;background:var(--panel)}
+.choice label:has(input:checked){border-color:var(--acc);background:var(--acc-soft)}
+.choice input{width:16px;height:16px;padding:0;margin:2px 0 0;border:0;box-shadow:none;accent-color:var(--acc);flex:none}
+.choice input:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+.choice span{min-width:0;overflow-wrap:anywhere}
+.choice b{display:block;font-size:13.5px;font-weight:600}.choice small{display:block;color:var(--mut);font-size:12px;margin-top:2px}
+.btns{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:4px}
+button{display:inline-flex;align-items:center;gap:7px;height:34px;padding:0 14px;border-radius:8px;border:1px solid transparent;background:var(--acc);color:var(--acc-ink);font:600 13px var(--sans);cursor:pointer;white-space:nowrap;transition:filter .15s,background .15s}
+button:hover{filter:brightness(1.08)}
+button:focus-visible,a:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+button.ghost{background:transparent;color:var(--fg);border-color:var(--field-line)}button.ghost:hover{background:var(--panel2);filter:none}
+button.danger{background:var(--bad);color:var(--bad-ink)}
+button.icon{width:34px;padding:0;justify-content:center}button.sm{height:28px;padding:0 10px;font-size:12.5px}
+button.wr{white-space:normal;height:auto;min-height:34px;padding-top:6px;padding-bottom:6px;text-align:left}
+button:disabled{opacity:.5;cursor:default}
+.inline{display:flex;gap:8px;align-items:center}.inline>input{flex:1;min-width:0}
+.f2{display:grid;grid-template-columns:1fr 110px;gap:12px}
+.f2.eq{grid-template-columns:1fr 1fr}
+.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,180px),1fr));gap:0 12px}
+input[type=range]{height:24px;padding:0;border:0;background:none;box-shadow:none;accent-color:var(--acc)}
+.snd{display:flex;align-items:center;gap:8px;margin:0 0 8px}.snd .sw{flex:1;margin:0;min-width:0}
+
+/* pills, tables, lists */
+.pill{display:inline-flex;align-items:center;gap:6px;height:22px;white-space:nowrap;padding:0 9px;border-radius:999px;font:600 11px var(--sans);letter-spacing:.02em;background:var(--panel2);color:var(--mut);border:1px solid var(--line)}
+.pill.ok{background:var(--ok-soft);color:var(--ok);border-color:transparent}.pill.warn{background:var(--warn-soft);color:var(--warn);border-color:transparent}.pill.bad{background:var(--bad-soft);color:var(--bad);border-color:transparent}.pill.acc{background:var(--acc-soft);color:var(--acc);border-color:transparent}
+.scroll{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--dim);padding:0 10px 8px;white-space:nowrap}
+td{padding:9px 10px;border-top:1px solid var(--line);vertical-align:middle;white-space:nowrap}
+tr:hover td{background:var(--panel2)}
+td.mono{font-family:var(--mono);font-size:12.5px}
+td.empty{color:var(--mut);text-align:center;padding:18px;white-space:normal}
+/* on a phone: the decks are a stacked row each, the model and its In Companion pill, then serial · fw · USB;
+   the signal chain's links go one under the other (step 8) */
+.dsub,.dm .pill{display:none}.mtc{display:inline-flex;align-items:center;gap:8px}td.dm{white-space:normal;min-width:140px}
+@media (max-width:600px){.dtab thead{display:none}.dtab tr{display:block;padding:9px 10px;border-top:1px solid var(--line)}.dtab tr:first-child{border-top:0;padding-top:0}
+  .dtab td{display:none;padding:0;border:0}.dtab td.dm{display:flex;align-items:center;justify-content:space-between;gap:4px 10px;flex-wrap:wrap;white-space:normal}
+  .dtab .dm .pill{display:inline-flex}.dtab td.dsub{display:block;margin-top:3px;color:var(--mut);font-size:12px;white-space:normal;overflow-wrap:anywhere}
+  .dtab td.empty{display:block;padding:8px 0}.dtab td.dmt{display:block;margin-top:8px}.dtab td.dmt:empty{display:none}
+  .chain{grid-template-columns:minmax(0,1fr)}.hop+.hop{border-left:0;border-top:1px solid var(--line)}.hop+.hop:before{left:24px;top:-6px;margin-top:0;transform:rotate(135deg)}
+  .sg small,.sg .bars{display:none}}
+::placeholder{color:var(--dim)}
+.hint{background:var(--panel2);border:1px dashed var(--field-line);border-radius:8px;padding:9px 12px;font-size:13px;color:var(--mut);margin-top:12px}
+.plist{list-style:none;margin:0;padding:0}.plist li{display:flex;gap:8px;align-items:flex-start;margin:8px 0 0}.plist li:first-child{margin-top:0}
+.plist .ic{color:var(--warn);margin-top:2px}
+.dock{padding:14px 0;border-top:1px solid var(--line)}.dock:first-child{padding-top:0;border-top:0}.dock:last-child{padding-bottom:0}
+.dockh{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px}
+.addto{margin-top:6px;font-size:13px;color:var(--mut);overflow-wrap:anywhere}.addto b{color:var(--fg);font-weight:600}
+
+/* banners, progress, log, toast */
+.bn{display:flex;align-items:flex-start;gap:10px;margin-bottom:16px;padding:10px 14px;border-radius:10px;font-weight:500;line-height:1.45}
+.bn>span:not(.spin){min-width:0;overflow-wrap:anywhere}
+.bn.warn{background:var(--warn-soft);color:var(--warn)}.bn.bad{background:var(--bad-soft);color:var(--bad)}.bn.ok{background:var(--ok-soft);color:var(--ok)}.bn.acc{background:var(--acc-soft);color:var(--acc)}
+.bn .ic{margin-top:2px}.bn button{margin-left:auto;flex:none}.bn button+button{margin-left:0}
+.bar{height:6px;background:var(--line);border-radius:3px;overflow:hidden;margin:10px 0 12px}.bar i{display:block;height:100%;background:var(--acc);width:0;transition:width .3s}
+pre{margin:0;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:12px;overflow:auto;font:12px/1.55 var(--mono);max-height:64vh;white-space:pre-wrap;overflow-wrap:anywhere;color:var(--mut)}
+#toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(18px + env(safe-area-inset-bottom,0px));z-index:70;display:none;align-items:center;gap:10px;max-width:min(460px,calc(100vw - 32px));padding:11px 14px;border-radius:10px;background:var(--panel);border:1px solid var(--line2);box-shadow:0 12px 32px rgba(0,0,0,.35);font-weight:500;color:var(--fg)}
+#toast .ic{color:var(--ok)}#toast.bad .ic{color:var(--bad)}
+.skel{height:96px;border-radius:12px;background:linear-gradient(90deg,var(--panel) 0,var(--panel2) 50%,var(--panel) 100%);background-size:200% 100%;animation:sk 1.2s infinite;border:1px solid var(--line)}
+@keyframes sk{to{background-position:-200% 0}}
+@media (prefers-reduced-motion:reduce){.spin,.skel{animation:none}}
+
+/* dialogs */
+.scrim{position:fixed;inset:0;z-index:40;background:rgba(3,6,10,.55)}
+.modal{position:fixed;inset:0;z-index:60;display:grid;place-items:center;padding:16px}
+.modal>.scrim{position:absolute;z-index:0}
+.modal .box{position:relative;z-index:1;width:min(480px,100%);max-height:calc(100vh - 32px);overflow:auto;background:var(--panel);border:1px solid var(--line2);border-radius:14px;box-shadow:0 24px 64px rgba(0,0,0,.45)}
+.modal .mh{display:flex;gap:12px;align-items:center;padding:18px 18px 8px}
+.modal .mi{width:38px;height:38px;border-radius:10px;display:grid;place-items:center;flex:none;background:var(--warn-soft);color:var(--warn)}
+.modal.danger .mi{background:var(--bad-soft);color:var(--bad)}
+.modal.info .mi{background:var(--acc-soft);color:var(--acc)}
+.modal h3{margin:0;font-size:15.5px;font-weight:600;text-wrap:balance;overflow-wrap:anywhere}
+.modal .mb{padding:0 18px 4px 68px;color:var(--mut);font-size:13.5px}
+.modal .mb p{margin:6px 0}.modal .mb b{color:var(--fg);font-weight:600}.modal .mb code{color:var(--fg)}
+.modal .mf{display:flex;justify-content:flex-end;gap:8px;padding:12px 18px;margin-top:14px;border-top:1px solid var(--line);background:var(--panel2)}
+.lgerr{color:var(--bad);min-height:1.3em;margin:8px 0 0;font-weight:500}
+@media (max-width:480px){.modal .mb{padding-left:18px}.f2{grid-template-columns:1fr 90px}.f2.eq{grid-template-columns:1fr}}
+@media (max-width:860px){
+  #app{grid-template-columns:1fr}
+  #side{position:fixed;inset:0 auto 0 0;width:260px;z-index:30;transform:translateX(-100%);transition:transform .2s,visibility .2s;visibility:hidden}
+  #side.open{transform:none;visibility:visible;box-shadow:0 0 40px rgba(0,0,0,.4);transition:transform .2s}   /* visible at once, so focus can move in */
+  #scrim.open{display:block;position:fixed;inset:0;z-index:20;background:rgba(3,6,10,.55)}
+  #menu{display:inline-flex}
+  header.top{padding:10px 16px;flex-wrap:wrap}
+  header.top h1{flex:1;min-width:0;white-space:normal}
+  .chips{order:1;width:100%;justify-content:flex-start;margin-left:0}
+  .wrap{padding:16px 16px 40px}
+}
+/* fingers: bigger targets */
+@media (pointer:coarse){button,button.sm{height:40px}button.wr{min-height:40px}button.icon{width:40px}nav a{padding:10px}.sw{min-height:40px;margin:0 0 4px}}
+</style>
+</head>
+<body>
+<!-- Icons: Phosphor Icons (regular), MIT License, (c) 2023 Phosphor Icons, https://phosphoricons.com
+     (all but i-keys, i-speaker, i-companion, i-satellite and i-dock, drawn for this page) -->
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none"><symbol id="i-speaker" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M15.5 9a4.2 4.2 0 0 1 0 6M18 6.5a8 8 0 0 1 0 11"/></g></symbol><symbol id="i-keys" viewBox="0 0 24 24"><g fill="currentColor"><circle cx="5" cy="5" r="2.6"/><circle cx="12" cy="5" r="2.6"/><circle cx="19" cy="5" r="2.6"/><circle cx="5" cy="12" r="2.6"/><circle cx="12" cy="12" r="2.6"/><circle cx="19" cy="12" r="2.6"/><circle cx="5" cy="19" r="2.6"/><circle cx="12" cy="19" r="2.6"/><circle cx="19" cy="19" r="2.6"/></g></symbol><symbol id="i-house" viewBox="0 0 256 256"><path d="M219.31,108.68l-80-80a16,16,0,0,0-22.62,0l-80,80A15.87,15.87,0,0,0,32,120v96a8,8,0,0,0,8,8h64a8,8,0,0,0,8-8V160h32v56a8,8,0,0,0,8,8h64a8,8,0,0,0,8-8V120A15.87,15.87,0,0,0,219.31,108.68ZM208,208H160V152a8,8,0,0,0-8-8H104a8,8,0,0,0-8,8v56H48V120l80-80,80,80Z"/></symbol><symbol id="i-companion" viewBox="0 0 256 256"><path d="M178.16,176H111.32A48,48,0,1,1,25.6,139.19a8,8,0,0,1,12.8,9.61A31.69,31.69,0,0,0,32,168a32,32,0,0,0,64,0,8,8,0,0,1,8-8h74.16a16,16,0,1,1,0,16ZM64,184a16,16,0,0,0,14.08-23.61l35.77-58.14a8,8,0,0,0-2.62-11,32,32,0,1,1,46.1-40.06A8,8,0,1,0,172,44.79a48,48,0,1,0-75.62,55.33L64.44,152c-.15,0-.29,0-.44,0a16,16,0,0,0,0,32Zm128-64a48.18,48.18,0,0,0-18,3.49L142.08,71.6A16,16,0,1,0,128,80l.44,0,35.78,58.15a8,8,0,0,0,11,2.61A32,32,0,1,1,192,200a8,8,0,0,0,0,16,48,48,0,0,0,0-96Z"/></symbol><symbol id="i-satellite" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m13.5 6.5-3.148-3.148a1.205 1.205 0 0 0-1.704 0L6.352 5.648a1.205 1.205 0 0 0 0 1.704L9.5 10.5"/><path d="M16.5 7.5 19 5"/><path d="m17.5 10.5 3.148 3.148a1.205 1.205 0 0 1 0 1.704l-2.296 2.296a1.205 1.205 0 0 1-1.704 0L13.5 14.5"/><path d="M9 21a6 6 0 0 0-6-6"/><path d="M9.352 10.648a1.205 1.205 0 0 0 0 1.704l2.296 2.296a1.205 1.205 0 0 0 1.704 0l4.296-4.296a1.205 1.205 0 0 0 0-1.704l-2.296-2.296a1.205 1.205 0 0 0-1.704 0z"/></g></symbol><symbol id="i-dock" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2.5"/><path d="M7 14h10"/></g></symbol><symbol id="i-network" viewBox="0 0 256 256"><path d="M232,112H136V88h8a16,16,0,0,0,16-16V40a16,16,0,0,0-16-16H112A16,16,0,0,0,96,40V72a16,16,0,0,0,16,16h8v24H24a8,8,0,0,0,0,16H56v32H48a16,16,0,0,0-16,16v32a16,16,0,0,0,16,16H80a16,16,0,0,0,16-16V176a16,16,0,0,0-16-16H72V128H184v32h-8a16,16,0,0,0-16,16v32a16,16,0,0,0,16,16h32a16,16,0,0,0,16-16V176a16,16,0,0,0-16-16h-8V128h32a8,8,0,0,0,0-16ZM112,40h32V72H112ZM80,208H48V176H80Zm128,0H176V176h32Z"/></symbol><symbol id="i-wifi-high" viewBox="0 0 256 256"><path d="M140,204a12,12,0,1,1-12-12A12,12,0,0,1,140,204ZM237.08,87A172,172,0,0,0,18.92,87,8,8,0,0,0,29.08,99.37a156,156,0,0,1,197.84,0A8,8,0,0,0,237.08,87ZM205,122.77a124,124,0,0,0-153.94,0A8,8,0,0,0,61,135.31a108,108,0,0,1,134.06,0,8,8,0,0,0,11.24-1.3A8,8,0,0,0,205,122.77Zm-32.26,35.76a76.05,76.05,0,0,0-89.42,0,8,8,0,0,0,9.42,12.94,60,60,0,0,1,70.58,0,8,8,0,1,0,9.42-12.94Z"/></symbol><symbol id="i-broadcast" viewBox="0 0 256 256"><path d="M128,88a40,40,0,1,0,40,40A40,40,0,0,0,128,88Zm0,64a24,24,0,1,1,24-24A24,24,0,0,1,128,152Zm73.71,7.14a80,80,0,0,1-14.08,22.2,8,8,0,0,1-11.92-10.67,63.95,63.95,0,0,0,0-85.33,8,8,0,1,1,11.92-10.67,80.08,80.08,0,0,1,14.08,84.47ZM69,103.09a64,64,0,0,0,11.26,67.58,8,8,0,0,1-11.92,10.67,79.93,79.93,0,0,1,0-106.67A8,8,0,1,1,80.29,85.34,63.77,63.77,0,0,0,69,103.09ZM248,128a119.58,119.58,0,0,1-34.29,84,8,8,0,1,1-11.42-11.2,103.9,103.9,0,0,0,0-145.56A8,8,0,1,1,213.71,44,119.58,119.58,0,0,1,248,128ZM53.71,200.78A8,8,0,1,1,42.29,212a119.87,119.87,0,0,1,0-168,8,8,0,1,1,11.42,11.2,103.9,103.9,0,0,0,0,145.56Z"/></symbol><symbol id="i-cloud-arrow-down" viewBox="0 0 256 256"><path d="M248,128a87.34,87.34,0,0,1-17.6,52.81,8,8,0,1,1-12.8-9.62A71.34,71.34,0,0,0,232,128a72,72,0,0,0-144,0,8,8,0,0,1-16,0,88,88,0,0,1,3.29-23.88C74.2,104,73.1,104,72,104a48,48,0,0,0,0,96H96a8,8,0,0,1,0,16H72A64,64,0,1,1,81.29,88.68,88,88,0,0,1,248,128Zm-69.66,42.34L160,188.69V128a8,8,0,0,0-16,0v60.69l-18.34-18.35a8,8,0,0,0-11.32,11.32l32,32a8,8,0,0,0,11.32,0l32-32a8,8,0,0,0-11.32-11.32Z"/></symbol><symbol id="i-circuitry" viewBox="0 0 256 256"><path d="M208,32H48A16,16,0,0,0,32,48V208a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V48A16,16,0,0,0,208,32ZM88,160a8,8,0,1,1-8,8A8,8,0,0,1,88,160ZM48,48H80v97.38a24,24,0,1,0,16,0V115.31l48,48V208H48ZM208,208H160V160a8,8,0,0,0-2.34-5.66L96,92.69V48h32V72a8,8,0,0,0,2.34,5.66l16,16A23.74,23.74,0,0,0,144,104a24,24,0,1,0,24-24,23.74,23.74,0,0,0-10.34,2.35L144,68.69V48h64V208ZM168,96a8,8,0,1,1-8,8A8,8,0,0,1,168,96Z"/></symbol><symbol id="i-terminal-window" viewBox="0 0 256 256"><path d="M128,128a8,8,0,0,1-3,6.25l-40,32a8,8,0,1,1-10-12.5L107.19,128,75,102.25a8,8,0,1,1,10-12.5l40,32A8,8,0,0,1,128,128Zm48,24H136a8,8,0,0,0,0,16h40a8,8,0,0,0,0-16Zm56-96V200a16,16,0,0,1-16,16H40a16,16,0,0,1-16-16V56A16,16,0,0,1,40,40H216A16,16,0,0,1,232,56ZM216,200V56H40V200H216Z"/></symbol><symbol id="i-list" viewBox="0 0 256 256"><path d="M224,128a8,8,0,0,1-8,8H40a8,8,0,0,1,0-16H216A8,8,0,0,1,224,128ZM40,72H216a8,8,0,0,0,0-16H40a8,8,0,0,0,0,16ZM216,184H40a8,8,0,0,0,0,16H216a8,8,0,0,0,0-16Z"/></symbol><symbol id="i-sun" viewBox="0 0 256 256"><path d="M120,40V16a8,8,0,0,1,16,0V40a8,8,0,0,1-16,0Zm72,88a64,64,0,1,1-64-64A64.07,64.07,0,0,1,192,128Zm-16,0a48,48,0,1,0-48,48A48.05,48.05,0,0,0,176,128ZM58.34,69.66A8,8,0,0,0,69.66,58.34l-16-16A8,8,0,0,0,42.34,53.66Zm0,116.68-16,16a8,8,0,0,0,11.32,11.32l16-16a8,8,0,0,0-11.32-11.32ZM192,72a8,8,0,0,0,5.66-2.34l16-16a8,8,0,0,0-11.32-11.32l-16,16A8,8,0,0,0,192,72Zm5.66,114.34a8,8,0,0,0-11.32,11.32l16,16a8,8,0,0,0,11.32-11.32ZM48,128a8,8,0,0,0-8-8H16a8,8,0,0,0,0,16H40A8,8,0,0,0,48,128Zm80,80a8,8,0,0,0-8,8v24a8,8,0,0,0,16,0V216A8,8,0,0,0,128,208Zm112-88H216a8,8,0,0,0,0,16h24a8,8,0,0,0,0-16Z"/></symbol><symbol id="i-moon" viewBox="0 0 256 256"><path d="M233.54,142.23a8,8,0,0,0-8-2,88.08,88.08,0,0,1-109.8-109.8,8,8,0,0,0-10-10,104.84,104.84,0,0,0-52.91,37A104,104,0,0,0,136,224a103.09,103.09,0,0,0,62.52-20.88,104.84,104.84,0,0,0,37-52.91A8,8,0,0,0,233.54,142.23ZM188.9,190.34A88,88,0,0,1,65.66,67.11a89,89,0,0,1,31.4-26A106,106,0,0,0,96,56,104.11,104.11,0,0,0,200,160a106,106,0,0,0,14.92-1.06A89,89,0,0,1,188.9,190.34Z"/></symbol><symbol id="i-check-circle" viewBox="0 0 256 256"><path d="M173.66,98.34a8,8,0,0,1,0,11.32l-56,56a8,8,0,0,1-11.32,0l-24-24a8,8,0,0,1,11.32-11.32L112,148.69l50.34-50.35A8,8,0,0,1,173.66,98.34ZM232,128A104,104,0,1,1,128,24,104.11,104.11,0,0,1,232,128Zm-16,0a88,88,0,1,0-88,88A88.1,88.1,0,0,0,216,128Z"/></symbol><symbol id="i-warning" viewBox="0 0 256 256"><path d="M236.8,188.09,149.35,36.22h0a24.76,24.76,0,0,0-42.7,0L19.2,188.09a23.51,23.51,0,0,0,0,23.72A24.35,24.35,0,0,0,40.55,224h174.9a24.35,24.35,0,0,0,21.33-12.19A23.51,23.51,0,0,0,236.8,188.09ZM222.93,203.8a8.5,8.5,0,0,1-7.48,4.2H40.55a8.5,8.5,0,0,1-7.48-4.2,7.59,7.59,0,0,1,0-7.72L120.52,44.21a8.75,8.75,0,0,1,15,0l87.45,151.87A7.59,7.59,0,0,1,222.93,203.8ZM120,144V104a8,8,0,0,1,16,0v40a8,8,0,0,1-16,0Zm20,36a12,12,0,1,1-12-12A12,12,0,0,1,140,180Z"/></symbol><symbol id="i-x" viewBox="0 0 256 256"><path d="M205.66,194.34a8,8,0,0,1-11.32,11.32L128,139.31,61.66,205.66a8,8,0,0,1-11.32-11.32L116.69,128,50.34,61.66A8,8,0,0,1,61.66,50.34L128,116.69l66.34-66.35a8,8,0,0,1,11.32,11.32L139.31,128Z"/></symbol><symbol id="i-arrow-clockwise" viewBox="0 0 256 256"><path d="M240,56v48a8,8,0,0,1-8,8H184a8,8,0,0,1,0-16H211.4L184.81,71.64l-.25-.24a80,80,0,1,0-1.67,114.78,8,8,0,0,1,11,11.63A95.44,95.44,0,0,1,128,224h-1.32A96,96,0,1,1,195.75,60L224,85.8V56a8,8,0,1,1,16,0Z"/></symbol><symbol id="i-trash" viewBox="0 0 256 256"><path d="M216,48H176V40a24,24,0,0,0-24-24H104A24,24,0,0,0,80,40v8H40a8,8,0,0,0,0,16h8V208a16,16,0,0,0,16,16H192a16,16,0,0,0,16-16V64h8a8,8,0,0,0,0-16ZM96,40a8,8,0,0,1,8-8h48a8,8,0,0,1,8,8v8H96Zm96,168H64V64H192ZM112,104v64a8,8,0,0,1-16,0V104a8,8,0,0,1,16,0Zm48,0v64a8,8,0,0,1-16,0V104a8,8,0,0,1,16,0Z"/></symbol><symbol id="i-upload-simple" viewBox="0 0 256 256"><path d="M224,144v64a8,8,0,0,1-8,8H40a8,8,0,0,1-8-8V144a8,8,0,0,1,16,0v56H208V144a8,8,0,0,1,16,0ZM93.66,77.66,120,51.31V144a8,8,0,0,0,16,0V51.31l26.34,26.35a8,8,0,0,0,11.32-11.32l-40-40a8,8,0,0,0-11.32,0l-40,40A8,8,0,0,0,93.66,77.66Z"/></symbol><symbol id="i-floppy-disk" viewBox="0 0 256 256"><path d="M219.31,72,184,36.69A15.86,15.86,0,0,0,172.69,32H48A16,16,0,0,0,32,48V208a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V83.31A15.86,15.86,0,0,0,219.31,72ZM168,208H88V152h80Zm40,0H184V152a16,16,0,0,0-16-16H88a16,16,0,0,0-16,16v56H48V48H172.69L208,83.31ZM160,72a8,8,0,0,1-8,8H96a8,8,0,0,1,0-16h56A8,8,0,0,1,160,72Z"/></symbol><symbol id="i-key" viewBox="0 0 256 256"><path d="M216.57,39.43A80,80,0,0,0,83.91,120.78L28.69,176A15.86,15.86,0,0,0,24,187.31V216a16,16,0,0,0,16,16H72a8,8,0,0,0,8-8V208H96a8,8,0,0,0,8-8V184h16a8,8,0,0,0,5.66-2.34l9.56-9.57A79.73,79.73,0,0,0,160,176h.1A80,80,0,0,0,216.57,39.43ZM224,98.1c-1.09,34.09-29.75,61.86-63.89,61.9H160a63.7,63.7,0,0,1-23.65-4.51,8,8,0,0,0-8.84,1.68L116.69,168H96a8,8,0,0,0-8,8v16H72a8,8,0,0,0-8,8v16H40V187.31l58.83-58.82a8,8,0,0,0,1.68-8.84A63.72,63.72,0,0,1,96,95.92c0-34.14,27.81-62.8,61.9-63.89A64,64,0,0,1,224,98.1ZM192,76a12,12,0,1,1-12-12A12,12,0,0,1,192,76Z"/></symbol><symbol id="i-info" viewBox="0 0 256 256"><path d="M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm0,192a88,88,0,1,1,88-88A88.1,88.1,0,0,1,128,216Zm16-40a8,8,0,0,1-8,8,16,16,0,0,1-16-16V128a8,8,0,0,1,0-16,16,16,0,0,1,16,16v40A8,8,0,0,1,144,176ZM112,84a12,12,0,1,1,12,12A12,12,0,0,1,112,84Z"/></symbol><symbol id="i-plug" viewBox="0 0 256 256"><path d="M237.66,66.34a8,8,0,0,0-11.32,0L192,100.69,155.31,64l34.35-34.34a8,8,0,1,0-11.32-11.32L144,52.69,117.66,26.34a8,8,0,0,0-11.32,11.32L112.69,44l-53,53a40,40,0,0,0,0,56.57l15.71,15.71L26.34,218.34a8,8,0,0,0,11.32,11.32l49.09-49.09,15.71,15.71a40,40,0,0,0,56.57,0l53-53,6.34,6.35a8,8,0,0,0,11.32-11.32L203.31,112l34.35-34.34A8,8,0,0,0,237.66,66.34ZM147.72,185a24,24,0,0,1-33.95,0L71,142.23a24,24,0,0,1,0-33.95l53-53L200.69,132Z"/></symbol><symbol id="i-lock" viewBox="0 0 256 256"><path d="M208,80H176V56a48,48,0,0,0-96,0V80H48A16,16,0,0,0,32,96V208a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V96A16,16,0,0,0,208,80ZM96,56a32,32,0,0,1,64,0V80H96ZM208,208H48V96H208V208Zm-68-56a12,12,0,1,1-12-12A12,12,0,0,1,140,152Z"/></symbol><symbol id="i-play" viewBox="0 0 256 256"><path d="M232.4,114.49,88.32,26.35a16,16,0,0,0-16.2-.3A15.86,15.86,0,0,0,64,39.87V216.13A15.94,15.94,0,0,0,80,232a16.07,16.07,0,0,0,8.36-2.35L232.4,141.51a15.81,15.81,0,0,0,0-27ZM80,215.94V40l143.83,88Z"/></symbol></svg>
+<div id="app">
+<aside id="side">
+  <div class="brand"><div class="logo"><svg class="ic"><use href="#i-keys"/></svg></div><div><b id="devname">Companion Box</b><small id="devid">connecting…</small></div></div>
+  <nav id="nav"></nav>
+  <div class="side-foot"><span id="fwver">fw —</span><button class="ghost icon" id="themebtn" type="button" title="Toggle theme" aria-label="Toggle theme"><svg class="ic sm"><use href="#i-moon"/></svg></button></div>
+</aside>
+<div id="scrim"></div>
+<main>
+  <header class="top">
+    <button class="ghost icon" id="menu" type="button" aria-label="Menu" aria-controls="side" aria-expanded="false"><svg class="ic"><use href="#i-list"/></svg></button>
+    <h1 id="title"></h1>
+    <div class="chips" id="chips"></div>
+    <button class="ghost icon" id="outbtn" type="button" hidden title="Sign out" aria-label="Sign out"><svg class="ic"><use href="#i-key"/></svg></button>
+  </header>
+  <div class="wrap"><div id="rsbn" role="status" hidden></div><div id="view"></div></div>
+</main>
+</div>
+<div id="toast" role="status"></div>
+<div class="modal" id="modal" hidden role="alertdialog" aria-modal="true" aria-labelledby="mtitle"></div>
+<div class="modal info" id="loginm" hidden></div>
+<script>
+'use strict';
+/* The box's setup page. Everything from the box or the network (names, decks, Companion hosts, log text, error
+   messages) reaches the page through textContent / attribute setters only (h() below), never as
+   markup. */
+const $=s=>document.querySelector(s), V=()=>$('#view');
+const AP_IP='192.168.4.1', DOCK_PORT=5343;
+const HINT="Stream Deck Mini or Pedal not showing up on a hub? Plug it straight into the box's USB port.";
+let ws=null, rid=1, pend={}, S={sys:null,at:0,key:''}, INFO={}, page='home', PG={}, RS=false, loginP=null, TOK='', OK=0, BACK=false;
+
+/* ---------- DOM building (data only ever becomes text nodes or attribute values) ---------- */
+function h(tag,attrs,...kids){
+  const e=document.createElement(tag);
+  for(const k in attrs||{}){const v=attrs[k];if(v==null||v===false)continue;
+    if(k==='class')e.className=v;else if(k.startsWith('on'))e.addEventListener(k.slice(2),v);else e.setAttribute(k,v===true?'':String(v))}
+  add(e,kids);return e}
+function add(e,kids){for(const c of [kids].flat(Infinity))if(c!=null&&c!==false)e.append(c instanceof Node?c:String(c));return e}
+function fill(e,...kids){if(e){e.replaceChildren();add(e,kids)}return e}
+/* fn redraws el: a button focused in it before is focused again after, found by its data-k, id or label (a live redraw
+   never drops focus to the page, audit P2-B) */
+const fkey=b=>b.dataset.k||b.id||b.textContent;
+function keepFocus(el,fn){const a=document.activeElement,k=el&&a&&el.contains(a)&&fkey(a);fn();
+  if(k)for(const b of el.querySelectorAll('button'))if(k===fkey(b)&&!b.disabled){b.focus();break}}
+function ic(n,c=''){const NS='http://www.w3.org/2000/svg',s=document.createElementNS(NS,'svg'),u=document.createElementNS(NS,'use');
+  s.setAttribute('class','ic'+(c?' '+c:''));s.setAttribute('aria-hidden','true');u.setAttribute('href','#i-'+n);s.append(u);return s}
+const panel=(title,body,act,icon,id)=>h('section',{class:'panel',id},h('div',{class:'ph'},h('h2',null,icon&&ic(icon,'sm'),title),act&&h('div',{class:'act'},act)),h('div',{class:'pb'},body));
+const kv=rows=>h('dl',{class:'kv'},rows.filter(Boolean).map(([k,v])=>[h('dt',null,k),h('dd',null,v)]));
+const pill=(cls,t)=>h('span',{class:'pill '+(cls||'')},t);
+const dot=cls=>h('span',{class:'dot '+(cls||'')});
+const P=(...k)=>h('p',null,...k), B=t=>h('b',null,t), C=t=>h('code',null,t);
+const NUM={inputmode:'numeric',pattern:'[0-9]*',maxlength:8},pinOk=p=>/^\d{4,8}$/.test(p);   // a PIN: the phone's number pad
+function fld(id,label,val,type='text',attrs={}){const i=h('input',Object.assign({id,type},attrs));i.value=val??'';return h('label',{class:'f'},h('span',null,label),i)}
+function chk(id,label,on){const i=h('input',{id,type:'checkbox'});i.checked=!!on;return h('label',{class:'sw'},i,label)}
+function pick(id,label,opts,val){const s=h('select',{id},opts.map(([v,t])=>h('option',{value:v},t)));s.value=String(val);return h('label',{class:'f'},h('span',null,label),s)}   // opts: [value, text]
+/* a password field with Show / Hide */
+function pfld(id,label,val,attrs){const i=h('input',Object.assign({id,type:'password',spellcheck:'false',maxlength:63},attrs));i.value=val||'';
+  const b=btn('Show',()=>{const s=i.type==='password';i.type=s?'text':'password';b.textContent=s?'Hide':'Show'},'ghost',null,{'aria-controls':id});
+  return h('label',{class:'f'},h('span',null,label),h('div',{class:'inline'},i,b))}
+/* a field's error under it (aria-invalid, aria-describedby) and the field focused; false, for return bad(...).
+   It goes when the field is edited. */
+function bad(id,m){const i=$('#'+id);if(!i){toast(m,true);return false}let e=$('#'+id+'-e');if(!e){e=h('small',{class:'ferr',id:id+'-e'});(i.closest('label')||i.parentNode).append(e)}
+  e.textContent=m;i.setAttribute('aria-invalid','true');i.setAttribute('aria-describedby',id+'-e');i.focus();return false}
+/* Save rows: Save stays off until a field of its panel differs from what was loaded or last saved, "Unsaved changes" beside it */
+const fv=p=>[...p.querySelectorAll('input:not([type=file]),select,textarea')].map(e=>e.type==='radio'?e.checked?e.value:'':e.type==='checkbox'?e.checked:e.value).join('\n');
+function dirt(){for(const r of V().querySelectorAll('.sv')){const v=fv(r.closest('.panel'));if(r._s==null)r._s=v;r._d=v!==r._s;r.firstChild.disabled=!r._d;r.lastChild.hidden=!r._d}}
+const dirty=()=>[...V().querySelectorAll('.sv')].some(r=>r._d);
+/* a few options as cards: opts [[value, title, description]]; radio(name) reads the choice */
+function choice(name,val,opts,label){return h('div',{class:'choice',role:'radiogroup','aria-label':label},opts.map(([v,t,d,n])=>{const i=h('input',{type:'radio',name,value:v});i.checked=v===val;
+  return h('label',null,i,h('span',null,h('b',null,n&&[ic(n),' '],t),d&&h('small',null,d)))}))}
+const radio=name=>{const e=document.querySelector(`input[name="${name}"]:checked`);return e?e.value:''};
+const btn=(label,onclick,cls,icon,attrs)=>h('button',Object.assign({type:'button',class:cls||null,onclick},attrs),icon&&ic(icon,'sm'),label);
+/* a button that stays disabled while its action runs */
+const act=fn=>async e=>{const b=e.currentTarget;b.disabled=true;try{await fn()}catch(_){}finally{b.disabled=false;dirt();
+  if(b.isConnected&&document.activeElement===document.body&&!$('#app').inert)b.focus()}};   // a dialog closed while it was disabled
+const gv=id=>{const e=$('#'+id);return e.type==='checkbox'?e.checked:e.value};
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const plural=(n,one,many)=>`${n} ${n===1?one:many}`;
+const bytes=s=>new TextEncoder().encode(s).length;   // the box counts UTF-8 bytes, not characters
+function fmtUp(s){s=Math.max(0,Math.floor(s||0));const d=Math.floor(s/86400),hr=Math.floor(s%86400/3600),m=Math.floor(s%3600/60);
+  return d?`${d} d ${hr} h`:hr?`${hr} h ${m} m`:m?`${m} m`:`${s} s`}
+const shortVer=v=>String(v||'').split('+')[0];
+const KEYS={boxName:'Box name',companionHost:'Address',companionPort:'Port',ethIp:'IP address',ethMask:'Subnet mask',ethGw:'Gateway',ethDns:'DNS',wifiSsid:'Network name',wifiPass:'Password',wifiBackupSsid:'Backup network name',wifiBackupPass:'Backup password',apPass:'Hotspot password',
+  speakerVolume:'Volume',ledPin:'Data pin',ledBrightness:'Brightness'};
+function errText(e){let m=String((e&&e.message)||e||'failed');const k=/^(\w+): /.exec(m);if(k&&KEYS[k[1]])m=KEYS[k[1]]+': '+m.slice(k[0].length);
+  if(m==='Failed to fetch'||m==='Load failed'||m==='NetworkError when attempting to fetch resource.')m='the box is not reachable';
+  return m.charAt(0).toUpperCase()+m.slice(1)}
+
+/* ---------- theme, toast ---------- */
+function applyTheme(t){if(t)document.documentElement.dataset.theme=t;else delete document.documentElement.dataset.theme;
+  const dark=t?t==='dark':!matchMedia('(prefers-color-scheme: light)').matches;fill($('#themebtn'),ic(dark?'sun':'moon','sm'))}
+function toggleTheme(){const cur=document.documentElement.dataset.theme||(matchMedia('(prefers-color-scheme: light)').matches?'light':'dark');const t=cur==='dark'?'light':'dark';
+  try{localStorage.setItem('theme',t)}catch(_){}applyTheme(t)}
+try{applyTheme(localStorage.getItem('theme'))}catch(_){applyTheme(null)}
+function toast(m,bad){const t=$('#toast');t.className=bad?'bad':'';fill(t,ic(bad?'warning':'check-circle'),h('span',null,m));t.style.display='flex';
+  clearTimeout(t._h);t._h=setTimeout(()=>{t.style.display='none'},bad?6500:3800)}
+
+/* ---------- JSON-RPC: WebSocket /rpc, HTTP POST /rpc when it is down ---------- */
+/* With a settings password every call carries the session token ("token" in the frame, Bearer on
+   plain requests). A 401 opens the sign-in dialog once and retries the call. */
+try{TOK=sessionStorage.getItem('tok')||localStorage.getItem('tok')||''}catch(_){}
+function setTok(t,remember){TOK=t||'';try{sessionStorage.removeItem('tok');localStorage.removeItem('tok');if(t)(remember?localStorage:sessionStorage).setItem('tok',t)}catch(_){}}
+const authHdr=x=>Object.assign(x||{},TOK?{Authorization:'Bearer '+TOK}:{});
+function wsSignIn(){if(TOK&&ws&&ws.readyState===1)ws.send(JSON.stringify({id:rid++,method:'Auth.GetStatus',token:TOK}))}   // the socket gets pushes
+function wsOpen(){
+  try{ws=new WebSocket(`ws://${location.host}/rpc`)}catch(_){ws=null;setTimeout(wsOpen,3000);return}
+  ws.onopen=()=>{wsSignIn();renderChips();if(INFO.id)catchUp()};   // a reconnect: catch up on what changed meanwhile
+  ws.onmessage=e=>{let m;try{m=JSON.parse(e.data)}catch(_){return}
+    if(m.id&&pend[m.id]){const p=pend[m.id];delete pend[m.id];p(m)}
+    else if(m.method==='NotifyStatus'&&m.params&&m.params.sys)onSys(m.params.sys)};
+  ws.onclose=()=>{ws=null;for(const k in pend){const p=pend[k];delete pend[k];p({error:{code:-1,message:'connection lost'}})}
+    renderChips();setTimeout(wsOpen,3000)};
+}
+function post(f,ms){const c=new AbortController(),t=setTimeout(()=>c.abort(),ms);
+  return fetch('rpc',{method:'POST',headers:authHdr({'Content-Type':'application/json'}),body:JSON.stringify(f),signal:c.signal})
+    .then(async r=>{const m=await r.json().catch(()=>({}));if(!r.ok&&!m.error)throw {message:m.message||'HTTP '+r.status};return m})
+    .catch(e=>{throw e&&e.name==='AbortError'?{message:'no answer from the box'}:e}).finally(()=>clearTimeout(t))}
+/* opt: {http: plain HTTP only, timeout: ms} */
+function rpc(method,params,opt={}){
+  const f={id:rid++,src:'webui',method,params:params||{}};if(TOK)f.token=TOK;
+  const ms=opt.timeout||20000;
+  const done=m=>{if(!m.error)return m.result;
+    if(m.error.code===401&&!opt.retried&&!/^Auth\./i.test(method))
+      return login().then(ok=>{if(ok)return rpc(method,params,Object.assign({},opt,{retried:true}));throw m.error});
+    throw m.error};
+  if(!opt.http&&ws&&ws.readyState===1){ws.send(JSON.stringify(f));
+    return new Promise(res=>{pend[f.id]=res;setTimeout(()=>{if(pend[f.id]){delete pend[f.id];res({error:{code:-1,message:'no answer from the box'}})}},ms)}).then(done)}
+  return post(f,ms).then(done);
+}
+/* every action's call: a toast for errors (and okMsg for success) */
+async function call(method,params,okMsg){try{const r=await rpc(method,params);OK++;if(okMsg)toast(okMsg);return r}catch(e){toast(errText(e),true);throw e}}
+
+/* ---------- sign-in ---------- */
+/* Only when the 401 was about this browser's session: a wrong current password in Device.SetAuth
+   is a 401 as well, and needs no dialog. */
+function login(){
+  return loginP||(loginP=(async()=>{let st={};try{st=await rpc('Auth.GetStatus')}catch(_){}
+    if(!st.auth_en||st.authed)return false;
+    if(TOK){setTok('');$('#outbtn').hidden=true}   // the box doesn't know this token: it restarted, or the password changed
+    return loginDialog(st)})().finally(()=>{loginP=null}));
+}
+function loginDialog(st){return new Promise(res=>{
+  const el=$('#loginm'),err=h('p',{class:'lgerr',role:'alert'}),pw=h('input',Object.assign({id:'lgp',type:'password',autocomplete:'current-password',required:true},st.pin===false?{}:NUM));
+  const keep=h('input',{id:'lgk',type:'checkbox'}),go=h('button',{type:'submit',id:'lgb'},ic('key','sm'),'Sign in');
+  let timer=null;const close=()=>{clearInterval(timer);el.hidden=true;el.replaceChildren();modalClosed()};
+  /* the box refuses for a while after wrong passwords ("try again in N s"): count it down */
+  const wait=s=>{clearInterval(timer);let left=s;const tick=()=>{if(left<=0){clearInterval(timer);go.disabled=false;err.textContent='';return}
+      go.disabled=true;err.textContent=`Too many wrong tries. Try again in ${left} s.`;left--};tick();timer=setInterval(tick,1000)};
+  const form=h('form',{onsubmit:async e=>{e.preventDefault();go.disabled=true;err.textContent='';
+    try{const t=await rpc('Auth.Login',{password:pw.value});setTok(t.token,keep.checked);close();
+      $('#outbtn').hidden=false;wsSignIn();res(true)}
+    catch(x){if(/^no (PIN|password) is set$/.test(x.message)){close();res(true);return}   // removed meanwhile, from another browser
+      const m=/try again in (\d+) s/.exec(x.message||'');pw.value='';pw.focus();
+      if(m)wait(Number(m[1]));else{go.disabled=false;err.textContent=/^wrong (PIN|password)$/.test(x.message)?'Wrong '+x.message.slice(6)+'.':errText(x)}}}},
+    h('div',{class:'mb'},h('label',{class:'f'},h('span',null,st.pin===false?'Settings password':'Settings PIN'),pw),h('label',{class:'sw'},keep,'Keep me signed in on this browser'),err),
+    h('div',{class:'mf'},go));
+  fill(el,h('div',{class:'scrim'}),h('div',{class:'box',role:'dialog','aria-modal':'true','aria-labelledby':'lgt'},
+    h('div',{class:'mh'},h('div',{class:'mi'},ic('key')),h('h3',{id:'lgt'},'Sign in to '+(INFO.name||(S.sys&&S.sys.name)||'the box'))),form));
+  modalOpen();el.hidden=false;pw.focus();if(st.locked_s)wait(st.locked_s);
+})}
+async function signOut(){try{if(TOK)await rpc('Auth.Logout',{token:TOK})}catch(_){}setTok('');location.reload()}
+
+/* ---------- dialogs ---------- */
+/* While a dialog is open the page behind it is inert (Tab stays in the dialog); focus then goes
+   back to what opened it. */
+let modalRes=null,modalFrom=null;
+function modalOpen(){if(!$('#app').inert)modalFrom=document.activeElement;$('#app').inert=true}
+function modalClosed(){if(!$('#modal').hidden||!$('#loginm').hidden)return;$('#app').inert=false;
+  const f=modalFrom;modalFrom=null;if(f&&f.isConnected&&!f.disabled)f.focus()}
+function confirmAction({title,body,ok='Continue',no:nt='Cancel',kind='warn',icon='warning'}){
+  return new Promise(res=>{const m=$('#modal');m.className='modal '+kind;
+    const no=btn(nt,()=>closeModal(false),'ghost'),yes=btn(ok,()=>closeModal(true),kind==='danger'?'danger':'');
+    fill(m,h('div',{class:'scrim',onclick:()=>closeModal(false)}),h('div',{class:'box'},h('div',{class:'mh'},h('div',{class:'mi'},ic(icon)),h('h3',{id:'mtitle'},title)),
+      h('div',{class:'mb'},body),h('div',{class:'mf'},no,yes)));
+    modalOpen();m.hidden=false;modalRes=res;no.focus()})}
+function closeModal(v){const m=$('#modal');if(m.hidden)return;m.hidden=true;m.replaceChildren();modalClosed();const r=modalRes;modalRes=null;if(r)r(v)}
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){if(modalRes)closeModal(false);else setDrawer(false)}});
+
+/* ---------- restarts: a banner, then wait until the box answers again ---------- */
+function banner(kind,msg,spin){const b=$('#rsbn');clearTimeout(b._h);if(!msg){b.hidden=true;b.replaceChildren();return}
+  b.className='bn '+kind;b.hidden=false;fill(b,spin?h('span',{class:'spin'}):ic(kind==='ok'?'check-circle':'warning'),h('span',null,msg))}
+/* act: what restarts the box (null when it is already on its way) */
+async function restartFlow(act,msg){
+  /* restarted = the uptime is behind what it would be by now without a restart (a missed poll
+     alone proves nothing) */
+  const b0=S.sys?{up:S.sys.uptime_s,at:S.at}:null;let gone=false,st=null;RS=true;
+  const back=st=>b0?st.uptime_s<b0.up+(Date.now()-b0.at)/1000-3:gone;
+  banner('acc',msg,true);
+  if(act){try{await act()}catch(e){RS=false;banner();toast('The restart did not start: '+errText(e),true);return false}}
+  const t0=Date.now();
+  while(Date.now()-t0<120000){
+    await sleep(1500);
+    try{st=await rpc('Sys.GetStatus',{},{http:true,timeout:4000});if(st&&back(st))break;st=null}
+    catch(_){if(!gone){gone=true;banner('acc','Restarting. The box is offline for a few seconds; this page reconnects by itself.',true)}}
+  }
+  if(!st){RS=false;banner('bad',"The box isn't back after 2 minutes. It may have a new address, or it is still starting: this page keeps trying by itself.");return false}
+  onSys(st);RS=false;   // after onSys: it would take the uptime drop for a restart of its own
+  try{await loadInfo()}catch(_){}
+  banner('ok','The box is back.');$('#rsbn')._h=setTimeout(()=>banner(),5000);
+  go();return true;
+}
+
+/* ---------- status ---------- */
+/* Sys.GetStatus, pushed as NotifyStatus whenever it changes, and polled every 10 s as a safety
+   net. Pages redraw only their live parts (LIVE[page]); forms are never redrawn. */
+const LIVE={};
+const statusKey=s=>JSON.stringify(Object.assign({},s,{uptime_s:0,heap:0,message:Object.assign({},s.message,{remaining_s:0})}));
+function onSys(s){
+  if(!s||typeof s!=='object')return;
+  const prev=S.sys;S.sys=s;S.at=Date.now();
+  const k=statusKey(s),changed=k!==S.key;S.key=k;
+  const up=$('#uptime');if(up)up.textContent=fmtUp(s.uptime_s);
+  if(prev&&s.uptime_s+5<prev.uptime_s&&!RS){restarted();return}   // restarted by someone else
+  renderBrand();renderChips();
+  if(changed&&LIVE[page])LIVE[page]();
+  if(page==='device')renderMsg();
+}
+async function refreshStatus(){if(document.hidden||RS)return;try{onSys(await rpc('Sys.GetStatus'))}catch(_){renderChips()}}
+async function restarted(){try{await loadInfo()}catch(_){}renderChips();if(!editing())go();else if(LIVE[page])LIVE[page]()}
+async function catchUp(){try{await loadInfo()}catch(_){}refreshStatus()}
+function editing(){const a=document.activeElement;return !!a&&V().contains(a)&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&!/^(checkbox|radio|button|submit|file)$/.test(a.type)}
+async function loadInfo(){INFO=await rpc('Device.GetInfo');$('#outbtn').hidden=!(INFO.auth_en&&TOK);$('#fwver').textContent='fw '+(INFO.version||'—');$('#devid').textContent=INFO.id||'';renderBrand()}
+function renderBrand(){const n=(S.sys&&S.sys.name)||INFO.name||'Companion Box';$('#devname').textContent=n;document.title=n+' · Companion Box'}
+
+/* Dock mode with no deck plugged in: no dock's port is open, so there is nothing to add yet. */
+const NODECK='Plug in a Stream Deck: each deck appears in Companion as its own surface (port 5343 for the first).';
+/* What the Companion page says when it lists no dock. */
+function docksEmpty(s){
+  if((s.net||{}).route==='none')return 'No network yet: connect Ethernet or Wi-Fi. '+NODECK;
+  if(!(s.dock||[]).length)return 'The Network Docks are not running: see the recent problems on Home.';
+  return NODECK;
+}
+
+/* What the box is doing, in one word for chips, tiles and banners. */
+function conn(s){
+  const n=s.net||{},c=s.companion||{};
+  if(n.route==='none')return {k:'nonet',cls:'bad',chip:'No network',tile:'No network'};
+  if(s.mode==='dock'&&!(s.decks||[]).length)return {k:'nodeck',cls:'warn',chip:'No deck',tile:'No deck'};
+  if(s.mode==='dock'){const k=(s.dock||[]).filter(d=>d.companion).length;
+    return k?{k:'dock',cls:'ok',chip:'Companion connected',tile:'Connected'}:{k:'dockwait',cls:'warn',chip:'Waiting for Companion',tile:'Waiting'}}
+  if(c.state==='connected')return {k:'connected',cls:'ok',chip:'Companion connected',tile:'Connected'};
+  if(c.state==='too_old')return {k:'old',cls:'bad',chip:'Companion too old',tile:'Too old'};
+  if(c.selection==='ambiguous')return {k:'choose',cls:'warn',chip:'Choose a Companion',tile:'Choose a Companion'};
+  return {k:'looking',cls:'warn',chip:'Looking for Companion',tile:'Looking for Companion'};
+}
+const hostPort=c=>c.host?c.host+':'+c.port:'';
+/* the address Companion uses for the box (the uplink's), else the one this page came from */
+const boxIp=s=>(s.net&&s.net.ip)||(location.hostname!==AP_IP?location.hostname:"the box's IP");
+function renderChips(){
+  const s=S.sys,c=[];
+  if(s){const st=conn(s),n=s.net||{},ago=Math.round((Date.now()-S.at)/1000);
+    /* the 10 s poll failed twice: what the page shows may be out of date */
+    if(ago>25&&!RS)c.push(h('span',{class:'chip',title:`Last answer ${ago} s ago. What this page shows may be out of date.`},dot(''),'No answer from the box'));
+    else c.push(h('span',{class:'chip'},dot(st.k==='nonet'&&location.hostname===AP_IP?'acc':st.cls),st.chip));   // first contact: accent
+    c.push(signs(n))}
+  fill($('#chips'),c);
+}
+/* the network signs (as on the decks), each a link to its page: Ethernet while linked, Wi-Fi and the
+   hotspot always; x: crossed, 'off' (grey) or 'bad' (red); the one carrying the route marked; the rest in title and label */
+function signs(n){
+  const sg=(pg,i,t,l,x,rt,...k)=>{l+=rt?' · carries the route':'';return h('a',{class:'chip sg'+(x?' x '+x:'')+(rt?' rt':''),href:'#'+pg,title:l,'aria-label':l},ic(i,'sm'),t,k)},
+    j=n.sta_net==='main'||n.sta_net==='backup',a=n.ap_clients;
+  return [n.eth_link&&sg('ethernet','network',n.eth_addr||'No address',`Ethernet, ${n.eth_dhcp===false?'static':'DHCP'}: ${n.eth_addr||'no address'}`,'',n.route==='eth'),
+    j?sg('wifi','wifi-high',n.sta_addr||'No address',`Wi-Fi ${n.sta_ssid} (${n.sta_net==='main'?'primary':n.sta_net} network), ${n.sta_rssi} dBm: ${n.sta_addr||'no address'}`,'',n.route==='wifi',
+      h('span',{class:'bars b'+sigBars(n.sta_rssi)},h('i'),h('i'),h('i'),h('i')))
+    :n.wifi_enabled===false?sg('wifi','wifi-high','Off','Wi-Fi off','off')
+    :n.wifi_set===false&&n.route!=='none'?sg('wifi','wifi-high','Not set up','Wi-Fi not set up','off')   // as the deck
+    :sg('wifi','wifi-high','Not connected','Wi-Fi not connected','bad'),
+    n.ap_on?sg('ap','broadcast',n.ap_ip||AP_IP,`Hotspot ${n.ap_ssid}: ${n.ap_ip||AP_IP}, ${plural(a,'device','devices')} joined`,'',0,a>0&&h('small',null,' · '+a))
+    :sg('ap','broadcast','Off','Hotspot off','off')]
+}
+
+/* ---------- navigation ---------- */
+const NAV=[
+ ['Overview',[['home','house','Home']]],
+ ['Companion',[['companion','companion','Companion']]],
+ ['Connectivity',[['ethernet','network','Ethernet'],['wifi','wifi-high','Wi-Fi'],['ap','broadcast','Access point']]],
+ ['System',[['firmware','cloud-arrow-down','Firmware'],['device','circuitry','Device'],['feedback','speaker','Speaker & LED'],['logs','terminal-window','Logs']]],
+];
+const TITLES=Object.fromEntries(NAV.flatMap(g=>g[1]).map(([k,i,t])=>[k,[i,t]]));
+fill($('#nav'),NAV.map(([g,items])=>[h('div',{class:'grp'},g),items.map(([k,i,t])=>h('a',{href:'#'+k,'data-p':k},ic(i),h('span',null,t)))]));
+function setDrawer(open){const sd=$('#side'),was=sd.classList.contains('open');if(open===was)return;
+  sd.classList.toggle('open',open);$('#scrim').classList.toggle('open',open);$('#menu').setAttribute('aria-expanded',String(open));
+  if(open){const a=$('#nav a.on')||$('#nav a');if(a)a.focus()}else if(sd.contains(document.activeElement))$('#menu').focus()}
+$('#menu').addEventListener('click',()=>setDrawer(!$('#side').classList.contains('open')));
+$('#scrim').addEventListener('click',()=>setDrawer(false));
+$('#nav').addEventListener('click',()=>setDrawer(false));
+$('#themebtn').addEventListener('click',toggleTheme);
+$('#outbtn').addEventListener('click',signOut);
+
+async function go(){
+  if(BACK){BACK=false;return}   // the hash put back below
+  const to=PAGES[(location.hash||'#home').slice(1)]?(location.hash||'#home').slice(1):'home';
+  if(to!==page&&dirty()&&!await confirmAction({title:'Leave without saving?',icon:'floppy-disk',ok:'Leave',body:P('This page has changes that are not saved.')})){BACK=true;location.hash=page;return}
+  page=to;
+  document.querySelectorAll('#nav a').forEach(a=>{const on=a.dataset.p===page;a.classList.toggle('on',on);if(on)a.setAttribute('aria-current','page');else a.removeAttribute('aria-current')});
+  setDrawer(false);
+  const [i,t]=TITLES[page];fill($('#title'),ic(i,'lg'),t);
+  clearInterval(PG.tick);clearTimeout(PG.timer);PG={};const pg=PG;   // the previous page's live state
+  try{if(!S.sys)onSys(await rpc('Sys.GetStatus'));if(pg!==PG)return;
+    await PAGES[page](pg);if(pg===PG&&LIVE[page])LIVE[page]();dirt()}
+  catch(e){if(pg===PG)fill(V(),panel('Error',[h('p',{class:'note'},'Could not load this page: '+errText(e)),btn('Retry',go,'ghost','arrow-clockwise')],null,'warning'))}
+}
+window.addEventListener('hashchange',go);
+window.addEventListener('beforeunload',e=>{if(dirty()){e.preventDefault();e.returnValue=''}});
+for(const ev of ['input','change'])V().addEventListener(ev,e=>{const t=e.target;if(t.hasAttribute('aria-invalid')){t.removeAttribute('aria-invalid');t.removeAttribute('aria-describedby');const x=$('#'+t.id+'-e');if(x)x.remove()}dirt()});
+
+/* ---------- pages ---------- */
+const saveRow=(fn,...more)=>{const r=h('div',{class:'btns sv'},btn('Save',act(async()=>{const n=OK;await fn();if(OK>n)r._s=null}),'','floppy-disk'),...more,
+  h('span',{class:'unsaved',role:'status',hidden:true},'Unsaved changes'));return r};
+/* the page is reached over this link: saving its settings may cut it off */
+const via=()=>{const s=S.sys||{},n=s.net||{},hn=location.hostname;return hn===AP_IP?'ap':n.ip&&hn===n.ip?n.route:'other'};
+
+const PAGES={
+async home(){
+  fill(V(),h('div',{id:'hbn'}),h('section',{class:'panel'},h('div',{class:'chain',id:'chain'},[1,2,3].map(()=>h('div',{class:'hop'}))),h('div',{id:'probs'})),
+    panel('Stream Decks',[h('div',{class:'scroll'},h('table',{class:'dtab',role:'table','aria-label':'Stream Decks'},h('thead',null,h('tr',null,['Model','Serial','Firmware','USB','In Companion','Box menu'].map(t=>h('th',null,t)))),h('tbody',{id:'decks',role:'rowgroup'}))),
+      h('div',{class:'hint'},HINT)],h('span',{id:'deckpill'}),'keys'));
+},
+async companion(pg){
+  const dock=S.sys.mode==='dock';
+  const [cfg,list]=await Promise.all([rpc('Companion.GetConfig'),dock?[]:rpc('Companion.List').catch(()=>[])]);
+  if(pg!==PG)return;pg.cfg=cfg;pg.list=list;
+  const conn_=panel('Connection',[choice('smode',cfg.mode,[
+      ['satellite','Satellite',"Companion finds the box and adds every deck by itself.",'satellite'],
+      ['dock','Network Dock',`The default. Companion connects to the box as a remote surface, port ${DOCK_PORT}, and drives the decks with its own Stream Deck support.`,'dock']],'Connection mode'),
+    h('div',{class:'btns',id:'modego',hidden:true},btn('',act(()=>switchMode(radio('smode'))))),h('div',{id:'modebn'})],null,'plug');
+  conn_.addEventListener('change',()=>{const v=radio('smode');$('#modego').hidden=v===pg.cfg.mode;$('#modego button').textContent=`Switch to ${v==='dock'?'Network Dock':'Satellite'} and restart…`});
+  if(dock){
+    fill(V(),conn_,panel('Network Docks',[h('p',{class:'note'},"Each deck has its own dock. Add each one in Companion once; Companion reconnects by itself after that, and the deck keeps its pages."),h('div',{id:'docks'})],h('span',{id:'dockpill'}),'keys'));
+  }else{
+    const auto=cfg.companionAuto;
+    const find=panel('Find Companion',[choice('cfind',auto?'auto':'manual',[['auto','Find automatically','Uses the Companion it finds on the network and keeps using it.'],['manual','Enter address','For Companion on another subnet.']],'How to find Companion'),
+        h('div',{id:'comp-auto',hidden:!auto},h('div',{class:'note'},'Companions found'),h('div',{id:'clist'})),
+        h('div',{id:'comp-manual',hidden:auto},h('div',{class:'f2'},fld('chost','Address',cfg.companionHost,'text',{class:'mono',autocomplete:'off',spellcheck:'false',maxlength:63,placeholder:'10.0.0.5'}),
+          fld('cport','Port',cfg.companionPort,'number',{class:'mono',min:1,max:65535}))),
+        saveRow(saveComp)],null,'companion');
+    find.addEventListener('change',e=>{if(e.target.name==='cfind'){const m=radio('cfind')==='manual';$('#comp-manual').hidden=!m;$('#comp-auto').hidden=m}});
+    fill(V(),conn_,h('div',{class:'grid'},find,panel('Status',h('div',{id:'cstat'}),null,'info')));
+    renderCList();
+    pg.tick=setInterval(async()=>{if(document.hidden)return;try{const l=await rpc('Companion.List');if(pg===PG&&JSON.stringify(l)!==JSON.stringify(pg.list)){pg.list=l;renderCList()}}catch(_){}},5000);
+  }
+},
+async ethernet(pg){
+  const c=await rpc('Eth.GetConfig');if(pg!==PG)return;pg.cfg=c;
+  const ipf=(id,l,v,x)=>fld(id,l,v,'text',Object.assign({class:'mono',autocomplete:'off',spellcheck:'false',inputmode:'decimal',maxlength:15},x));
+  fill(V(),panel('Ethernet',[h('div',{id:'ethst',class:'kvw'}),chk('dhcp','Get address automatically (DHCP)',c.ethDhcp),
+    h('div',{id:'static',hidden:c.ethDhcp},ipf('ip','IP address',c.ethIp,{placeholder:'192.168.10.57'}),h('div',{class:'f2 eq'},ipf('mask','Subnet mask',c.ethMask||'255.255.255.0'),ipf('gw','Gateway',c.ethGw)),ipf('dns','DNS (optional)',c.ethDns)),
+    saveRow(saveEth)],h('span',{id:'ethpill'}),'network'));
+  $('#dhcp').addEventListener('change',e=>{$('#static').hidden=e.target.checked});
+},
+async wifi(pg){
+  const c=await rpc('Wifi.GetConfig');if(pg!==PG)return;pg.cfg=c;const off=c.wifiEnabled===false?'off':null;
+  /* three cards: the state, the primary network, the backup network */
+  fill(V(),panel('Wi-Fi',[h('p',{class:'note'},'For places without a network cable. Power the box from its USB-C port.'),h('div',{id:'wfst',class:'kvw'}),
+    h('div',{class:'btns'},btn(off?'Turn Wi-Fi on':'Turn Wi-Fi off',act(()=>setWifiOn(!!off)),'ghost','wifi-high'),off&&h('span',{class:'note'},'Wi-Fi is off. The setup hotspot stays.'))],h('span',{id:'wfpill'}),'wifi-high'),
+  panel('Primary network',h('div',{class:off},h('div',{id:'wmst',class:'kvw'}),
+    fld('ssid','Network name',c.wifiSsid,'text',{autocomplete:'off',spellcheck:'false',maxlength:32,placeholder:'Studio Wi-Fi'}),
+    h('div',{class:'btns',style:'margin:-4px 0 14px'},btn('Scan for networks',act(scanWifi),'ghost','wifi-high')),h('div',{id:'wfscan'}),
+    pfld('wpass',c.wifiHasPass?'New password':'Password','',{autocomplete:'new-password',placeholder:c.wifiHasPass?'Leave empty to keep the saved one':''}),
+    saveRow(saveWifi,c.wifiHasPass&&btn('Forget password',act(()=>forgetWifiPass('main')),'ghost','trash'),useBtn('main',c.wifiSsid))),h('span',{id:'wmpill'}),'wifi-high'),
+  panel('Backup network',h('div',{class:off},h('p',{class:'note'},'The box joins this one when it cannot join the network above for 30 seconds, and stays on it while it works. Leave the name empty for no backup. It is only used while the network above has a name.'),h('div',{id:'wbst',class:'kvw'}),
+    fld('bssid','Network name',c.wifiBackupSsid,'text',{autocomplete:'off',spellcheck:'false',maxlength:32,placeholder:'Phone-Hotspot'}),
+    h('div',{class:'btns',style:'margin:-4px 0 14px'},btn('Scan for networks',act(()=>scanWifi('backup')),'ghost','wifi-high')),h('div',{id:'wfscan2'}),
+    pfld('bpass',c.wifiBackupHasPass?'New password':'Password','',{autocomplete:'new-password',placeholder:c.wifiBackupHasPass?'Leave empty to keep the saved one':''}),
+    saveRow(saveWifiBackup,c.wifiBackupHasPass&&btn('Forget password',act(()=>forgetWifiPass('backup')),'ghost','trash'),useBtn('backup',c.wifiSsid&&c.wifiBackupSsid))),h('span',{id:'wbpill'}),'wifi-high'));
+},
+async ap(pg){
+  const c=await rpc('Ap.GetConfig');if(pg!==PG)return;pg.cfg=c;
+  fill(V(),panel('Setup hotspot',[chk('apon','Keep the hotspot on',c.apEnabled),h('div',{id:'apst',class:'kvw'}),
+    chk('apsec','Hotspot password',c.apSecured),
+    h('div',{id:'appw',hidden:!c.apSecured},pfld('appass','Password (8-63 characters)',c.apPass,{class:'mono',autocomplete:'off'})),
+    h('p',{class:'note',id:'apnote'}),saveRow(saveAp)],h('span',{id:'appill'}),'broadcast'));
+  $('#apon').addEventListener('change',()=>LIVE.ap());
+  $('#apsec').addEventListener('change',e=>{$('#appw').hidden=!e.target.checked;LIVE.ap()});
+},
+async firmware(pg){
+  const o=await rpc('Ota.GetStatus');if(pg!==PG)return;pg.ota=o;
+  const file=h('input',{type:'file',id:'fw',accept:'.bin'}),go_=btn('Upload and restart',act(upload),'','upload-simple',{id:'fwgo',disabled:true});
+  file.addEventListener('change',()=>{go_.disabled=!file.files.length;fill($('#fwmsg'))});
+  fill(V(),panel('Firmware',[h('div',{id:'fwst',class:'kvw'}),h('div',{id:'fwpv'}),
+    h('label',{class:'f'},h('span',null,'New firmware file (.bin)'),file),
+    h('div',{class:'bar',id:'fwprog',hidden:true},h('i')),h('div',{id:'fwmsg'}),
+    h('div',{class:'btns'},go_,btn('Restart',act(restartBox),'ghost','arrow-clockwise')),
+    h('p',{class:'note',style:'margin:12px 0 0'},"If the new firmware doesn't start properly, the box goes back to the previous one by itself.")],null,'cloud-arrow-down'),
+    panel('Firmware slots',h('div',{id:'slots'}),null,'floppy-disk'));
+  renderSlots();pg.timer=setTimeout(()=>pollSlots(pg),5000);
+},
+async device(pg){
+  const [c,a]=await Promise.all([rpc('Device.GetConfig'),rpc('Auth.GetStatus')]);if(pg!==PG)return;pg.cfg=c;pg.auth=a;
+  const gk=[0,1].map(i=>{const k=CN.indexOf((c.gestureKeys||[])[i]);return k<0?[1,3][i]:k});   // absent: the default, top right and bottom right
+  const text=h('textarea',{id:'msgtext',maxlength:160,rows:3,spellcheck:'false',placeholder:'Back in 5 minutes'});
+  const rst=h('div',{class:'bn bad',id:'rstc',hidden:true,style:'margin:14px 0 0'},ic('warning'),h('span',null,'Reset the box to default settings?'),
+    btn('Reset now',act(factoryReset),'danger'),btn('Cancel',()=>{rst.hidden=true},'ghost'));
+  const last=(S.sys||{}).lastReset||INFO.lastReset;   // Uptime (moved from Home), kept live by onSys
+  fill(V(),h('div',{class:'grid'},panel('Status',h('dl',{class:'kv'},h('dt',null,'Running for'),h('dd',{id:'uptime'},fmtUp((S.sys||{}).uptime_s)),
+      last&&[h('dt',null,'Last start'),h('dd',null,last)]),null,'circuitry'),
+    panel('Find my box',[h('p',{class:'note'},'The box beeps for 3 seconds and its status light blinks white for 30 seconds, whatever the Speaker & LED settings say.'),
+      h('div',{class:'btns'},btn('Find my box',act(findBox),'','speaker'))],null,'speaker'),
+    panel('Stream Decks',[h('p',{class:'note'},c.deckLimit===4?'Up to 4 Stream Decks (at your own risk: power for 2).':"Up to 2 Stream Decks: the box's power over Ethernet is sized for 2."),
+      h('div',{class:'btns'},btn(c.deckLimit===4?'Back to 2 decks…':'Allow up to 4 decks…',act(()=>setDecks(c.deckLimit===4?2:4)),'ghost',c.deckLimit===4?null:'warning',{id:'dlim'}))],null,'plug')),
+    panel('Box menu gesture',[h('p',{class:'note'},"The taps reach Companion too: pick keys you don't use there."),
+      chk('gon','Open the box menu from the keys',c.gestureEnabled!==false),
+      h('div',{class:'cols'},pick('gk1','Tap',CNR,gk[0]),pick('gtaps','Taps',[[1,'Once'],[2,'Twice'],[3,'3 times']],c.gestureTaps||1),
+        pick('gk2','Then hold it with',CNR,gk[1]),pick('ghold','For',[2,3,5].map(s=>[s,s+' s']),c.gestureHoldSeconds||2)),
+      saveRow(saveGesture)],null,'keys'),
+    h('div',{class:'grid'},
+    panel('Message on the decks',[h('p',{class:'note'},"The text covers every deck's keys for a while, then Companion's buttons come back."),
+      h('label',{class:'f'},h('span',null,'Message (up to 160 characters, Enter for a new line)'),text),
+      fld('msgsec','Seconds (0 keeps it until you clear it)',10,'number',{min:0,max:3600,step:1}),
+      h('p',{class:'note',id:'msgst',role:'status'}),
+      h('div',{class:'btns'},btn('Show',act(showMsg),'','play'),btn('Clear',act(clearMsg),'ghost','x'))],null,'keys'),
+    panel('Box name and PIN',[fld('bname','Box name',c.boxName,'text',{maxlength:32,autocomplete:'off',spellcheck:'false'}),
+      a.auth_en&&fld('pwold',a.pin?'Current PIN':'Current password','','password',Object.assign({autocomplete:'current-password',maxlength:64},a.pin?NUM:{})),
+      h('div',{class:'cols'},fld('pwnew',a.auth_en?'New PIN (optional)':'Settings PIN (optional)','','password',Object.assign({autocomplete:'new-password',placeholder:a.auth_en?'Unchanged':'Off'},NUM)),
+        fld('pwrep','Repeat it','','password',Object.assign({autocomplete:'new-password'},NUM))),
+      h('p',{class:'note'},a.auth_en&&!a.pin?'Set a PIN to unlock the decks with it; the old password still signs in here until then.':'4 to 8 digits; it also unlocks the decks\' locked keys.'),
+      chk('cadopt','Let Companion adopt this box without the PIN',c.companionAdopt!==false),
+      h('p',{class:'note'},"Companion's Surfaces → Discover can point this box at itself. Turn off to require the PIN for that too."),
+      saveRow(saveDevice,a.auth_en&&btn(a.pin?'Remove PIN':'Remove password',act(removePass),'ghost','trash'))],
+      a.auth_en?pill('ok',a.pin?'PIN on':'Password on'):pill('','No PIN'),'key')),
+    panel('Factory reset',[h('p',{class:'note'},'All settings go back to defaults, including Wi-Fi and the hotspot, which gets a new random password (shown on the decks). Decks keep their pages in Companion. Holding the service button (GPIO32) for 10 seconds does the same.'),
+      h('div',{class:'btns'},btn('Factory reset',()=>{rst.hidden=false},'danger','trash')),rst],null,'trash'));
+  renderMsg();pg.tick=setInterval(renderMsg,1000);
+},
+async feedback(pg){
+  const c=await rpc('Feedback.GetConfig');if(pg!==PG)return;pg.cfg=c;
+  const range=(id,v,min)=>{const i=h('input',{id,type:'range',min,max:100,step:1});i.value=v;return i};
+  const pct=(i,l)=>{const t=h('span',null),up=()=>{t.textContent=`${l}: ${i.value} %`};up();i.addEventListener('input',up);return h('label',{class:'f'},t,i)};
+  const row=(id,label,on,...evs)=>h('div',{class:'snd'},chk(id,label,on),evs.map(([e,t])=>btn(t||'',act(()=>testSound(e)),t?'ghost':'ghost icon','play',{title:'Play','aria-label':'Play: '+(t?label+', '+t:label)})));
+  const pins=(c.ledPins||[]).includes(c.ledPin)?c.ledPins:[c.ledPin,...(c.ledPins||[])];
+  const sel=h('select',{id:'ledpin'},pins.map(p=>h('option',{value:p},'GPIO'+p)));sel.value=String(c.ledPin);
+  fill(V(),h('div',{class:'grid'},
+    panel('Speaker',[chk('spkon','Speaker on',c.speakerEnabled),pct(range('spkvol',c.speakerVolume,0),'Volume'),
+      row('sready','Ready, after a start',c.soundReady,['ready']),
+      row('sconn','Companion connected',c.soundConnected,['connected']),
+      row('sprob','Problem: Companion lost, a deck in trouble, no network',c.soundProblem,['problem']),
+      row('splug','Deck plugged in or removed',c.soundDeckPlug,['deckIn','in'],['deckOut','out']),
+      row('sclick','Click on every key press',c.soundKeyClick,['keyClick']),
+      h('p',{class:'note'},'The play buttons sound at the volume above, also when a sound is off.'),saveRow(saveSpeaker)],null,'speaker'),
+    panel('Status light',[chk('ledon','Show the status on the light',c.ledEnabled),chk('ledfl','Flash with each event (key clicks too)',c.ledFlash),
+      h('label',{class:'f'},h('span',null,'Data pin'),sel),pct(range('ledbri',c.ledBrightness,1),'Brightness'),
+      kv(LIGHT.map(([col,l,m])=>[m,[h('span',{class:'dot',style:'box-shadow:0 0 0 1px var(--line2);background:'+col}),l]])),
+      h('p',{class:'note'},'One WS2812B NeoPixel: 5 V, GND and its data input on this pin. Find my box blinks it also when it is off.'),saveRow(saveLight)],null,'sun')));
+},
+async logs(pg){
+  fill(V(),panel('Log',h('pre',{id:'log'},''),btn('Clear view',()=>{$('#log').textContent=''},'ghost','trash'),'terminal-window'));
+  pg.seq=0;pollLog(pg);
+},
+};
+
+/* ---------- Home ---------- */
+/* The signal chain: Network → Companion → Decks, each link with its state (dot), one word, one line and, when
+   broken, its one fix; the banner text of a broken link (why). The first broken link gets the page's one banner; all
+   three good is Ready. */
+function chain(s,ap){   // ap: this page came over the hotspot (no uplink there: setting up, the network link in accent)
+  const n=s.net||{},c=s.companion||{},decks=(s.decks||[]).filter(d=>!d.ignored),docks=s.dock||[],dock=s.mode==='dock',on=n.route!=='none';
+  const L=(icon,name,cls,word,sub,fix,why)=>({icon,name,cls,word,sub,fix:fix||null,why:why||null});
+  const net=on?L('network','Network','ok',n.route==='eth'?'Ethernet':'Wi-Fi',[n.route==='wifi'&&n.sta_ssid,n.ip].filter(Boolean).join(' · '))
+    :L('network','Network',ap?'acc':'bad','Offline',(n.eth_link?'':'Ethernet cable not connected. ')+(n.wifi_connected?'':'Wi-Fi is not connected.'),
+      null,'No network. The box is running its setup hotspot only.');   // its fixes: the banner's
+  let comp;
+  const C=(...a)=>L('companion','Companion',...a);
+  if(!on)comp=C('','Waiting','needs the network');
+  else if(dock){const k=docks.filter(d=>d.companion);
+    comp=!decks.length?C('','Waiting','waits for a deck')   // no port is open, nothing to add yet
+      :k.length?C('ok','Connected',k[0].peer?'from '+k[0].peer:plural(k.length,'dock','docks')+' in use')
+      :C('warn','Waiting','add the box in Companion',['Show how','companion'],'Network Dock mode: add the box in Companion under Surfaces → Remote.')}
+  else if(c.state==='connected')comp=C('ok','Connected',hostPort(c)+(c.version?' · '+shortVer(c.version):''));
+  else if(c.state==='too_old')comp=C('bad','Too old',`${shortVer(c.version)} at ${hostPort(c)}`,null,
+    'Companion is older than 5.0, so the box refuses to connect. Update Companion; the box checks again every 30 seconds.');
+  else if(c.selection==='ambiguous')comp=C('warn','Choose',`${c.instances} found`,['Choose one','companion'],
+    "More than one Companion answers. The box won't pick one by itself.");
+  else comp=C('warn','Looking',c.auto?'not found yet':'trying '+hostPort(c),['Find Companion','companion'],c.auto
+    ?"The box is on the network but hasn't found Companion yet. Companion 5.0+ announces itself; on another subnet, enter its address."
+    :'No answer from Companion yet: check its address and that it runs.');
+  const inC=d=>!!drives(s,d);
+  const m=decks.filter(inC).length,nd=plural(decks.length,'deck','decks'),D=(...a)=>L('keys','Decks',...a);
+  const ig=s.decksIgnored,lim=s.deckLimit||2,room=decks.length<lim,xd=(s.decks||[]).find(d=>d.ignored);   // a deck over the limit, ignored until unplugged
+  const dk=ig?D('warn',nd,plural(ig,'deck','decks')+' over the limit',!room&&lim<4&&['Open Device','device'],room   // room again, still ignored
+      ?`${xd?xd.model:'A deck'} is over the limit: unplug it and plug it back in.`:`Deck limit reached (${lim}). Unplug one${lim<4?', or allow up to 4 on Device':''}.`)
+    :!on?D('',decks.length?nd:'No deck',decks.length?'wait for the network':'none plugged in')   // not yet
+    :!decks.length?D('warn','No deck','none plugged in',null,dock?NODECK:"No Stream Deck connected. Plug one into the box's USB port.")
+    :m===decks.length?D('ok',nd,`${m} of ${m} in Companion`)
+    :m||comp.cls==='ok'?D('warn',nd,`${m} of ${decks.length} in Companion`,dock&&['Show how','companion'],
+      `${plural(decks.length-m,'deck is','decks are')} not in Companion yet: add each dock in Companion under Surfaces → Remote.`)
+    :D('',nd,'not in Companion yet');
+  const links=[net,comp,dk];
+  return {links,first:links.find(l=>/bad|warn|acc/.test(l.cls))||null,ready:links.every(l=>l.cls==='ok'),sum:`${nd} in Companion over ${net.word}`};
+}
+
+LIVE.home=()=>{
+  const s=S.sys;if(!s||!$('#chain'))return;
+  /* first contact: on the hotspot with no uplink, setting up, not a failure (accent, not red) */
+  const setup=(s.net||{}).route==='none'&&location.hostname===AP_IP,ch=chain(s,setup),decks=s.decks||[];
+  const goBtn=(l,p,cls)=>btn(l,()=>{location.hash=p},cls==null?'ghost':cls);
+  const nf=[goBtn('Set up Wi-Fi','wifi',''),goBtn('Open Ethernet','ethernet')],p=s.problems||[];   // the network's two fixes
+  const om=decks.filter(d=>d.menu);   // the decks the box menu is open on
+  keepFocus($('#hbn'),()=>fill($('#hbn'),om.length?mtBanner(om):setup?h('div',{class:'bn acc setup'},ic('info'),h('span',null,h('b',null,'Step 1: connect the box to the venue network'),
+      'Plug in an Ethernet cable, or join a Wi-Fi network. Companion and the decks come next.'),nf)
+    :ch.first?h('div',{class:'bn bw '+ch.first.cls},ic('warning'),h('span',null,ch.first.why),ch.first.icon==='network'&&nf)
+    :ch.ready&&h('div',{class:'ready',role:'status'},dot('ok'),h('b',null,'Ready'),h('span',null,ch.sum+(p.length?' · '+plural(p.length,'recent problem','recent problems'):'')))));
+  keepFocus($('#chain'),()=>fill($('#chain'),ch.links.map(l=>h('div',{class:'hop'},h('div',{class:'lbl'},ic(l.icon,'sm'),l.name),h('div',{class:'val'},dot(l.cls),l.word),
+    h('div',{class:'sub'},l.sub),l.fix&&goBtn(...l.fix)))));
+  const o=$('#probs details');   // the decks' and USB's recent problems (newest first): folded under the chain
+  fill($('#probs'),!p.length?null:h('details',{class:'probs',open:!!(o&&o.open)},h('summary',null,plural(p.length,'recent problem','recent problems')),
+    h('ul',{class:'plist'},p.map(x=>h('li',null,ic('warning','sm'),h('span',null,x))))));
+  const inComp=d=>{const k=drives(s,d);return d.ignored?'Over the limit':!k?'Not yet':s.mode==='dock'?`Dock ${k.dock+1}, connected`:d.device_id};
+  fill($('#deckpill'),pill(decks.length?'ok':'',decks.length+' connected'));
+  const usb=d=>(d.high_speed?'High speed':'Full speed')+', '+(d.hub_depth?'hub port '+d.port:'direct'),td=(c,...k)=>h('td',{class:c,role:'cell'},...k);   // roles: rows stacked on a phone stay a table
+  keepFocus($('#decks'),()=>fill($('#decks'),decks.length?decks.map(d=>{const k=inComp(d),y=!d.ignored&&k!=='Not yet';   // the pill and the line under it: phones
+    return h('tr',{role:'row'},td('dm',h('span',null,d.model),pill(y?'ok':d.ignored?'warn':'',y?(s.mode==='dock'?k.split(',')[0]:'In Companion'):k)),
+      td('mono',d.serial),td('mono',d.fw),td(null,usb(d)),td('mono',k),td('dsub mono',d.serial+' · '+d.fw+' · '+usb(d)),td('dmt',d.screen&&h('span',{class:'mtc'},mtCell(d))))})
+    :h('tr',null,h('td',{class:'empty',colspan:6},"No Stream Deck connected. Plug one into the box's USB port."))));
+};
+
+/* ---------- Companion ---------- */
+function renderCList(){
+  const el=$('#clist');if(!el)return;
+  const s=S.sys||{},c=s.companion||{},list=PG.list||[],keep=radio('cpick');
+  if(!list.length){fill(el,h('div',{class:'hint',style:'margin:0 0 14px'},(s.net||{}).route==='none'?'Companions appear here once the box is on a network.'
+    :'No Companion found yet. Companion 5.0+ announces itself automatically; on another subnet, enter its address.'));return}
+  const inUse=x=>c.state==='connected'&&c.host===x.host&&c.port===x.port;
+  const sel=list.some(x=>x.id===keep)?keep:(list.find(x=>x.pinned)||list.find(inUse)||{}).id;
+  fill(el,choice('cpick',sel,list.map(x=>[x.id,h('span',{class:'mono'},x.host+(x.port!==16622?':'+x.port:'')),
+    `Companion ${x.version||'?'}${inUse(x)?' · in use':x.pinned?' · chosen':''}`]),'Companions found'));
+}
+LIVE.companion=()=>{
+  const s=S.sys;if(!s)return;
+  const cfg=PG.cfg||{},mb=$('#modebn');
+  if(mb)fill(mb,cfg.mode&&cfg.mode!==s.mode?h('div',{class:'bn warn',style:'margin:0'},ic('warning'),
+    h('span',null,`Saved as ${cfg.mode==='dock'?'Network Dock':'Satellite'}, but the box still runs in ${s.mode==='dock'?'Network Dock':'Satellite'} mode until it restarts.`),btn('Restart now',act(restartBox),'ghost')):null);
+  const ds=$('#docks');
+  if(ds){const docks=(s.dock||[]).filter(d=>d.listening||d.serial),ip=boxIp(s);
+    fill($('#dockpill'),pill(docks.some(d=>d.companion)?'ok':'warn',docks.filter(d=>d.companion).length+' connected'));
+    fill(ds,docks.length?docks.map(d=>h('div',{class:'dock'},
+      h('div',{class:'dockh'},h('b',null,`Dock ${d.dock+1}`),d.companion?pill('ok','Companion connected'):pill('','Companion not connected'),d.companion&&d.peer&&h('span',{class:'mono dim'},'from '+d.peer)),
+      h('div',null,d.serial?[d.model||'Stream Deck',' ',h('span',{class:'mono dim'},d.serial)]:h('span',{class:'dim'},'No deck on this dock yet')),
+      h('div',{class:'addto'},'Add in Companion → Surfaces → Remote → Add Remote Surface → ',h('b',{class:'mono'},ip),' port ',h('b',{class:'mono'},String(d.port)))))
+      :h('p',{class:'note',style:'margin:0'},docksEmpty(s)));
+  }
+  const cs=$('#cstat');
+  if(cs){const c=s.companion||{},st=conn(s),known=c.state==='connected'||c.state==='too_old';
+    const state={connected:pill('ok','Connected'),old:pill('bad','Refused'),choose:pill('warn','Waiting for you to choose'),nonet:pill('bad','Waiting for a network'),
+      looking:pill('warn',c.auto?'Looking on the network':'Connecting')}[st.k];
+    fill(cs,kv([['State',state],
+      ['Server',hostPort(c)||'None found yet'],
+      st.k==='choose'&&['Found',`${c.instances} Companions, pick one`],
+      known&&['Version',c.state==='too_old'?`${shortVer(c.version)}, needs 5.0 or newer`:`${shortVer(c.version)} (API ${c.api_version})`],
+      ['Chosen by',c.auto?(c.pinned_id?'Found automatically, kept':'Found automatically'):'Address entered here']]));
+  }
+  renderCList();
+};
+async function saveComp(){
+  const pg=PG;   // the page may change while a call runs
+  if(radio('cfind')==='manual'){
+    const host=gv('chost').trim(),port=Number(gv('cport'));
+    if(!host)return bad('chost',"Enter Companion's address");
+    if(!Number.isInteger(port)||port<1||port>65535)return bad('cport','A whole number 1-65535');
+    await call('Companion.SetConfig',{companionAuto:false,companionHost:host,companionPort:port},`Saved. The box connects to ${host}:${port} now.`);
+  }else{
+    const id=radio('cpick');
+    if(!id&&(pg.list||[]).length>1)return toast('Pick one of the Companions found',true);
+    if(id&&id!==pg.cfg.companionPinId)await call('Companion.Choose',{id},'Saved. The box uses this Companion from now on.');
+    else await call('Companion.SetConfig',{companionAuto:true},'Saved. The box finds Companion by itself.');
+  }
+  try{pg.cfg=await rpc('Companion.GetConfig')}catch(_){}
+  refreshStatus();
+}
+async function switchMode(to){
+  const pg=PG,name=to==='dock'?'Network Dock':'Satellite',back=()=>{const r=pg===PG&&document.querySelector(`input[name="smode"][value="${pg.cfg.mode}"]`);if(r){r.checked=true;$('#modego').hidden=true}};
+  const ok=await confirmAction({title:`Switch to ${name} mode?`,icon:'arrow-clockwise',ok:'Switch and restart',body:[
+    P(B('The box restarts'),', so the decks go dark for about 5 seconds.'),
+    to==='dock'?P('Then add the box in Companion: Surfaces → Remote → Add Remote Surface, address ',C(boxIp(S.sys||{})),', port ',C(String(DOCK_PORT)),'. Each further deck gets the next dock and its own port; the Companion page lists them.')
+      :P('Then Companion finds the box by itself again. You can remove its remote surfaces from Companion\'s Surfaces page.')]});
+  if(!ok)return back();
+  let r;try{r=await rpc('Companion.SetConfig',{mode:to})}catch(e){back();return toast(errText(e),true)}
+  pg.cfg.mode=to;
+  if(r&&r.restarting)return restartFlow(null,`Switching to ${name} mode. The box restarts…`);
+  if(pg!==PG)return toast('Saved');
+  if(r&&r.restart_required)return LIVE.companion();   // saved, but the restart couldn't start: the banner offers it
+  toast('Saved');go();
+}
+
+/* ---------- Ethernet, Wi-Fi, Access point ---------- */
+const quad=s=>/^(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}$/.test(s);
+LIVE.ethernet=()=>{const n=(S.sys||{}).net||{};
+  fill($('#ethpill'),n.eth_link?pill('ok','Linked'):pill(n.route==='wifi'?'':'bad','No cable'));
+  fill($('#ethst'),n.eth_link&&kv([['Address',(n.eth_addr||'None yet')+(n.eth_dhcp===false?' (static)':' (DHCP)')]]))};
+async function saveEth(){
+  const p={ethDhcp:gv('dhcp')};
+  if(!p.ethDhcp){Object.assign(p,{ethIp:gv('ip').trim(),ethMask:gv('mask').trim(),ethGw:gv('gw').trim(),ethDns:gv('dns').trim()});
+    for(const [k,i] of [['ethIp','ip'],['ethMask','mask'],['ethGw','gw']])if(!quad(p[k]))return bad(i,'Four numbers 0-255, like 192.168.1.10');
+    if(p.ethDns&&!quad(p.ethDns))return bad('dns','Four numbers 0-255, or leave it empty')}
+  if(via()==='eth'&&!await confirmAction({title:'Change the Ethernet address?',body:[P("This page reaches the box over Ethernet, so it may lose the connection."),
+    P(p.ethDhcp?'Find the new address on the decks or in your router.':['Open ',C('http://'+p.ethIp+'/'),' afterwards.'])],ok:'Save'}))return;
+  await call('Eth.SetConfig',p,'Saved. Applied without a restart.');
+}
+LIVE.wifi=()=>{const s=S.sys||{},n=s.net||{},c=PG.cfg||{},v=(s.c6||{}).running,
+    np=(k,x,e)=>n.sta_net===k?pill('ok','In use'):x?pill('','Standby'):pill('',e),   // a network card's pill
+    pw=(x,p)=>x&&kv([['Password',p?pill('ok','set'):pill('','not set')]]);
+  /* the Wi-Fi state; the network joined (primary or backup), its address and signal, the chip */
+  fill($('#wfpill'),c.wifiEnabled===false?pill('','Off'):!c.wifiSsid?pill('','Not set up'):n.radio_down?pill('bad','Radio down')
+    :n.wifi_connected?pill('ok','Connected'):n.sta_not_found?pill('bad','Not found'):pill('warn','Connecting'));
+  const nm=n.sta_ssid,bk=n.sta_net==='backup';
+  fill($('#wfst'),kv([c.wifiSsid&&['Network',nm?[nm,' ',pill(bk?'warn':'',bk?'Backup':'Primary')]:'None'],n.sta_addr&&['Address',n.sta_addr],nm&&['Signal',n.sta_rssi+' dBm'],
+    v&&v!=='unknown'&&['Wi-Fi chip','ESP-Hosted '+v]]));
+  fill($('#wmpill'),np('main',c.wifiSsid,'Not set'));
+  fill($('#wmst'),pw(c.wifiSsid,c.wifiHasPass));
+  fill($('#wbpill'),np('backup',c.wifiBackupSsid,'Not set up'));
+  fill($('#wbst'),pw(c.wifiBackupSsid,c.wifiBackupHasPass));
+  for(const k of ['main','backup']){const b=$('#use-'+k);if(b)b.hidden=n.sta_net===k}};
+/* Wifi.Scan: the networks in range. st: {busy} | {error: text} | {results: [{ssid, rssi, auth, channel}]} -> the node to show */
+const sigBars=r=>r>=-55?4:r>=-65?3:r>=-75?2:1;
+/* the two scan targets: the field ids, where the list goes and which saved-password flag counts */
+const WF={main:{ssid:'ssid',pass:'wpass',out:'wfscan',has:'wifiHasPass'},backup:{ssid:'bssid',pass:'bpass',out:'wfscan2',has:'wifiBackupHasPass'}};
+function scanView(st,who='main'){
+  if(st.busy)return h('div',{class:'scanst',role:'status'},h('span',{class:'spin'}),'Scanning. This takes a few seconds.');
+  if(st.error)return h('div',{class:'scanst',role:'alert'},ic('warning'),'Scan failed: '+st.error);
+  if(!st.results.length)return h('div',{class:'scanst'},'No networks found.');
+  return h('ul',{class:'nets'},st.results.map(n=>h('li',null,h('button',{type:'button',class:'net',title:n.ssid+', channel '+n.channel,'aria-label':`${n.ssid}, ${n.auth==='open'?'open':'secured'}, ${n.rssi} dBm`,onclick:()=>{const w=WF[who],t=pickNet(n,$('#'+w.ssid),$('#'+w.pass),!!(PG.cfg||{})[w.has]);fill($('#'+w.out),t&&h('p',{class:'note'},t));dirt()}},
+    h('span',{class:'bars b'+sigBars(n.rssi)},h('i'),h('i'),h('i'),h('i')),h('span',{class:'nm'},n.ssid),
+    n.auth!=='open'&&ic('lock','sm'),h('small',null,n.rssi+' dBm')))))}
+/* a network picked from the list: its name into the field, then the password (left empty for an open one).
+   Returns a hint when a saved password would stop the box joining an open network */
+function pickNet(n,ssid,pass,hasPass){
+  ssid.value=n.ssid;
+  if(n.auth==='open')pass.value='';
+  pass.focus();
+  return n.auth==='open'&&hasPass?'Open network: use "Forget password" so the box joins without one.':''}
+/* Wifi.Scan answers: {scanning} while the box is still scanning, else the list or why it failed -> the state scanView draws */
+const scanOutcome=r=>r.scanning?{error:'the box did not finish in time'}:r.error?{error:r.error}:{results:r.results||[]};
+/* the scan runs on the box for 3-6 s: start it, then ask for the answer twice a second for up to 10 s */
+async function scanWifi(who='main'){
+  const pg=PG,out=WF[who].out;
+  fill($('#'+out),scanView({busy:true},who));
+  let st;
+  try{
+    let r=await rpc('Wifi.Scan');
+    for(let i=0;r.scanning&&i<20;i++){await sleep(500);if(pg!==PG)return;r=await rpc('Wifi.Scan',{results:true})}
+    st=scanOutcome(r)}
+  catch(e){st={error:errText(e)}}
+  if(pg===PG)fill($('#'+out),scanView(st,who))}
+const NAME32='At most 32 bytes (accented letters and symbols count 2-4)',PASS863='8-63 characters';
+const redrawWifi=pg=>PAGES.wifi(pg).then(()=>{if(pg===PG){LIVE.wifi();dirt()}}).catch(()=>{});
+async function saveWifi(){
+  const pg=PG,ssid=gv('ssid').trim(),pass=gv('wpass'),p={wifiSsid:ssid};
+  if(bytes(ssid)>32)return bad('ssid',NAME32);
+  if(pass){if(pass.length<8||bytes(pass)>63)return bad('wpass',PASS863);p.wifiPass=pass}
+  if(via()==='wifi'&&!await confirmAction({title:'Change the Wi-Fi network?',body:P('This page reaches the box over Wi-Fi, so it may lose the connection.'),ok:'Save'}))return;
+  await call('Wifi.SetConfig',p,ssid?'Saved. The box joins this network now.':'Saved. Wi-Fi is off.');redrawWifi(pg);
+}
+/* the station on or off, a button of its own (a switch never acts by itself); the hotspot keeps its own settings */
+async function setWifiOn(on){
+  const pg=PG;
+  if(!on&&via()==='wifi'&&!await confirmAction({title:'Turn Wi-Fi off?',body:P('This page reaches the box over Wi-Fi: it loses the connection. The setup hotspot stays.'),ok:'Turn off'}))return;
+  try{await call('Wifi.SetConfig',{wifiEnabled:on},on?'Wi-Fi on: the box joins the primary network.':'Wi-Fi off. The setup hotspot stays.')}catch(_){}
+  redrawWifi(pg);
+}
+/* the backup pair: the name empty means no backup; a missing password keeps the saved one */
+async function saveWifiBackup(){
+  const pg=PG,ssid=gv('bssid').trim(),pass=gv('bpass'),p={wifiBackupSsid:ssid};
+  if(bytes(ssid)>32)return bad('bssid',NAME32);
+  if(pass){if(pass.length<8||bytes(pass)>63)return bad('bpass',PASS863);p.wifiBackupPass=pass}
+  if(via()==='wifi'&&!await confirmAction({title:'Change the backup network?',body:P('This page reaches the box over Wi-Fi, so it may lose the connection.'),ok:'Save'}))return;
+  await call('Wifi.SetConfig',p,ssid?'Saved. The box uses it when the primary network is out of reach.':'Saved. No backup network.');redrawWifi(pg);
+}
+/* join that network now; it stays the one in use while it works */
+/* shown for the network not in use, kept up to date by LIVE.wifi (the status arrives later, and changes) */
+const useBtn=(net,set)=>set&&btn('Use this network',act(async()=>{
+  if(await confirmAction({title:'Use this network now?',body:P('Wi-Fi drops for a moment while the box switches.'),ok:'Use it'}))await call('Wifi.Use',{net},'Switching.')}),'ghost','wifi-high',{id:'use-'+net,hidden:((S.sys||{}).net||{}).sta_net===net});
+async function forgetWifiPass(who='main'){
+  const pg=PG,bk=who==='backup';
+  if(!await confirmAction({title:bk?'Forget the backup password?':'Forget the Wi-Fi password?',body:P('The box then joins the network without a password, as an open network.'),ok:'Forget it'}))return;
+  await call('Wifi.SetConfig',bk?{wifiBackupPass:''}:{wifiPass:''},'Password forgotten.');redrawWifi(pg);
+}
+/* the hotspot: a password unless it is switched off; saved settings in, one line out */
+const apPassInfo=c=>c.apSecured?'On (WPA2)':'Open, no password';
+/* what is wrong with the hotspot form, or null: the 8-63 rule applies only while the password is on */
+const apPassProblem=p=>p.apSecured&&(String(p.apPass||'').length<8||bytes(String(p.apPass||''))>63)?'Hotspot password: 8-63 characters':null;
+LIVE.ap=()=>{const n=(S.sys||{}).net||{},c=PG.cfg||{},on=$('#apon');if(!on)return;
+  fill($('#appill'),n.ap_on?(n.ap_forced?pill('warn','On for 15 min'):pill('ok','On')):pill('','Off'));
+  fill($('#apst'),kv([['Name',n.ap_ssid||c.apSsid],['Password',apPassInfo(c)],['Joined',n.ap_clients?plural(n.ap_clients,'device','devices'):'No devices']]));
+  $('#apnote').textContent=on.checked?($('#apsec').checked?'The name and password also show on the decks whenever Companion isn\'t using them.'
+      :'Open: anyone in range can join it and open this page. For an install, set a settings password on the Device page, or switch the hotspot password on. The name shows on the decks whenever Companion isn\'t using them.')
+    :n.ap_forced?'Hotspot off in the settings, but on for 15 minutes now (RESET pressed three times, or the service button held 5 s).'
+    :'Hotspot off. If the box ever becomes unreachable, press RESET three times in a row to turn the hotspot on for 15 minutes.'};
+async function saveAp(){
+  const p={apEnabled:gv('apon'),apSecured:gv('apsec')};
+  if(p.apSecured)p.apPass=gv('appass');   // off: the saved password stays as it is, unused
+  if(apPassProblem(p))return bad('appass',PASS863);
+  const c=PG.cfg,off=!p.apEnabled&&c.apEnabled,rejoin=p.apSecured!==!!c.apSecured||p.apSecured&&p.apPass!==c.apPass;
+  if(via()==='ap'&&(off||rejoin)&&!await confirmAction({title:'Change the hotspot?',ok:'Save',
+    body:P('This page reaches the box through its hotspot. ',off?'Turning it off disconnects this device.'
+      :p.apSecured?'Join the hotspot again with the new password.':'Join the hotspot again: it is open now, with no password.')}))return;
+  await call('Ap.SetConfig',p,'Saved. Applied without a restart.');Object.assign(c,p);LIVE.ap();
+}
+
+/* ---------- Firmware ---------- */
+LIVE.firmware=()=>{const s=S.sys||{},fw=s.firmware||{},c6=s.c6||{};if(!$('#fwst'))return;
+  fill($('#fwst'),kv([['Running',fw.version||INFO.version],
+    ['Wi-Fi chip',c6.running?['ESP-Hosted '+c6.running,c6.carried&&c6.carried!==c6.running?pill('warn','box carries '+c6.carried):pill('ok','Up to date')]:pill('bad','not answering')]]));
+  fill($('#fwpv'),fw.pending_verify?h('div',{class:'bn warn'},ic('warning'),h('span',null,'This firmware is new and still checking itself (about 30 seconds after start). Uploading works once that is done.')):null)};
+/* the recovery slot: both app slots and Ota.GetStatus.sync */
+const SYNC={in_sync:['ok','In sync',"The other slot holds a copy of this firmware: if this slot's image gets damaged, the box starts the copy. (A fault in the firmware itself isn't covered: the copy is the same firmware.)"],
+  syncing:['','Syncing','Copying this firmware into the other slot. The box works on as usual.'],
+  differs:['warn','Differs','The other slot holds an older firmware. The box replaces it with a copy of this one.'],
+  other_newer:['warn','Other slot newer',"The other slot holds a firmware built at the same time as this one or later (written over USB?). The box never overwrites it by itself: boot it, or sync to replace it."],
+  empty:['warn','Empty','The other slot holds no firmware. The box puts a copy of this one there.'],
+  invalid:['bad','Invalid','The other slot holds a firmware that failed (an update that went back). The box replaces it with a copy of this one.'],
+  waiting:['','Waiting','The box makes the copy 10 minutes after start, not while new firmware checks itself or an upload runs, and an hour after a failed try.']};
+/* another project's firmware: replaced by the sync, never booted from here */
+function slotsView(o){const y=o.sync||{},x=y.other||{},fw=(S.sys||{}).firmware||{},sy=y.state==='syncing',pct=(y.pct||0)+' %';
+  const foreign=!!x.foreign||(!!x.project&&!!fw.project&&x.project!==fw.project),[cls,label,note]=foreign?['bad',x.project?'Other project':'Unknown firmware',
+    `The other slot holds ${x.project?`another project's firmware (${x.project})`:'a firmware without an app descriptor (another or unknown project)'}. It can't be started from here; the box replaces it with a copy of this one.`]:SYNC[y.state]||SYNC.waiting;
+  const boot=!!x.valid&&!foreign&&!o.pending_verify&&!sy;
+  return [kv([[(o.running||'?')+' (running)',[o.version||INFO.version||'—',fw.build&&h('span',{class:'dim'},fw.build)]],
+      [x.label||'Other slot',x.version?[foreign&&x.project,x.version,h('span',{class:'dim'},x.date+' '+x.time)]:'—'],
+      ['Recovery copy',[pill(cls,label),sy&&pct]]]),
+    sy&&h('div',{class:'bar'},h('i',{style:'width:'+pct.replace(' ','')})),h('p',{class:'note'},note),
+    h('div',{class:'btns'},btn('Sync now',act(syncNow),'','floppy-disk',{disabled:sy}),btn('Boot other slot',act(bootOther),'ghost','play',{disabled:!boot}))]}
+function renderSlots(){const e=$('#slots'),o=PG.ota;if(!e||!o)return;const fw=(S.sys||{}).firmware||{};   // all slotsView reads
+  const k=JSON.stringify([o.sync,o.running,o.version,o.pending_verify,fw.build,fw.project,INFO.version]);
+  if(k!==PG.sk){PG.sk=k;fill(e,slotsView(o))}}
+async function pollSlots(pg){clearTimeout(pg.timer);const n=pg.ps=(pg.ps||0)+1;
+  if(!document.hidden)try{const o=await rpc('Ota.GetStatus');if(pg!==PG||n!==pg.ps)return;pg.ota=o;renderSlots()}catch(_){}
+  if(pg===PG&&n===pg.ps)pg.timer=setTimeout(()=>pollSlots(pg),((pg.ota||{}).sync||{}).state==='syncing'?1500:5000)}
+async function syncNow(){const y=(PG.ota||{}).sync||{},x=y.other||{},force=y.state==='other_newer';
+  if(force&&!await confirmAction({title:'Replace the newer firmware?',kind:'danger',ok:'Replace it',body:[
+    P(B(x.label),` holds ${x.version||'a firmware'}, built ${x.date} ${x.time}: newer than the running one.`),P('Sync overwrites it with a copy of the running firmware.')]}))return;
+  await call('Ota.Sync',force?{force}:{},'Sync started.');pollSlots(PG)}
+async function bootOther(){const x=((PG.ota||{}).sync||{}).other||{};
+  if(await confirmAction({title:'Boot the other slot?',icon:'play',ok:'Boot and restart',body:[P('The box restarts into ',B(x.label),` (${x.version||'?'}), a few seconds offline.`),
+    P("It checks itself like an update: if it doesn't start properly, the box goes back to this firmware.")]}))
+    await restartFlow(()=>rpc('Ota.BootOther'),'Restarting into the other slot…')}
+function fwMsg(kind,msg){fill($('#fwmsg'),msg?h('div',{class:'bn '+kind},ic(kind==='ok'?'check-circle':kind==='acc'?'info':'warning'),h('span',null,msg)):null)}
+async function upload(){
+  const f=$('#fw').files[0];if(!f)return;
+  const o=PG.ota||{};
+  if(!await confirmAction({title:'Install new firmware?',icon:'cloud-arrow-down',kind:'info',ok:'Upload and restart',body:[
+    P(B(f.name),` (${(f.size/1048576).toFixed(2)} MB) is written to the spare slot${o.next?' ('+o.next+')':''}; the running firmware stays untouched until the new one is complete and checked.`),
+    P("Then the box restarts into it, a few seconds offline. If the new firmware doesn't start properly, the box goes back to the previous one by itself.")]}))return;
+  const bar=$('#fwprog'),fillb=bar.firstChild;bar.hidden=false;fillb.style.width='0';fwMsg('acc','Uploading… 0%');
+  const r=await new Promise(res=>{const x=new XMLHttpRequest();x.open('POST','ota');if(TOK)x.setRequestHeader('Authorization','Bearer '+TOK);
+    x.setRequestHeader('Content-Type','application/octet-stream');
+    x.upload.onprogress=e=>{if(!e.lengthComputable)return;const p=Math.round(e.loaded*100/e.total);fillb.style.width=p+'%';fwMsg('acc',p<100?`Uploading… ${p}%`:'Checking the image…')};
+    x.onload=()=>{let m={};try{m=JSON.parse(x.responseText)}catch(_){}res({status:x.status,m})};
+    x.onerror=()=>res({status:0,m:{message:'the connection dropped during the upload'}});x.send(f)});
+  if(r.status===200){fillb.style.width='100%';fwMsg('ok',`Firmware ${r.m.version||''} installed. The box restarts into it.`);
+    return restartFlow(null,`Installing firmware ${r.m.version||''}. The box restarts…`)}
+  bar.hidden=true;
+  if(r.status===401){fwMsg('warn','Sign in, then upload again.');return login()}
+  const why=(r.status?'Upload refused: ':'Upload failed: ')+errText(r.m.message||('HTTP '+r.status));fwMsg('bad',why);toast(why,true);
+}
+async function restartBox(){
+  if(await confirmAction({title:'Restart the box?',icon:'arrow-clockwise',ok:'Restart now',body:P('The decks go dark for about 5 seconds; this page reconnects by itself.')}))
+    await restartFlow(()=>rpc('Device.Restart'),'Restarting. The box is back in a few seconds…');
+}
+
+/* ---------- Device ---------- */
+async function saveDevice(){
+  const pg=PG,a=pg.auth,name=gv('bname').trim(),pw=gv('pwnew'),old=a.auth_en?gv('pwold'):'';
+  if(!name)return bad('bname','Enter a box name');
+  if(bytes(name)>32)return bad('bname',NAME32);
+  /* one typo here locks the user out: the new password twice, then a warning */
+  if(pw!==gv('pwrep')){$('#pwnew').value=$('#pwrep').value='';return bad('pwnew','The two PINs differ. Type the new one in both fields again.')}
+  if(pw){
+    if(!pinOk(pw))return bad('pwnew','4 to 8 digits');
+    if(a.auth_en&&!old)return bad('pwold','Enter the current '+(a.pin?'PIN':'password')+' first');
+    if(!await confirmAction({title:a.auth_en?'Change the settings PIN?':'Set a settings PIN?',icon:'key',kind:'info',ok:a.auth_en?'Change PIN':'Set PIN',body:[
+      P(a.auth_en?'Every other browser is signed out and needs the new PIN.':'This page then asks for it before it shows or changes anything, and the decks ask for it before their locked keys work.'),
+      P(B('Keep it somewhere safe.'),' Without it, nobody can sign in here, and the factory reset on this page is locked as well. The only way back is the service button (GPIO32): hold it for 10 seconds for a factory reset, which erases every setting.')]}))return;
+  }
+  let did=false;const u={},ad=gv('cadopt');
+  if(name!==pg.cfg.boxName)u.boxName=name;
+  if(ad!==(pg.cfg.companionAdopt!==false))u.companionAdopt=ad;
+  if(Object.keys(u).length){await call('Device.SetConfig',u);Object.assign(pg.cfg,u);did=true;if(u.boxName)loadInfo().catch(()=>{})}
+  if(pw){const p={pass:pw};if(a.auth_en)p.old_pass=old;
+    let keep=false;try{keep=!!localStorage.getItem('tok')}catch(_){}   // "keep me signed in" stays as it was
+    const r=await call('Device.SetAuth',p);setTok(r.token,keep);wsSignIn();INFO.auth_en=true;$('#outbtn').hidden=false;
+    toast(a.auth_en?'Saved. The PIN is changed; other browsers sign in again.':'Saved. The settings PIN is on.');if(pg===PG)go();return}
+  if(!did){for(const i of ['pwold','pwnew','pwrep']){const e=$('#'+i);if(e)e.value=''}OK++}   // nothing to save leaves it clean (no #pwold without a PIN)
+  toast(did?'Saved.':'Nothing to save.');
+}
+/* the box menu gesture: two different corners (the first tapped), the taps, the hold; it applies at once */
+const CN=['topLeft','topRight','bottomLeft','bottomRight'],CNR=['Top left','Top right','Bottom left','Bottom right'].map((t,i)=>[i,t]);
+async function saveGesture(){const a=+gv('gk1'),b=+gv('gk2');if(a===b)return bad('gk2','Pick another key');
+  await call('Device.SetConfig',{gestureEnabled:gv('gon'),gestureKeys:[CN[a],CN[b]],gestureTaps:+gv('gtaps'),gestureHoldSeconds:+gv('ghold')},'Saved.')}
+async function removePass(){
+  const pg=PG,old=gv('pwold'),w=(pg.auth||{}).pin?'PIN':'password';if(!old)return bad('pwold',`Enter the current ${w} first`);
+  if(!await confirmAction({title:`Remove the settings ${w}?`,body:P('Anyone on the network can then open this page and change the settings.'),ok:'Remove it'}))return;
+  await call('Device.SetAuth',{pass:null,old_pass:old},w==='PIN'?'PIN removed.':'Password removed.');setTok('');INFO.auth_en=false;$('#outbtn').hidden=true;if(pg===PG)go();
+}
+function renderMsg(){const el=$('#msgst');if(!el)return;const m=(S.sys||{}).message||{};
+  if(!m.active){el.textContent='No message on the decks.';return}
+  const left=Math.max(0,Math.round(m.remaining_s-(Date.now()-S.at)/1000));
+  el.textContent=`On the decks now: “${m.text.replace(/\n/g,' / ')}”`+(m.remaining_s?`, ${left} s left.`:', until you clear it.');
+  if(m.remaining_s&&left===0&&!PG.msgPoll){PG.msgPoll=true;setTimeout(()=>{PG.msgPoll=false;refreshStatus()},1200)}}
+async function showMsg(){
+  const text=gv('msgtext'),sec=Number(gv('msgsec'));
+  if(!/^[\x20-\x7e\n]{1,160}$/.test(text)||!text.trim())return bad('msgtext','1-160 plain characters (letters, digits, punctuation; no accents or emoji)');
+  if(!Number.isInteger(sec)||sec<0||sec>3600)return bad('msgsec','A whole number 0-3600');
+  const m=await call('Deck.ShowMessage',{text,seconds:sec},'Shown on the decks.');
+  if(S.sys){S.sys.message=m;S.at=Date.now()}renderMsg();
+}
+/* The box menu on the decks: each deck with a screen has its own, opened and closed from its row on
+   Home; it takes that deck away from Companion until it is closed (or 60 s without a press), so it asks first when
+   Companion drives that deck. The banner names the decks it is open on and closes them all. */
+const drives=(s,d)=>{if(d.ignored)return null;if(s.mode==='dock'){const k=(s.dock||[]).find(x=>x.serial===d.serial);return k&&k.companion?k:null}
+  return (s.companion||{}).state==='connected'};
+const mtBanner=o=>h('div',{class:'bn acc bw'},ic('keys'),h('span',null,o.length>1?`Box menu open on ${o.length} decks. Companion gets each deck back when you close its menu.`
+    :`Box menu open on ${o[0].model}. Companion gets the deck back when you close it.`),
+  btn(o.length>1?'Close all':'Close menu',act(()=>mtToggle(false)),'ghost',null,{'data-k':'mtall'}));
+const mtCell=d=>d.menu?[pill('acc','Box menu'),btn('Close menu',act(()=>mtToggle(false,d)),'ghost sm',null,{'data-k':'mt'+d.serial,'aria-label':'Close the box menu on '+d.model})]
+  :btn('Show box menu',act(()=>mtToggle(true,d)),'ghost sm',null,{'data-k':'mt'+d.serial,'aria-label':'Show the box menu on '+d.model});
+async function mtToggle(on,d){const s=S.sys||{};   // d: that deck's row; none: every deck (the banner)
+  if(on&&drives(s,d)&&!await confirmAction({title:`Show the box menu on ${d.model}?`,ok:'Show the box menu',icon:'keys',
+    body:[P('Companion loses ',B(d.model),' until you close the menu, or after 60 s without a press: its keys show the box menu instead.')]}))return;
+  await call('Deck.ShowMaintenance',d?{on,serial:d.serial}:{on});await refreshStatus();
+  const b=$(`[data-k="mt${d?d.serial:'all'}"]`)||$('#decks button');   // redrawn: focus on its new self (the banner gone: a deck's button)
+  if(b&&document.activeElement===document.body&&!$('#app').inert)b.focus()}
+async function clearMsg(){const m=await call('Deck.ClearMessage',{},'Cleared.');if(S.sys){S.sys.message=m;S.at=Date.now()}renderMsg()}
+/* the deck limit, 2 (what the box's PoE is sized for) or 4 at the user's risk; it restarts the box */
+async function setDecks(n){
+  if(!await confirmAction(n===4?{title:'Allow up to 4 Stream Decks?',kind:'danger',ok:'Allow 4 and restart',no:'Keep 2',body:[
+    P('The box powers its USB port from Power over Ethernet, which is sized for 2 Stream Decks. With more, the decks can drop out or the box can restart. A powered USB hub gives the extra decks their own power.'),
+    P(B('You enable this at your own risk.'),' The box restarts.')]}
+    :{title:'Back to 2 Stream Decks?',icon:'arrow-clockwise',ok:'Use 2 and restart',body:[P(B('The box restarts.'),' A third or fourth deck is then ignored.')]}))return;
+  const r=await call('Device.SetConfig',{deckLimit:n});
+  if(r&&r.restarting)return restartFlow(null,`Up to ${n} Stream Decks. The box restarts…`);
+  toast('Saved');go()}
+async function factoryReset(){$('#rstc').hidden=true;await restartFlow(()=>rpc('Device.FactoryReset'),'Factory reset. Restarting with default settings…')}
+
+/* ---------- Speaker & LED ---------- */
+const LIGHT=[['#fff','White, fast blink','Find my box'],['#a0f','Purple, fast blink','Firmware update'],['#f04','Red and purple','Deck problem'],
+  ['#f00','Red, slow blink','No network'],['#08f','Blue, slow blink','Setup hotspot'],['#fa0','Amber, slow blink','No Companion'],['#0c4','Green','Connected'],['#aaa','White, dim','Starting']];
+async function saveSpeaker(){
+  const p={speakerEnabled:gv('spkon'),speakerVolume:Number(gv('spkvol')),soundReady:gv('sready'),soundConnected:gv('sconn'),
+    soundProblem:gv('sprob'),soundDeckPlug:gv('splug'),soundKeyClick:gv('sclick')},c=PG.cfg;
+  await call('Feedback.SetConfig',p,'Saved. Applied at once.');Object.assign(c,p);
+}
+async function saveLight(){
+  const c=PG.cfg,p={ledEnabled:gv('ledon'),ledFlash:gv('ledfl'),ledPin:Number(gv('ledpin')),ledBrightness:Number(gv('ledbri'))};
+  if(p.ledPin!==c.ledPin&&!await confirmAction({title:`Move the status light to GPIO${p.ledPin}?`,ok:'Move it',body:[
+    P('The box drives that pin from now on: connect nothing to it but the light\'s data input.'),P('Move the data wire over from GPIO',String(c.ledPin),'.')]}))return;
+  await call('Feedback.SetConfig',p,'Saved. Applied at once.');Object.assign(c,p);
+}
+/* the speaker field of a Feedback.Test / Device.Identify answer as words: null when it works; "starting"
+   (the codec still coming up after a start) is no fault */
+const spkNote=s=>s==='ok'?null:s==='starting'?'The speaker is still starting: try again in a few seconds.':'The speaker does not work: '+s;
+async function testSound(event){
+  const vol=Number(gv('spkvol')),r=await call('Feedback.Test',{event,volume:vol}),n=r&&spkNote(r.speaker);
+  if(n)toast(n,r.speaker!=='starting');else if(!vol)toast('The volume is 0: only the light flashes',true);
+}
+async function findBox(){
+  const r=await call('Device.Identify',{},'The box beeps, and its light blinks white for 30 seconds.'),n=r&&spkNote(r.speaker);
+  if(n)toast('The light blinks. '+n,r.speaker!=='starting');
+}
+
+/* ---------- Logs ---------- */
+async function pollLog(pg){
+  if(pg!==PG)return;
+  if(!document.hidden)try{const r=await rpc('Log.Get',{since:pg.seq});if(pg!==PG)return;pg.seq=r.seq;const pre=$('#log');
+    if(pre&&r.text){const atEnd=pre.scrollTop+pre.clientHeight>=pre.scrollHeight-20;
+      pre.textContent+=r.text.replace(/\x1b\[[0-9;]*m/g,'');if(pre.textContent.length>200000)pre.textContent=pre.textContent.slice(-150000);
+      if(atEnd)pre.scrollTop=pre.scrollHeight}}catch(_){}
+  pg.timer=setTimeout(()=>pollLog(pg),2000);
+}
+
+/* ---------- start ---------- */
+wsOpen();
+setTimeout(async()=>{try{await loadInfo()}catch(_){}await refreshStatus();go()},300);
+setInterval(refreshStatus,10000);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)refreshStatus()});
+</script>
+</body>
+</html>

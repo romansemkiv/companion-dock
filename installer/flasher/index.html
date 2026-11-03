@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Companion Dock installer</title>
+<meta name="description" content="Install the latest Companion Dock firmware on a Waveshare ESP32-P4-WIFI6-POE-ETH board from your browser.">
+<style>
+:root{
+  --bg:#0b0e12;--panel:#11161c;--panel2:#161d25;--line:#1e2731;--line2:#2b3644;
+  --fg:#e6edf3;--mut:#8b98a8;--field-line:#617086;
+  --acc:#4cc2ff;--acc-ink:#04131c;--acc-soft:rgba(76,194,255,.12);
+  --ok:#3ddc84;--ok-soft:rgba(61,220,132,.13);--warn:#f5b942;--warn-soft:rgba(245,185,66,.14);--bad:#ff5d6c;--bad-soft:rgba(255,93,108,.13);
+  --shadow:0 1px 0 rgba(255,255,255,.03) inset,0 8px 24px rgba(0,0,0,.25);
+  --mono:ui-monospace,SFMono-Regular,"Cascadia Mono","JetBrains Mono",Menlo,Consolas,monospace;
+  --sans:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",sans-serif;
+  color-scheme:dark
+}
+@media (prefers-color-scheme:light){:root{
+  --bg:#f3f5f8;--panel:#fff;--panel2:#f6f8fb;--line:#e3e8ee;--line2:#d3dae3;--fg:#0f1720;--mut:#5b6878;--field-line:#7a8594;
+  --acc:#0067b0;--acc-ink:#fff;--acc-soft:rgba(10,132,214,.09);--ok:#0a7340;--ok-soft:rgba(19,154,85,.1);--warn:#8a5a00;--warn-soft:rgba(183,121,31,.1);
+  --bad:#b3202f;--bad-soft:rgba(214,52,71,.09);--shadow:0 1px 2px rgba(15,23,32,.04),0 6px 18px rgba(15,23,32,.05);color-scheme:light
+}}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.55 var(--sans)}
+main{max-width:700px;margin:0 auto;padding:36px 16px 56px}
+header{display:flex;align-items:center;gap:14px;margin-bottom:8px}
+.logo{width:44px;height:44px;border-radius:11px;background:var(--panel);border:1px solid var(--line);display:grid;place-items:center;flex:none}
+.logo svg{width:24px;height:24px;fill:var(--acc)}
+h1{margin:0;font-size:21px;font-weight:650;letter-spacing:-.01em}
+.sub{margin:0;color:var(--mut);font-size:14px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px 22px;margin-top:16px;box-shadow:var(--shadow)}
+h2{margin:0 0 12px;font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--mut)}
+p{margin:0 0 12px}
+.fw{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 12px;margin-bottom:14px}
+.fw b{font:600 20px var(--mono)}
+.fw span{color:var(--mut);font-size:13px}
+ol{margin:0 0 16px;padding-left:22px}
+li{margin:0 0 6px}
+li::marker{color:var(--mut)}
+.callout{border:1px solid transparent;border-radius:10px;padding:12px 14px;margin:0 0 16px}
+.callout.warn{background:var(--warn-soft)}
+.callout.warn b{color:var(--warn)}
+.callout.bad{background:var(--bad-soft)}
+.callout.bad b{color:var(--bad)}
+label.chk{display:flex;gap:10px;align-items:flex-start;margin:0 0 16px;cursor:pointer}
+label.chk input{width:18px;height:18px;margin:2px 0 0;accent-color:var(--acc);flex:none}
+button{font:600 15px var(--sans);border-radius:10px;padding:11px 18px;cursor:pointer;border:1px solid var(--field-line);background:transparent;color:var(--fg)}
+button.primary{background:var(--acc);color:var(--acc-ink);border-color:transparent}
+button:disabled{opacity:.45;cursor:not-allowed}
+:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+.bar{height:8px;border-radius:99px;background:var(--panel2);border:1px solid var(--line);overflow:hidden;margin:16px 0 0}
+.bar>div{height:100%;width:0;background:var(--acc);transition:width .2s}
+#status{margin:12px 0 0;min-height:1.55em}
+#status.ok{color:var(--ok)}
+#status.bad{color:var(--bad)}
+details{margin-top:14px}
+details summary{cursor:pointer;color:var(--mut)}
+details[open] summary{margin-bottom:10px}
+input[type=file]{font:14px var(--sans);color:var(--mut);max-width:100%}
+.note{color:var(--mut);font-size:14px}
+ul{margin:0;padding-left:20px}
+ul li{margin:0 0 8px}
+kbd,code{font:13px var(--mono);background:var(--panel2);border:1px solid var(--line);border-radius:5px;padding:1px 5px;white-space:nowrap}
+pre{margin:0;max-height:260px;overflow:auto;font:12px/1.5 var(--mono);color:var(--mut);white-space:pre-wrap;word-break:break-word}
+footer{margin-top:24px;color:var(--mut);font-size:13px}
+footer a,.panel a{color:var(--acc)}
+@media (max-width:480px){.panel{padding:18px 16px}button{width:100%}}
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div class="logo" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="5" cy="5" r="2.4"/><circle cx="12" cy="5" r="2.4"/><circle cx="19" cy="5" r="2.4"/><circle cx="5" cy="12" r="2.4"/><circle cx="12" cy="12" r="2.4"/><circle cx="19" cy="12" r="2.4"/><circle cx="5" cy="19" r="2.4"/><circle cx="12" cy="19" r="2.4"/><circle cx="19" cy="19" r="2.4"/></svg></div>
+    <div>
+      <h1>Companion Dock installer</h1>
+      <p class="sub">Puts the firmware on a Waveshare ESP32-P4-WIFI6-POE-ETH board, straight from this page.</p>
+    </div>
+  </header>
+
+  <div class="panel callout bad" id="unsupported" hidden>
+    <b>This browser can't talk to the board.</b> Open this page in Chrome or Edge on a computer (Windows, macOS or
+    Linux). Safari, Firefox and phones don't support USB serial devices.
+  </div>
+
+  <section class="panel" aria-labelledby="h-install">
+    <h2 id="h-install">Install</h2>
+    <div class="fw"><b id="ver">…</b><span id="fwinfo">Looking for the latest firmware</span></div>
+    <ol>
+      <li>Connect the board's <b>USB-C</b> port to this computer with a data cable. The USB-A port is for the Stream Decks.</li>
+      <li>Press <b>Connect and install</b> and pick the board in the list. It usually shows up as "USB Single Serial", "CH343" or "usbmodem".</li>
+      <li>Wait until it says it's done, about 3 minutes. Leave the cable in meanwhile.</li>
+    </ol>
+    <div class="callout warn"><b>This is a fresh install.</b> It erases the box's settings: Wi-Fi networks, the settings
+      PIN and the Companion address. To update a box that already runs Companion Dock and keep its settings, open the
+      box's web page and upload the new <code>companion-dock-v….bin</code> on its Firmware page instead.</div>
+    <label class="chk"><input type="checkbox" id="agree"> <span>I understand the box's settings will be erased.</span></label>
+    <button class="primary" id="go" type="button" disabled>Connect and install</button>
+    <div class="bar" id="bar" hidden><div></div></div>
+    <p id="status" role="status" aria-live="polite"></p>
+    <details>
+      <summary>Use a firmware file from this computer</summary>
+      <input type="file" id="file" accept=".bin">
+      <p class="note">Pick a full image, the one whose name ends in <code>-full.bin</code>. It's written at address 0x0, like the latest one.</p>
+    </details>
+  </section>
+
+  <section class="panel" aria-labelledby="h-after">
+    <h2 id="h-after">After installing</h2>
+    <p>The box restarts and the Stream Decks show the setup screen with two QR codes.</p>
+    <ol>
+      <li>Scan the first code with your phone to join the box's hotspot.</li>
+      <li>Scan the second to open the setup page, then join your network on its Wi-Fi page, or plug in an Ethernet cable.</li>
+      <li>Add the box in Companion. <a href="https://github.com/romansemkiv/companion-dock#3-add-it-in-companion">How to add it</a> covers both modes.</li>
+    </ol>
+  </section>
+
+  <section class="panel" aria-labelledby="h-trouble">
+    <h2 id="h-trouble">If it doesn't work</h2>
+    <ul>
+      <li><b>The board isn't in the list.</b> Try another cable (charge-only cables have no data wires) and plug straight into the computer, not through a hub. On Windows, if no COM port appears, install WCH's CH343 driver.</li>
+      <li><b>It can't connect.</b> Close anything else that has the port open, such as a serial monitor or the Arduino IDE. Then put the board in download mode by hand: hold <kbd>BOOT</kbd>, press and release <kbd>RESET</kbd>, release <kbd>BOOT</kbd>, and try again.</li>
+      <li><b>It stopped halfway.</b> Nothing is broken. Press <kbd>RESET</kbd> on the board and install again.</li>
+      <li>The log below shows exactly what happened. It helps if you open an issue.</li>
+    </ul>
+  </section>
+
+  <details class="panel">
+    <summary>Log</summary>
+    <pre id="log"></pre>
+  </details>
+
+  <footer>
+    Flashing is done by <a href="https://github.com/espressif/esptool-js">esptool-js</a> 0.7.1 (Apache-2.0), which
+    supports this board's chip revision. Nothing is sent anywhere: the firmware goes from this page to the board over USB.
+    <br>Companion Dock is under the <a href="https://github.com/romansemkiv/companion-dock/blob/main/LICENSE">PolyForm Shield 1.0.0</a>
+    licence; the firmware's <a href="../firmware/THIRD_PARTY_LICENSES.txt">third-party notices</a>. Not affiliated with or
+    endorsed by Elgato / Corsair or Bitfocus AS.
+  </footer>
+</main>
+
+<script type="module">
+import { ESPLoader, Transport } from "./esptool-js-0.7.1.mjs";
+import { md5 } from "./md5.mjs";
+
+const $ = (s) => document.querySelector(s);
+const logEl = $("#log");
+const log = (t) => { logEl.textContent += t; logEl.scrollTop = logEl.scrollHeight; };
+const terminal = { clean() { logEl.textContent = ""; }, writeLine(t) { log(t + "\n"); }, write(t) { log(t); } };
+const canSerial = "serial" in navigator;
+let latest = null, localFile = null, busy = false;
+
+function setStatus(text, cls = "") { const s = $("#status"); s.textContent = text; s.className = cls; }
+function progress(f) { const b = $("#bar"); b.hidden = f === null; if (f !== null) b.firstElementChild.style.width = Math.round(f * 100) + "%"; }
+function refresh() {
+  const source = localFile || latest;
+  $("#go").disabled = busy || !canSerial || !source || !$("#agree").checked;
+  $("#go").textContent = localFile ? "Connect and install this file" : "Connect and install";
+}
+const mb = (n) => (n / 1048576).toFixed(1) + " MB";
+async function sha256(bytes) {
+  const h = new Uint8Array(await crypto.subtle.digest("SHA-256", bytes));
+  return Array.from(h, (x) => x.toString(16).padStart(2, "0")).join("");
+}
+
+// A full image starts with the bootloader at 0x2000 and the app at 0x20000; both begin with the ESP image magic.
+function checkImage(data) {
+  if (data.length < 0x20000 + 256 || data[0x2000] !== 0xe9 || data[0x20000] !== 0xe9)
+    throw new Error("this isn't a full image. Pick the file whose name ends in -full.bin.");
+}
+
+async function loadLatest() {
+  try {
+    const r = await fetch("../firmware/latest.json", { cache: "no-store" });
+    if (!r.ok) throw new Error(String(r.status));
+    latest = await r.json();
+    $("#ver").textContent = "v" + latest.version;
+    $("#fwinfo").textContent = [latest.date, latest.full_size ? mb(latest.full_size) : ""].filter(Boolean).join(" · ");
+  } catch {
+    $("#ver").textContent = "No firmware found";
+    $("#fwinfo").textContent = "Open this page from the project's site, or use a file from this computer below.";
+  }
+  refresh();
+}
+
+async function getImage() {
+  if (localFile) return new Uint8Array(await localFile.arrayBuffer());
+  setStatus(`Downloading v${latest.version}…`);
+  const r = await fetch("../firmware/" + latest.full, { cache: "no-store" });
+  if (!r.ok) throw new Error(`the download failed (${r.status}).`);
+  const data = new Uint8Array(await r.arrayBuffer());
+  if (latest.full_sha256 && (await sha256(data)) !== latest.full_sha256)
+    throw new Error("the download is damaged (its checksum doesn't match). Try again.");
+  return data;
+}
+
+async function install() {
+  busy = true; refresh(); progress(null); setStatus("");
+  let transport = null;
+  try {
+    const data = await getImage();
+    checkImage(data);
+    setStatus("Pick the board in the list…");
+    const port = await navigator.serial.requestPort();
+    transport = new Transport(port, false);
+    /* 115200, the ROM's own rate: esptool-js changes the rate by closing and reopening the port (Web Serial can't change
+       it in place), and the reopen's DTR/RTS toggle can reset this board through its auto-reset circuit, which drops the
+       flasher stub ("Serial data stream stopped" at the write). Slower, but nothing reopens the port. */
+    const loader = new ESPLoader({ transport, baudrate: 115200, terminal });
+    setStatus("Connecting to the board…");
+    const chip = await loader.main();
+    if (!/ESP32-P4/.test(loader.chip.CHIP_NAME))
+      throw new Error(`this board has an ${loader.chip.CHIP_NAME}. Companion Dock runs on the ESP32-P4.`);
+    loader.DEFAULT_TIMEOUT = 30000; /* the stub may erase before it answers the write's start: give it time */
+    setStatus(`Connected to ${chip}. Writing ${mb(data.length)}, about 3 minutes…`);
+    progress(0);
+    await loader.writeFlash({
+      fileArray: [{ data, address: 0 }],
+      flashMode: "keep", flashFreq: "keep", flashSize: "keep",
+      eraseAll: false, compress: true,
+      reportProgress: (_i, written, total) => progress(written / total),
+      calculateMD5Hash: md5,
+    });
+    progress(1);
+    setStatus("Restarting the box…");
+    /* Our own reset, as esptool.py's hard reset does it: esptool-js 0.7.1's after("hard_reset") never asserts RTS (it
+       only waits and releases it) and re-sends a stale DTR "on", which holds BOOT (GPIO35) low through the auto-reset
+       circuit: the chip stayed in the flasher stub until a power cycle. DTR off (BOOT high), RTS on 100 ms (EN low),
+       RTS off: the box starts its new firmware. A moment for it to start before the port closes. */
+    terminal.writeLine("Restarting the box: EN pulsed through RTS, BOOT released.");
+    await transport.setDTR(false);
+    await transport.setRTS(true);
+    await new Promise((r) => setTimeout(r, 100));
+    await transport.setRTS(false);
+    await new Promise((r) => setTimeout(r, 300));
+    setStatus("Done. The box is starting; the decks show the setup screen in a few seconds.", "ok");
+  } catch (e) {
+    progress(null);
+    if (e && e.name === "NotFoundError") setStatus("No board was picked. Press the button again and choose it in the list.");
+    else setStatus("That didn't work: " + (e && e.message ? e.message : e) + " See “If it doesn't work” below.", "bad");
+    log("\n" + String(e && e.stack ? e.stack : e) + "\n");
+  } finally {
+    if (transport) { try { await transport.disconnect(); } catch { /* already closed */ } }
+    busy = false; refresh();
+  }
+}
+
+if (!canSerial) $("#unsupported").hidden = false;
+$("#agree").addEventListener("change", refresh);
+$("#file").addEventListener("change", (e) => { localFile = e.target.files[0] || null; refresh(); });
+$("#go").addEventListener("click", install);
+loadLatest();
+</script>
+</body>
+</html>

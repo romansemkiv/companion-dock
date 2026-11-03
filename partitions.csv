@@ -1,0 +1,16 @@
+# Name,   Type, SubType,  Offset,  Size
+# 16 MB flash (the board has 32 MB; the table must fit 16). Two 4 MB app slots for A/B updates with
+# rollback, no factory app. App slots start on a 64 KB boundary (0x20000), as app partitions must.
+# coredump: the last crash's core dump (ELF, CONFIG_ESP_COREDUMP_ENABLE_TO_FLASH), read over USB with
+# idf.py coredump-info (docs/manual.md, Recovery). It was appended after ota_1 so that every other partition
+# kept its offset and size: a box flashed with an older table gets it with one partition-table
+# flash (0x8000), and NVS (0x9000: the settings and the Wi-Fi) and both app slots stay as they are.
+# 256 KB (was 64 KB): one deck took 32 KB, 6 decks + 6 docks are estimated at 48-60 KB, and a dump
+# that doesn't fit is not saved. The firmware finds the partition at run time
+# (esp_partition_find_first), so it runs with either size.
+nvs,      data, nvs,      0x9000,  0x6000
+otadata,  data, ota,      ,        0x2000
+phy_init, data, phy,      ,        0x1000
+ota_0,    app,  ota_0,    0x20000, 4M
+ota_1,    app,  ota_1,    ,        4M
+coredump, data, coredump, ,        256K

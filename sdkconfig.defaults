@@ -1,0 +1,84 @@
+CONFIG_IDF_TARGET="esp32p4"
+CONFIG_ESP32P4_SELECTS_REV_LESS_V3=n
+CONFIG_ESP32P4_REV_MIN_300=y
+CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y
+CONFIG_PARTITION_TABLE_CUSTOM=y
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"
+# A/B updates: two app slots + otadata (partitions.csv), bootloader rollback. The version comes from
+# version.txt and git (CMakeLists.txt), not from here.
+CONFIG_APP_PROJECT_VER_FROM_CONFIG=n
+CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y
+
+# Board-wide basics:
+CONFIG_FREERTOS_HZ=1000
+# -O2: the image is far from filling its 4 MB slot; speed matters on the key and image paths and for
+# the PBKDF2 of a settings-password check
+CONFIG_COMPILER_OPTIMIZATION_PERF=y
+# PSRAM: large buffers go there so internal RAM stays free (anything over 1 KB; task stacks may too)
+CONFIG_SPIRAM=y
+CONFIG_SPIRAM_USE_MALLOC=y
+CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=1024
+CONFIG_SPIRAM_ALLOW_STACK_EXTERNAL_MEMORY=y
+# A crash leaves an ELF core dump in the "coredump" partition (partitions.csv); read it over USB with
+# idf.py coredump-info -p PORT (docs/manual.md, Recovery)
+CONFIG_ESP_COREDUMP_ENABLE_TO_FLASH=y
+CONFIG_ESP_COREDUMP_DATA_FORMAT_ELF=y
+CONFIG_ESP_COREDUMP_CHECKSUM_CRC32=y
+CONFIG_ESP_COREDUMP_CHECK_BOOT=y
+# Stack-smashing protection for functions with local arrays (-fstack-protector)
+CONFIG_COMPILER_STACK_CHECK_MODE_NORM=y
+CONFIG_USB_HOST_HUBS_SUPPORTED=y
+CONFIG_USB_HOST_HUB_MULTI_LEVEL=y
+CONFIG_USB_HOST_CONTROL_TRANSFER_MAX_SIZE=1024
+CONFIG_USB_HOST_ENABLE_ENUM_FILTER_CALLBACK=y
+# Stream Decks (XL, Original v2, MK.2) use 1024-byte interrupt OUT endpoints; the default
+# "balanced" FIFO split caps periodic OUT MPS at 512 on the HS port, so claiming them would fail.
+# The FIFO split actually used is set in components/usbdeck/usb_host_task.c (fifo_settings_custom):
+# this bias alone left the RX FIFO too small for the decks' 512-byte IN packets (no key input).
+CONFIG_USB_HOST_HW_BUFFER_BIAS_PERIODIC_OUT=y
+CONFIG_ESP_TASK_WDT_PANIC=y
+# Task watchdog: the supervisor, satclient, imgwork, usb_daemon and usb_client tasks feed it.
+CONFIG_ESP_TASK_WDT_TIMEOUT_S=10
+# Stacks: app_main runs the staged boot, including the ESP-Hosted bring-up
+# (and a C6 update when one is due); the default event loop task runs every network handler.
+CONFIG_ESP_MAIN_TASK_STACK_SIZE=6144
+CONFIG_ESP_SYSTEM_EVENT_TASK_STACK_SIZE=4096
+CONFIG_HTTPD_MAX_REQ_HDR_LEN=1024
+# WebSocket /rpc (webui): JSON-RPC frames and NotifyStatus pushes
+CONFIG_HTTPD_WS_SUPPORT=y
+# the cross-site / host check runs before the 101 reply (IDF never calls the handler for the upgrade)
+CONFIG_HTTPD_WS_PRE_HANDSHAKE_CB_SUPPORT=y
+# Network Dock mode: up to 6 docks x (2 listening + 2 connected) sockets, on top of the
+# web server's 8 + 2, the captive DNS and the Satellite client.
+CONFIG_LWIP_MAX_SOCKETS=40
+CONFIG_LWIP_MAX_ACTIVE_TCP=32
+
+# ESP-Hosted over SDIO to the on-board ESP32-C6 (names verified against esp_hosted 3.0.9)
+CONFIG_ESP_HOSTED_CP_TARGET_ESP32C6=y
+CONFIG_ESP_HOSTED_HOST_TRANSPORT_BUS_SDIO=y
+CONFIG_ESP_HOSTED_SDIO_SLOT_1=y
+CONFIG_ESP_HOSTED_HOST_SDIO_BUS_WIDTH_4=y
+CONFIG_ESP_HOSTED_HOST_SDIO_CLK_KHZ=40000
+CONFIG_ESP_HOSTED_HOST_SDIO_PIN_CMD=19
+CONFIG_ESP_HOSTED_HOST_SDIO_PIN_CLK=18
+CONFIG_ESP_HOSTED_HOST_SDIO_PIN_D0=14
+CONFIG_ESP_HOSTED_HOST_SDIO_PIN_D1=15
+CONFIG_ESP_HOSTED_HOST_SDIO_PIN_D2=16
+CONFIG_ESP_HOSTED_HOST_SDIO_PIN_D3=17
+CONFIG_ESP_HOSTED_HOST_RESET_GPIO=54
+# A C6 that stops answering never restarts the P4 (ESP-Hosted's default does):
+# components/netmgr/hosted.c turns Wi-Fi off and the box goes on over Ethernet.
+CONFIG_ESP_HOSTED_HOST_TRANSPORT_RESTART_ON_FAILURE=n
+
+# The speaker (components/feedback): the board's codec is an ES8311; esp_codec_dev's other chips stay
+# out of the image
+CONFIG_CODEC_ES8311_SUPPORT=y
+CONFIG_CODEC_ES7210_SUPPORT=n
+CONFIG_CODEC_ES7243_SUPPORT=n
+CONFIG_CODEC_ES7243E_SUPPORT=n
+CONFIG_CODEC_ES8156_SUPPORT=n
+CONFIG_CODEC_AW88298_SUPPORT=n
+CONFIG_CODEC_ES8389_SUPPORT=n
+CONFIG_CODEC_ES8374_SUPPORT=n
+CONFIG_CODEC_ES8388_SUPPORT=n
+CONFIG_CODEC_TAS5805M_SUPPORT=n

@@ -1,0 +1,9 @@
+build/
+build-*/
+build-host/
+build-c6/
+sdkconfig
+sdkconfig.old
+managed_components/
+tools/dock_check/node_modules/
+.DS_Store

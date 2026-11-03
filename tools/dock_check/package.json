@@ -1,0 +1,16 @@
+{
+  "name": "dock-check",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Network Dock mode conformance check: drives the box with the library Companion uses",
+  "type": "module",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "check": "node dock_check.mjs"
+  },
+  "dependencies": {
+    "@elgato-stream-deck/tcp": "7.8.0"
+  }
+}

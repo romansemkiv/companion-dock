@@ -1,0 +1,12 @@
+dependencies:
+  espressif/mdns: "*"
+  # Wi-Fi through the ESP32-C6 over SDIO (components/netmgr/hosted.c). Pinned: the C6
+  # image is built at exactly this version (tools/build_c6.sh reads it from
+  # dependencies.lock), so another firmware on the same version never
+  # re-flashes the C6.
+  espressif/esp_hosted: "3.0.9"
+  espressif/esp_wifi_remote: "1.6.5"
+  # The board's speaker: the ES8311 codec (I2C 0x18 on GPIO7/8, I2S on 9, 10, 12, 13) and its
+  # amplifier (GPIO53), components/feedback/speaker.c. Pinned to a
+  # tested version.
+  espressif/esp_codec_dev: "1.6.2"

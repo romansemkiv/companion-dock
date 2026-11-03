@@ -1,0 +1,5 @@
+bf4418b7ef4919076b3f7bda4b278d1689c3dc866673cece855e10ee274ccdc1  bootloader.bin
+1d95127090c9ae7db45fb1284c9aba34173e7eaf11d34ab923a4cf10e4fc6145  companion-dock-v0.2.2-full.bin
+50b52e69adbe1c35ca575c1b6a362e1e6eb16319dc012ef48a861430d7a3dd24  companion-dock-v0.2.2.bin
+7d2c7ac4888bfd75cd5f56e8d61f69595121183afc81556c876732fd3782c62f  ota_data_initial.bin
+67cb6a6b24b2dcf5a417e8917fec30e15ec4d36087fc3fa815df46c13de677a3  partition-table.bin
