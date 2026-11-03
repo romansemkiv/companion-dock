@@ -7,8 +7,8 @@ The files are in the [`firmware/`](../firmware) folder of this repository:
 
 | File | What it is |
 |---|---|
-| `companion-dock-v0.2.2-full.bin` | the whole flash in one file, written at `0x0`. Use this one on a new board |
-| `companion-dock-v0.2.2.bin` | the app alone. Use this one for updates through the web page |
+| `companion-dock-v0.2.3-full.bin` | the whole flash in one file, written at `0x0`. Use this one on a new board |
+| `companion-dock-v0.2.3.bin` | the app alone. Use this one for updates through the web page |
 | `bootloader.bin`, `partition-table.bin`, `ota_data_initial.bin` | the other parts, for flashing file by file |
 | `SHA256SUMS` | checksums of all of the above |
 
@@ -50,7 +50,7 @@ With Espressif's page:
 
 1. Plug the board in, set the baud rate to **460800** and press **Connect**. Pick the board's port in the
    browser's list.
-2. Under the flash address, enter **`0x0`** and choose the file **`companion-dock-v0.2.2-full.bin`**.
+2. Under the flash address, enter **`0x0`** and choose the file **`companion-dock-v0.2.3-full.bin`**.
 3. Press **Program** and wait until it says it is done.
 4. Press **Disconnect**, then press the board's **RESET** button or unplug and replug it.
 
@@ -69,7 +69,7 @@ python3 -m pip install "esptool>=4.12"
 Then, from the `firmware/` folder:
 
 ```sh
-esptool.py --chip esp32p4 -p <PORT> -b 460800 write_flash 0x0 companion-dock-v0.2.2-full.bin
+esptool.py --chip esp32p4 -p <PORT> -b 460800 write_flash 0x0 companion-dock-v0.2.3-full.bin
 ```
 
 `<PORT>` is the board's port, for example `/dev/cu.usbmodem1101` on macOS, `/dev/ttyACM0` on Linux or `COM3` on
@@ -82,7 +82,7 @@ esptool.py --chip esp32p4 -p <PORT> -b 460800 write_flash --flash_mode dio --fla
   0x2000 bootloader.bin \
   0x8000 partition-table.bin \
   0xf000 ota_data_initial.bin \
-  0x20000 companion-dock-v0.2.2.bin
+  0x20000 companion-dock-v0.2.3.bin
 ```
 
 Press **RESET** or replug the board when it finishes.
@@ -107,6 +107,6 @@ shows it too.
 
 ## Updating a running box
 
-Open the box's web page, go to **Firmware**, choose **`companion-dock-v0.2.2.bin`** and upload it. The settings
+Open the box's web page, go to **Firmware**, choose **`companion-dock-v0.2.3.bin`** and upload it. The settings
 stay. The box restarts into the new firmware, checks that it runs properly, and goes back to the previous one if
 it doesn't. See the manual's [Recovery slot](manual.md#recovery-slot) section for how the two firmware slots work.
