@@ -130,8 +130,19 @@ static void test_ota_without_a_record_needs_a_route_or_the_hotspot(void)
     TEST_ASSERT_FALSE(net(NETMGR_IF_NONE, true, true, false, false));
 }
 
-/* Checked every 30 s from 30 s; rolled back only at 5 min. */
-static void test_ota_verdict_waits_up_to_5_min(void)
+/* the web page's countdown names the check that rolls back: the one ota_verdict rolls back at, the one before waits */
+static void test_ota_rollback_check(void)
+{
+    const int64_t start = 4200000;
+    const int64_t at = ota_rollback_check_us(start);
+    TEST_ASSERT_EQUAL_INT64(start + 120 * 1000000LL, at); /* 30 s, then every 30 s: the fourth check, 2 min */
+    TEST_ASSERT_EQUAL_INT64(0, (at - start - OTA_FIRST_CHECK_US) % OTA_RECHECK_US); /* a check runs then */
+    TEST_ASSERT_EQUAL_INT(OTA_ROLLBACK, ota_verdict(false, at - start));
+    TEST_ASSERT_EQUAL_INT(OTA_WAIT, ota_verdict(false, at - start - OTA_RECHECK_US));
+}
+
+/* Checked every 30 s from 30 s; rolled back only at 2 min. */
+static void test_ota_verdict_waits_up_to_2_min(void)
 {
     TEST_ASSERT_EQUAL_INT(OTA_CONFIRM, ota_verdict(true, OTA_FIRST_CHECK_US));
     for (int64_t t = OTA_FIRST_CHECK_US; t < OTA_GIVE_UP_US; t += OTA_RECHECK_US)
@@ -139,7 +150,7 @@ static void test_ota_verdict_waits_up_to_5_min(void)
     TEST_ASSERT_EQUAL_INT(OTA_CONFIRM, ota_verdict(true, OTA_GIVE_UP_US - OTA_RECHECK_US));
     TEST_ASSERT_EQUAL_INT(OTA_ROLLBACK, ota_verdict(false, OTA_GIVE_UP_US));
     TEST_ASSERT_EQUAL_INT(OTA_CONFIRM, ota_verdict(true, OTA_GIVE_UP_US));
-    TEST_ASSERT_EQUAL_INT64(5 * 60 * S, OTA_GIVE_UP_US);
+    TEST_ASSERT_EQUAL_INT64(2 * 60 * S, OTA_GIVE_UP_US);
     TEST_ASSERT_EQUAL_INT64(30 * S, OTA_RECHECK_US);
 }
 
@@ -197,10 +208,11 @@ int main(void)
     RUN_TEST(test_record_round_trip_and_garbage);
     RUN_TEST(test_ota_needs_the_interface_it_came_over);
     RUN_TEST(test_ota_without_a_record_needs_a_route_or_the_hotspot);
-    RUN_TEST(test_ota_verdict_waits_up_to_5_min);
+    RUN_TEST(test_ota_verdict_waits_up_to_2_min);
     RUN_TEST(test_pin_save_only_when_changed);
     RUN_TEST(test_ota_over_a_forced_hotspot_forces_it_again);
     RUN_TEST(test_ota_hotspot_force_only_when_needed);
     RUN_TEST(test_pin_save_at_most_once_a_minute);
+    RUN_TEST(test_ota_rollback_check);
     return UNITY_END();
 }

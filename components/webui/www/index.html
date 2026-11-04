@@ -407,16 +407,18 @@ async function restartFlow(act,msg){
   /* restarted = the uptime is behind what it would be by now without a restart (a missed poll
      alone proves nothing) */
   const b0=S.sys?{up:S.sys.uptime_s,at:S.at}:null;let gone=false,st=null;RS=true;
+  const fw=(S.sys||{}).firmware||{};   // new firmware checking itself: the restart waits for the check
+  if(fw.pending_verify)msg+=` It waits for the firmware's self-check first${fw.check_at_s>boxUp()?` (in ${clock(fw.check_at_s-boxUp())})`:''}.`;
   const back=st=>b0?st.uptime_s<b0.up+(Date.now()-b0.at)/1000-3:gone;
   banner('acc',msg,true);
   if(act){try{await act()}catch(e){RS=false;banner();toast('The restart did not start: '+errText(e),true);return false}}
-  const t0=Date.now();
-  while(Date.now()-t0<120000){
+  const t0=Date.now(),wait=120000+(fw.pending_verify&&fw.rollback_at_s?Math.max(0,fw.rollback_at_s-boxUp())*1000:0);   // the restart waits for the check
+  while(Date.now()-t0<wait){
     await sleep(1500);
     try{st=await rpc('Sys.GetStatus',{},{http:true,timeout:4000});if(st&&back(st))break;st=null}
     catch(_){if(!gone){gone=true;banner('acc','Restarting. The box is offline for a few seconds; this page reconnects by itself.',true)}}
   }
-  if(!st){RS=false;banner('bad',"The box isn't back after 2 minutes. It may have a new address, or it is still starting: this page keeps trying by itself.");return false}
+  if(!st){RS=false;banner('bad',`The box isn't back after ${Math.round(wait/60000)} minutes. It may have a new address, or it is still starting: this page keeps trying by itself.`);return false}
   onSys(st);RS=false;   // after onSys: it would take the uptime drop for a restart of its own
   try{await loadInfo()}catch(_){}
   banner('ok','The box is back.');$('#rsbn')._h=setTimeout(()=>banner(),5000);
@@ -645,6 +647,7 @@ async firmware(pg){
     h('p',{class:'note',style:'margin:12px 0 0'},"If the new firmware doesn't start properly, the box goes back to the previous one by itself.")],null,'cloud-arrow-down'),
     panel('Firmware slots',h('div',{id:'slots'}),null,'floppy-disk'));
   renderSlots();   // read again when the slots change (rev.slots)
+  pg.tick=setInterval(()=>{const e=$('#fwpvt'),fw=(S.sys||{}).firmware||{};if(e&&fw.pending_verify)e.textContent=pvText(fw,boxUp())},1000);
 },
 async device(pg){
   const [c,a]=await Promise.all([rpc('Device.GetConfig'),rpc('Auth.GetStatus')]);if(pg!==PG)return;pg.cfg=c;pg.auth=a;
@@ -962,7 +965,20 @@ async function saveAp(){
 LIVE.firmware=()=>{const s=S.sys||{},fw=s.firmware||{},c6=s.c6||{};if(!$('#fwst'))return;
   fill($('#fwst'),kv([['Running',fw.version||INFO.version],
     ['Wi-Fi chip',c6.running?['ESP-Hosted '+c6.running,c6.carried&&c6.carried!==c6.running?pill('warn','box carries '+c6.carried):pill('ok','Up to date')]:pill('bad','not answering')]]));
-  fill($('#fwpv'),fw.pending_verify?h('div',{class:'bn warn'},ic('warning'),h('span',null,'This firmware is new and still checking itself (about 30 seconds after start). Uploading works once that is done.')):null)};
+  fill($('#fwpv'),fw.pending_verify?h('div',{class:'bn warn'},ic('warning'),h('span',{id:'fwpvt'},pvText(fw,boxUp()))):null)};
+/* The OTA self-check's countdown. firmware.check_at_s (the next check) and rollback_at_s (the check that goes back to the
+   previous firmware if they keep failing) are the box's uptime seconds; check_failed, what the last check found. up: the
+   box's uptime now, as this page reckons it (the last status's, and the time since). */
+const clock=s=>{s=Math.max(0,Math.ceil(s));return Math.floor(s/60)+':'+String(s%60).padStart(2,'0')};
+const boxUp=()=>S.sys?S.sys.uptime_s+(Date.now()-S.at)/1000:0;
+function pvText(fw,up){
+  if(!fw.check_at_s)return 'This firmware is new and still checking itself (about 30 seconds after start). Uploading works once that is done.';
+  const next=fw.check_at_s-up,when=next>0?'in '+clock(next):'now';
+  if(!fw.check_failed)return next>0?`This firmware is new: it checks itself in ${clock(next)}. Uploading works once it has passed; a restart asked for now waits for it.`
+    :'This firmware is new and is checking itself now…';
+  return `The firmware's last self-check found: ${fw.check_failed}. `+(fw.rollback_at_s<=fw.check_at_s
+    ?`The next check (${when}) is the last: if it fails too, the box goes back to the previous firmware.`
+    :`Next check ${when}. If the checks still fail in ${clock(fw.rollback_at_s-up)}, the box goes back to the previous firmware.`)}
 /* the recovery slot: both app slots and Ota.GetStatus.sync */
 const SYNC={in_sync:['ok','In sync',"The other slot holds a copy of this firmware: if this slot's image gets damaged, the box starts the copy. (A fault in the firmware itself isn't covered: the copy is the same firmware.)"],
   syncing:['','Syncing','Copying this firmware into the other slot. The box works on as usual.'],
@@ -1001,6 +1017,10 @@ async function upload(){
   if(!await confirmAction({title:'Install new firmware?',icon:'cloud-arrow-down',kind:'info',ok:'Upload and restart',body:[
     P(B(f.name),` (${(f.size/1048576).toFixed(2)} MB) is written to the spare slot${o.next?' ('+o.next+')':''}; the running firmware stays untouched until the new one is complete and checked.`),
     P("Then the box restarts into it, a few seconds offline. If the new firmware doesn't start properly, the box goes back to the previous one by itself.")]}))return;
+  /* signed in first (rpc signs in on a 401): one refused halfway through the image only shows a dropped connection;
+     and not while another upload is being written */
+  let st;try{st=await rpc('Ota.GetStatus')}catch(e){fwMsg('bad','Upload not started: '+errText(e));return}
+  if(st&&st.state==='writing'){fwMsg('warn','Another firmware upload is being written. Try again once it is done.');return}
   const bar=$('#fwprog'),fillb=bar.firstChild;bar.hidden=false;fillb.style.width='0';fwMsg('acc','Uploading… 0%');
   const r=await new Promise(res=>{const x=new XMLHttpRequest();x.open('POST','ota');if(TOK)x.setRequestHeader('Authorization','Bearer '+TOK);
     x.setRequestHeader('Content-Type','application/octet-stream');

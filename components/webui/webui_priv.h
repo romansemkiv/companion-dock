@@ -30,14 +30,13 @@ esp_err_t webui_methods_init(box_config_t *cfg, void (*changed)(void), box_surfa
 bool webui_apply_satellite(const char *json, bool has_host, bool has_port, const char *adopted_by, char *err, size_t n);
 /* This run's surface mode (as main gave it to webui_start). */
 box_surface_mode_t webui_run_mode(void);
-/* Restarts in about a second (after the reply went out); with factory_reset the settings are erased
- * first, holding the config lock until the restart so no save lands after the erase. why: the
- * restart breadcrumb's reason (BC_WHY_*, breadcrumb.h; a string that outlives the call).
- * ESP_ERR_INVALID_STATE: a restart is already on its way; ESP_ERR_NO_MEM: no task for it. */
-esp_err_t webui_restart_later(bool factory_reset, const char *why);
-/* The running image is on its first boot after an update, not confirmed yet (reads otadata from
- * flash: not from a task with a PSRAM stack). */
-bool webui_pending_verify(void);
+/* A restart is on its way (webui_restart_later): a firmware upload is refused meanwhile (web.c). Any task. */
+bool webui_restart_pending(void);
+/* webui_restart_later(false, why), asked again when the "on its way" came from a restart whose task couldn't be
+ * made a moment ago (none comes then). For the restarts that must happen: an upload's, a setting's, the C6's. */
+esp_err_t webui_restart_plain(const char *why);
+/* A firmware upload is being written (web.c): a restart on its way waits for it. Any task. */
+bool web_ota_writing(void);
 /* The Companion connection, for Sys.GetStatus, Companion.GetStatus and /api/status. */
 cJSON *webui_companion_status(void);
 /* Attached decks as an array of objects (Deck.List, /api/surfaces). */
@@ -100,7 +99,8 @@ esp_err_t web_start(void);
 esp_err_t web_queue_work(void (*fn)(void *), void *arg);
 /* A WebSocket client can receive pushes: any client while no password is set, else a signed-in one. */
 bool web_ws_listening(void);
-/* Sends text to every WebSocket client allowed to see pushes. HTTP server task only. */
-void web_ws_broadcast_now(const char *text);
+/* Sends text to every WebSocket client allowed to see pushes. HTTP server task only. Invalid UTF-8 in text is made
+ * '?' first, in place (web_utf8_scrub). */
+void web_ws_broadcast_now(char *text);
 /* Ota.GetStatus. */
 cJSON *web_ota_status(void);

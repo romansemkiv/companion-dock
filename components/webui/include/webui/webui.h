@@ -39,6 +39,39 @@ esp_err_t webui_start(box_config_t *cfg, void (*on_config_changed)(void), box_su
  * without a web page and POST /ota could only be replaced over USB. */
 bool webui_running(void);
 
+/* Restarts in about a second (after the reply went out); with factory_reset the settings are erased
+ * first, holding the config lock until the restart so no save lands after the erase. Not over an
+ * update's self-check (webui_wait_confirmed) nor over a firmware upload being written: the restart
+ * waits for them (a factory reset erases before such a wait too). why: the restart breadcrumb's
+ * reason (BC_WHY_*, breadcrumb.h; a string that outlives the call). A factory reset asked for while
+ * a plain restart is on its way joins it (ESP_OK). ESP_ERR_INVALID_STATE: a restart is already on
+ * its way (for a factory reset: one past the point of taking it); ESP_ERR_NO_MEM: no task for it.
+ * Any task, without the config lock. */
+esp_err_t webui_restart_later(bool factory_reset, const char *why);
+
+/* A factory reset is asked for and on its way (webui_restart_later): the supervisor's rollback over a failed self-check
+ * erases the settings first, so the previous firmware starts without them, as asked. Any task. */
+bool webui_reset_pending(void);
+
+/* The running image is on its first boot after an update, not confirmed yet (reads otadata from
+ * flash: not from a task with a PSRAM stack). */
+bool webui_pending_verify(void);
+
+/* A restart asked for while the running firmware is pending verify (its first start after an update, before the
+ * supervisor's OTA self-check confirms it) would roll the update back: the bootloader marks a pending image ABORTED at
+ * every start, whatever the reason. Blocks until the image is confirmed (the self-check passes 30 s after the start, or
+ * at a recheck every 30 s), for at most 3 minutes (past the self-check's 2-minute give-up, which rolls back and
+ * restarts the box by itself); returns at once when not pending. why names the restart in the log. Never with the
+ * config lock held (the self-check's Sys.GetStatus takes it), and not on a task with a PSRAM stack (it reads otadata
+ * from flash). */
+void webui_wait_confirmed(const char *why);
+
+/* The OTA self-check's schedule, for the web page's countdown (Sys.GetStatus firmware.check_at_s, rollback_at_s and
+ * check_failed while pending verify): the next check, and the check that rolls the image back if they keep failing
+ * (esp_timer_get_time() microseconds; next_us 0: none, after the last one), and what the last check found (NULL or ""
+ * before the first). The supervisor sets it; any task. */
+void webui_ota_check_set(int64_t next_us, int64_t rollback_us, const char *failed);
+
 /* The interface the last firmware upload came in on (POST /ota records it in NVS, namespace "ota",
  * right before the restart into the new image), then forgets it: NETMGR_IF_NONE when there was no
  * record. The supervisor takes it once at start for the OTA self-check. */

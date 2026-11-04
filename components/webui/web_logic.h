@@ -93,6 +93,15 @@ bool wg_adopt_log_due(wg_bucket_t *b, int64_t now_ms);
 struct cJSON;
 void wg_api_body(struct cJSON *body, wg_api_t access);
 
+/* Each byte of invalid UTF-8 in s[0..n) made '?', in place, the length kept: a lead byte that can't start a sequence
+ * (0x80-0xC1, 0xF5-0xFF), a sequence cut short or broken by a non-continuation byte, an overlong form, a UTF-16
+ * surrogate (U+D800-DFFF), past U+10FFFF. Valid sequences and ASCII are kept as they are, and a byte that ends a bad
+ * sequence early is looked at again (a quote after a stray lead byte stays a quote). A WebSocket text frame must be
+ * valid UTF-8 (RFC 6455 8.1: the browser fails the connection), and text from outside the box need not be (a
+ * scanned SSID, an mDNS TXT record, Companion's version): JSON's structure is ASCII, so a JSON text stays the same
+ * JSON. Returns the bytes replaced. */
+size_t web_utf8_scrub(char *s, size_t n);
+
 #ifdef __cplusplus
 }
 #endif

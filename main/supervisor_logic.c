@@ -84,6 +84,13 @@ ota_verdict_t ota_verdict(bool healthy, int64_t since_start_us)
     return since_start_us >= OTA_GIVE_UP_US ? OTA_ROLLBACK : OTA_WAIT;
 }
 
+int64_t ota_rollback_check_us(int64_t start_us)
+{
+    int64_t at = OTA_FIRST_CHECK_US;
+    while (at < OTA_GIVE_UP_US) at += OTA_RECHECK_US;
+    return start_us + at;
+}
+
 bool ota_force_hotspot(bool pending, netmgr_if_t via, bool ap_enabled, bool already_forced)
 {
     return pending && via == NETMGR_IF_AP && !ap_enabled && !already_forced;

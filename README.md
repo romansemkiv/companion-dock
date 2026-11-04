@@ -186,9 +186,10 @@ You need [ESP-IDF 5.5.6](https://github.com/espressif/esp-idf/releases/tag/v5.5.
 ./build.sh --release                  # release build in build-release/, version from version.txt
 ```
 
-The image carries the ESP32-C6's Wi-Fi firmware and keeps the C6 on it. `build.sh` builds that firmware first
+The image carries the ESP32-C6's Wi-Fi firmware and keeps the C6 on it: flashing the box, over USB or the web page,
+also updates the C6 when its ESP-Hosted version differs. `build.sh` builds that firmware first
 (`tools/build_c6.sh`, into `build-c6/`) when it is missing or out of date, which needs ESP-IDF's component
-registry once.
+registry once; without it a build stops (`-DCBX_NO_C6_IMAGE=ON` builds one without it on purpose).
 
 ## Project layout
 

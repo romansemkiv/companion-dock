@@ -508,6 +508,11 @@ bool netmgr_c6_ready(void) { return netmgr_hosted_ready(); }
  * task, which takes s_cfg_lock only to read the records and put the radio mode back. */
 #define SCAN_FINISH_STACK 4096 /* internal: RPCs to the C6 and a few log lines */
 static bool s_scan_running, s_scan_have;
+/* Which scan s_scan_running is about: one more at every start, cancel and failed start. A finish task works only on
+ * the scan it was started for: one that waited for s_cfg_lock while a settings save cancelled that scan and a new one
+ * started must neither read the new scan's records (an empty list, its real end ignored) nor end its running state
+ * and timer (its SCAN_DONE then ignored, the radio left in the scan's mode, every later scan and connect held up). */
+static uint32_t s_scan_gen;
 static int64_t s_scan_start_ms, s_scan_end_ms;
 static wifiscan_ap_t s_scan_last[WIFISCAN_MAX];
 static size_t s_scan_last_n;
@@ -524,24 +529,32 @@ static void scan_finish_task(void *arg)
     if (!atomic_exchange(&s_scan_finishing, true)) {
         xSemaphoreTake(s_lock, portMAX_DELAY);
         const bool go = s_scan_running && (!timed_out || wifiscan_timed_out(true, now_ms(), s_scan_start_ms));
+        const uint32_t gen = s_scan_gen;
         xSemaphoreGive(s_lock);
         if (go) {
             size_t n = 0;
+            esp_err_t e = ESP_ERR_INVALID_STATE; /* "the scan was cancelled" */
             xSemaphoreTake(s_cfg_lock, portMAX_DELAY);
-            const esp_err_t e = netmgr_wifi_scan_finish(timed_out, s_scan_tmp, &n);
+            xSemaphoreTake(s_lock, portMAX_DELAY); /* s_cfg_lock, then s_lock: the lock order */
+            const bool still = s_scan_running && s_scan_gen == gen; /* not cancelled, no other scan since */
+            xSemaphoreGive(s_lock);
+            if (still) e = netmgr_wifi_scan_finish(timed_out, s_scan_tmp, &n);
             xSemaphoreGive(s_cfg_lock);
             xSemaphoreTake(s_lock, portMAX_DELAY);
-            esp_timer_stop(s_scan_timer); /* before the running state ends: a new scan arms its own */
-            s_scan_running = false;
-            if (e == ESP_OK) {
-                s_scan_last_n = n;
-                memcpy(s_scan_last, s_scan_tmp, n * sizeof *s_scan_tmp);
-                s_scan_have = true;
-                s_scan_end_ms = now_ms();
-            } else {
-                if (e == ESP_ERR_TIMEOUT) snprintf(s_scan_err, sizeof s_scan_err, "the scan did not finish");
-                else if (e == ESP_ERR_INVALID_STATE) snprintf(s_scan_err, sizeof s_scan_err, "the scan was cancelled");
-                else snprintf(s_scan_err, sizeof s_scan_err, "reading the scan failed: %s", esp_err_to_name(e));
+            if (s_scan_gen == gen) { /* else that scan ended meanwhile (its cancel said so): a newer one is left alone */
+                esp_timer_stop(s_scan_timer); /* before the running state ends: a new scan arms its own */
+                s_scan_running = false;
+                s_scan_gen++;
+                if (e == ESP_OK) {
+                    s_scan_last_n = n;
+                    memcpy(s_scan_last, s_scan_tmp, n * sizeof *s_scan_tmp);
+                    s_scan_have = true;
+                    s_scan_end_ms = now_ms();
+                } else {
+                    if (e == ESP_ERR_TIMEOUT) snprintf(s_scan_err, sizeof s_scan_err, "the scan did not finish");
+                    else if (e == ESP_ERR_INVALID_STATE) snprintf(s_scan_err, sizeof s_scan_err, "the scan was cancelled");
+                    else snprintf(s_scan_err, sizeof s_scan_err, "reading the scan failed: %s", esp_err_to_name(e));
+                }
             }
             xSemaphoreGive(s_lock);
         }
@@ -565,6 +578,7 @@ void netmgr_scan_cancelled(void)
     xSemaphoreTake(s_lock, portMAX_DELAY);
     if (s_scan_running) {
         s_scan_running = false;
+        s_scan_gen++; /* a finish task still waiting for this scan leaves the next one alone */
         snprintf(s_scan_err, sizeof s_scan_err, "the scan was cancelled");
     }
     xSemaphoreGive(s_lock);
@@ -594,6 +608,7 @@ netmgr_scan_t netmgr_wifi_scan_start(char *why, size_t why_n)
     const wifiscan_act_t act = wifiscan_decide(s_scan_running, s_scan_have, now_ms(), s_scan_end_ms);
     if (act == WIFISCAN_RUN) {
         s_scan_running = true;
+        s_scan_gen++;
         s_scan_start_ms = now_ms();
         s_scan_err[0] = '\0';
     }
@@ -623,6 +638,7 @@ netmgr_scan_t netmgr_wifi_scan_start(char *why, size_t why_n)
     if (e != ESP_OK) {
         xSemaphoreTake(s_lock, portMAX_DELAY);
         s_scan_running = false;
+        s_scan_gen++;
         xSemaphoreGive(s_lock);
         if (!netmgr_hosted_ready()) {
             snprintf(why, why_n, "no Wi-Fi: %s", netmgr_hosted_error());

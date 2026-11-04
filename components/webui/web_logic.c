@@ -216,3 +216,38 @@ bool wg_adopt_log_due(wg_bucket_t *b, int64_t now_ms)
     b->warned_ms = now_ms;
     return true;
 }
+
+size_t web_utf8_scrub(char *s, size_t n)
+{
+    unsigned char *p = (unsigned char *)s;
+    size_t fixed = 0;
+    for (size_t i = 0; i < n;) {
+        const unsigned char c = p[i];
+        if (c < 0x80) {
+            i++;
+            continue;
+        }
+        size_t len = 0;
+        unsigned char lo = 0x80, hi = 0xBF; /* the second byte's range: narrower after E0, ED, F0, F4 */
+        if (c >= 0xC2 && c <= 0xDF) {
+            len = 2;
+        } else if (c >= 0xE0 && c <= 0xEF) {
+            len = 3;
+            if (c == 0xE0) lo = 0xA0; /* overlong */
+            if (c == 0xED) hi = 0x9F; /* a surrogate */
+        } else if (c >= 0xF0 && c <= 0xF4) {
+            len = 4;
+            if (c == 0xF0) lo = 0x90; /* overlong */
+            if (c == 0xF4) hi = 0x8F; /* past U+10FFFF */
+        }
+        bool ok = len > 0 && len <= n - i && p[i + 1] >= lo && p[i + 1] <= hi;
+        for (size_t k = 2; ok && k < len; k++) ok = (p[i + k] & 0xC0) == 0x80;
+        if (ok) {
+            i += len;
+            continue;
+        }
+        p[i++] = '?';
+        fixed++;
+    }
+    return fixed;
+}

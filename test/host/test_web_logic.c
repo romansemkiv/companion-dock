@@ -420,6 +420,59 @@ static void test_api_body_adversarial(void)
     cJSON_Delete(arr);
 }
 
+/* The WebSocket's text frames must be valid UTF-8 (RFC 6455 8.1): bad bytes become '?', the length and every valid
+ * sequence kept */
+static size_t scrub(char *buf) { return web_utf8_scrub(buf, strlen(buf)); }
+
+static void test_utf8_scrub(void)
+{
+    char ok[] = "{\"ssid\":\"Caf\xc3\xa9 \xe2\x82\xac \xf0\x9f\x98\x80 \xf4\x8f\xbf\xbf\"}"; /* é € 😀 U+10FFFF */
+    char want_ok[sizeof ok];
+    memcpy(want_ok, ok, sizeof ok);
+    TEST_ASSERT_EQUAL_UINT(0, scrub(ok));
+    TEST_ASSERT_EQUAL_STRING(want_ok, ok);
+
+    char latin1[] = "{\"ssid\":\"Caf\xe9\"}"; /* a Latin-1 SSID: E9 then a quote, which stays */
+    TEST_ASSERT_EQUAL_UINT(1, scrub(latin1));
+    TEST_ASSERT_EQUAL_STRING("{\"ssid\":\"Caf?\"}", latin1);
+
+    static const struct {
+        const char *in, *out;
+        size_t n;
+    } C[] = {
+        {"\x80", "?", 1},                    /* a lone continuation byte */
+        {"a\xbf\xbf" "b", "a??b", 2},
+        {"\xc0\xaf", "??", 2},              /* overlong '/' */
+        {"\xc1\xbf", "??", 2},
+        {"\xe0\x80\xaf", "???", 3},        /* overlong, 3 bytes */
+        {"\xf0\x80\x80\xaf", "????", 4},  /* overlong, 4 bytes */
+        {"\xed\xa0\x80", "???", 3},        /* a surrogate */
+        {"\xf4\x90\x80\x80", "????", 4},  /* past U+10FFFF */
+        {"\xf5\x80\x80\x80", "????", 4},
+        {"\xff\xfe", "??", 2},
+        {"x\xe2\x82", "x??", 2},            /* cut short at the end */
+        {"\xe2\x82\"", "??\"", 2},          /* cut short by a quote, which stays */
+        {"\xe2(\xa1", "?(?", 2},
+        {"\xc3\xa9\xe9", "\xc3\xa9?", 1},   /* valid, then not */
+        {"", "", 0},
+    };
+    for (size_t i = 0; i < sizeof C / sizeof C[0]; i++) {
+        char buf[16];
+        snprintf(buf, sizeof buf, "%s", C[i].in);
+        char msg[16];
+        snprintf(msg, sizeof msg, "case %u", (unsigned)i);
+        TEST_ASSERT_EQUAL_UINT_MESSAGE(C[i].n, scrub(buf), msg);
+        TEST_ASSERT_EQUAL_STRING_MESSAGE(C[i].out, buf, msg);
+    }
+
+    char nul[] = {'a', '\xe9', '\0', '\xe9', 'b'}; /* only the n bytes given; a NUL is ASCII */
+    TEST_ASSERT_EQUAL_UINT(2, web_utf8_scrub(nul, sizeof nul));
+    TEST_ASSERT_EQUAL_MEMORY("a?\0?b", nul, sizeof nul);
+    char cut[] = {'\xc3', '\xa9'}; /* n stops inside a valid sequence: not read past n */
+    TEST_ASSERT_EQUAL_UINT(1, web_utf8_scrub(cut, 1));
+    TEST_ASSERT_EQUAL_MEMORY("?\xa9", cut, sizeof cut);
+}
+
 int main(void)
 {
     UNITY_BEGIN();
@@ -439,5 +492,6 @@ int main(void)
     RUN_TEST(test_adopt_limiter);
     RUN_TEST(test_api_body);
     RUN_TEST(test_api_body_adversarial);
+    RUN_TEST(test_utf8_scrub);
     return UNITY_END();
 }

@@ -2585,7 +2585,8 @@ static void test_lock_clear_of_satellite(void)
 static void test_password_one_key(void)
 {
     static const uint16_t PIDS[] = {0x0060, 0x0090, 0x0063, 0x0080, 0x006C, 0x00BA, 0x00B9, 0x00B8, 0x0084, 0x009A, 0x00C6};
-    static const char *const PW[] = {"k7m2p9xq", "k7m2p9xqhd"};
+    /* the box's own is 10 of AP_ALPHABET (boxconfig): its widest letters too */
+    static const char *const PW[] = {"k7m2p9xq", "k7m2p9xqhd", "mmmmmmmmmm", "wwwwwwwwww", "mwmwmwmwmw"};
     for (size_t m = 0; m < sizeof PIDS / sizeof PIDS[0]; m++)
         for (size_t w = 0; w < sizeof PW / sizeof PW[0]; w++)
             for (int home = 0; home < 2; home++) {
@@ -2613,6 +2614,33 @@ static void test_password_one_key(void)
                     TEST_ASSERT_NULL_MESSAGE(strstr(PW[w], piece), msg);
                 }
             }
+}
+
+/* A password with spaces too long for one key goes word by word (a Wi-Fi name's path): its first word keeps the
+ * caption, the others are plain words, as a long value's pieces are (no caption tile without its caption) */
+static void test_password_words_plain(void)
+{
+    static const uint16_t PIDS[] = {0x0060, 0x006C, 0x00BA};
+    static const char *const LATER[] = {"horse", "battery", "staple"};
+    for (size_t m = 0; m < sizeof PIDS / sizeof PIDS[0]; m++) {
+        dui_box_t b = box_default();
+        strcpy(b.net.ap_pass, "Correct horse battery staple wwwwwwwwwwwwwwww");
+        build(DUI_PAGE_HOTSPOT, &b);
+        plan(PIDS[m]);
+        char msg[48];
+        snprintf(msg, sizeof msg, "pid %04x", PIDS[m]);
+        const int first = tile_with("Correct");
+        TEST_ASSERT_TRUE_MESSAGE(first >= 0, msg);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(DUI_TILE_CAP, L.tile[first].kind, msg);
+        TEST_ASSERT_EQUAL_STRING_MESSAGE("Password", L.tile[first].caption, msg);
+        for (size_t w = 0; w < sizeof LATER / sizeof LATER[0]; w++) {
+            const int ti = tile_with(LATER[w]);
+            snprintf(msg, sizeof msg, "pid %04x, %s", PIDS[m], LATER[w]);
+            TEST_ASSERT_TRUE_MESSAGE(ti >= 0, msg);
+            TEST_ASSERT_EQUAL_INT_MESSAGE(DUI_TILE_WORD, L.tile[ti].kind, msg);
+            TEST_ASSERT_NULL_MESSAGE(L.tile[ti].caption, msg);
+        }
+    }
 }
 
 int main(void)
@@ -2665,5 +2693,6 @@ int main(void)
     RUN_TEST(test_lock_clear_of_satellite);
     RUN_TEST(test_setup_screen_qr);
     RUN_TEST(test_password_one_key);
+    RUN_TEST(test_password_words_plain);
     return UNITY_END();
 }

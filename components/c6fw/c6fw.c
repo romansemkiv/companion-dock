@@ -21,10 +21,12 @@
  *   power-on (reset reason, or the magic missing).
  * - A power cut during the copy leaves the C6 on its old slot: the next start
  *   copies again.
- * - A build without build-c6/ (C6FW_HAVE_IMAGE 0, CMake warns) carries no
- *   image: it never updates, only reports a C6 on another version and uses it
- *   when it speaks the same major version. */
+ * - A build without build-c6/ stops (CMake error) unless asked for with
+ *   -DCBX_NO_C6_IMAGE=ON (C6FW_HAVE_IMAGE 0): it carries no image, never
+ *   updates, only reports a C6 on another version and uses it when it speaks
+ *   the same major version. */
 #include <inttypes.h>
+#include <stdatomic.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -78,6 +80,18 @@ static RTC_NOINIT_ATTR struct {
 } s_rtc;
 
 static portMUX_TYPE s_mux = portMUX_INITIALIZER_UNLOCKED; /* guards s_running */
+static atomic_bool s_updating; /* the C6's firmware is being written (c6fw_updating) */
+typedef esp_err_t (*restart_fn_t)(const char *why);
+typedef bool (*pending_fn_t)(void);
+static _Atomic(restart_fn_t) s_restart; /* c6fw_set_restart's */
+static _Atomic(pending_fn_t) s_restart_pending;
+
+bool c6fw_updating(void) { return atomic_load(&s_updating); }
+void c6fw_set_restart(esp_err_t (*restart)(const char *why), bool (*restart_pending)(void))
+{
+    atomic_store(&s_restart_pending, restart_pending);
+    atomic_store(&s_restart, restart);
+}
 static char s_running[VER_LEN] = "unknown";
 static bool s_checked;
 
@@ -133,20 +147,32 @@ static esp_err_t update(void)
 }
 
 /* The update and the P4's restart (this image is confirmed); returns only on
- * failure. */
-static esp_err_t update_and_restart(const char *was)
+ * failure, or (deferred) with the restart on its way through c6fw_set_restart's. */
+static esp_err_t update_and_restart(const char *was, bool deferred)
 {
+    atomic_store(&s_updating, true); /* then the check: webui's restart task checks the restart, then this */
+    const pending_fn_t pending = deferred ? atomic_load(&s_restart_pending) : NULL;
+    if (pending && pending()) {
+        atomic_store(&s_updating, false);
+        ESP_LOGW(TAG, "the C6 runs ESP-Hosted %s: a restart is on its way, it is updated at the next start", was);
+        return ESP_OK;
+    }
     s_rtc.tries++;
     ESP_LOGW(TAG, "the C6 runs ESP-Hosted %s: updating it to %d.%d.%d (%u bytes, try %" PRIu32 " of %d)", was,
              C6FW_MAJOR, C6FW_MINOR, C6FW_PATCH, (unsigned)(c6fw_end - c6fw_start), s_rtc.tries, C6FW_MAX_TRIES);
     feedback_firmware_update(true); /* the status light's purple blink */
     esp_err_t e = update();
+    atomic_store(&s_updating, false);
     if (e != ESP_OK) {
         feedback_firmware_update(false);
         return e;
     }
     ESP_LOGW(TAG, "C6 firmware %s -> %d.%d.%d: restarting to meet it", was, C6FW_MAJOR, C6FW_MINOR, C6FW_PATCH);
     vTaskDelay(pdMS_TO_TICKS(500)); /* the C6 restarting into its new slot */
+    /* after the confirmation an upload may be under way: webui's restart waits for it (a restart already on its way,
+     * ESP_ERR_INVALID_STATE, is one too) */
+    const restart_fn_t r = deferred ? atomic_load(&s_restart) : NULL;
+    if (r && r(BC_WHY_C6_UPDATE) != ESP_ERR_NO_MEM) return ESP_OK;
     breadcrumb_restart(BC_WHY_C6_UPDATE);
 }
 
@@ -160,7 +186,7 @@ static void deferred_task(void *arg)
     bool known = read_running(&r, was);
     switch (c6fw_decide(r, known, carried(), false, (int)s_rtc.tries, false)) {
     case C6FW_UPDATE:
-        update_and_restart(was); /* returns only on failure, logged */
+        update_and_restart(was, true); /* returns on failure (logged), or with the restart on its way */
         break;
     case C6FW_GIVE_UP:
         ESP_LOGW(TAG, "the C6 stays on ESP-Hosted %s after %d updates (again after a power-on)", was,
@@ -194,7 +220,7 @@ esp_err_t c6fw_check(void)
         return ESP_OK;
     case C6FW_UPDATE:
 #if C6FW_HAVE_IMAGE
-        err = update_and_restart(was); /* returns only on failure */
+        err = update_and_restart(was, false); /* returns only on failure */
 #endif
         break;
     case C6FW_WAIT_CONFIRM:

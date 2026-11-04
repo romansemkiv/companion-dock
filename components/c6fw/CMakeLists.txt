@@ -4,8 +4,8 @@ idf_component_register(SRCS "c6fw.c" "c6fw_logic.c"
 
 # The C6's ESP-Hosted firmware that this image carries (c6fw.c keeps the C6 on
 # it), built first by tools/build_c6.sh into build-c6/; its version becomes
-# c6fw_version.h. Without build-c6/ the build still succeeds with C6 updating
-# disabled (C6FW_HAVE_IMAGE 0). The CONFIGURE_DEPENDS glob makes the next
+# c6fw_version.h. Without build-c6/ the build stops, unless -DCBX_NO_C6_IMAGE=ON
+# asks for an image without it (C6FW_HAVE_IMAGE 0). The CONFIGURE_DEPENDS glob makes the next
 # idf.py build reconfigure on its own once build_c6.sh has made (or a clean
 # has removed) the image.
 idf_build_get_property(project_dir PROJECT_DIR)
@@ -28,8 +28,14 @@ if(c6_count EQUAL 2)
     target_compile_definitions(${COMPONENT_LIB} PRIVATE C6FW_HAVE_IMAGE=1)
     set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${c6_dir}/version.txt")
     message(STATUS "c6fw: carrying the C6's ESP-Hosted ${c6_ver} firmware (build-c6/network_adapter.bin)")
-else()
+elseif(CBX_NO_C6_IMAGE)
+    # only when asked for (-DCBX_NO_C6_IMAGE=ON): an image that never updates the C6
     target_compile_definitions(${COMPONENT_LIB} PRIVATE C6FW_HAVE_IMAGE=0)
-    message(WARNING "c6fw: build-c6/network_adapter.bin or version.txt is missing, so this image carries no C6 "
-                    "firmware and C6 updating is disabled. Run tools/build_c6.sh, then idf.py build.")
+    message(WARNING "c6fw: built without the C6's firmware (-DCBX_NO_C6_IMAGE): this image never updates the C6")
+else()
+    # Every firmware carries the C6's: flashing the P4 updates the C6 too. Without it, a box flashed
+    # with this image would keep whatever ESP-Hosted its C6 runs.
+    message(FATAL_ERROR "c6fw: build-c6/network_adapter.bin or version.txt is missing, and an image without them never "
+                        "updates the C6's ESP-Hosted firmware. Run tools/build_c6.sh (./build.sh does it by itself), "
+                        "then build again; or build without it on purpose: -DCBX_NO_C6_IMAGE=ON.")
 endif()

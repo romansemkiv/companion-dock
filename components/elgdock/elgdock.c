@@ -435,9 +435,29 @@ esp_err_t elgdock_start(const char *box_name, const uint8_t mac[6], const elgdoc
 /* usbdeck's stand-in for a deck whose serial couldn't be read is no identity to keep a dock for. */
 static bool sticky_serial(const char *serial) { return serial[0] && strncmp(serial, "unknown-", 8) != 0; }
 
+/* A deck re-attached before its old handle detached (a new usbdeck_t with the same serial: surfaces' "reused";
+ * each handle has its own task, and the old one's teardown can take seconds). The old handle would
+ * still hold the serial's dock, which then looks busy: the deck would land on another port, or on none (all
+ * docks busy), and stay there after the old handle goes. That handle is past use (it is being torn down), so
+ * its dock is let go first, as its on_detach would; its own elgdock_release then finds none. */
+static void release_stale(const usbdeck_t *d, const char *serial)
+{
+    if (!sticky_serial(serial)) return;
+    usbdeck_t *old = NULL;
+    elg_lock();
+    for (int i = 0; i < ELGDOCK_MAX && !old; i++)
+        if (elg.dock[i].deck && elg.dock[i].deck != d && strcmp(elg.dock[i].deck_serial, serial) == 0)
+            old = elg.dock[i].deck;
+    elg_unlock();
+    if (!old) return;
+    ESP_LOGW(TAG, "Stream Deck %s attached again before its old handle detached: its dock is let go first", serial);
+    elgdock_release(old); /* usb_mtx, then elg.mtx: the lock order; neither is held here */
+}
+
 int elgdock_assign(usbdeck_t *d, const deck_model_t *m, const char *serial)
 {
     if (!elg.mtx || !d || !m || !serial) return -1;
+    release_stale(d, serial);
     elg_lock();
     int at = -1;
     for (int i = 0; i < ELGDOCK_MAX && at < 0; i++)
@@ -503,10 +523,16 @@ void elgdock_release(usbdeck_t *d)
     if (!k) return;
     xSemaphoreTake(k->usb_mtx, portMAX_DELAY); /* dockrxK has left every call with d */
     elg_lock();
-    k->deck = NULL;
-    k->deck_serial[0] = k->model[0] = k->deck_fw[0] = '\0';
+    /* still d's: d's own on_detach and a re-attached deck's release_stale may both let it go; the second one
+     * must not clear the dock the deck has meanwhile been given (d stays allocated until its on_detach returns) */
+    const bool mine = k->deck == d;
+    if (mine) {
+        k->deck = NULL;
+        k->deck_serial[0] = k->model[0] = k->deck_fw[0] = '\0';
+    }
     elg_unlock();
     xSemaphoreGive(k->usb_mtx);
+    if (!mine) return;
     elg_deck_stop(k); /* the server task then closes the port and withdraws it */
     ESP_LOGI(TAG, "dock %d: deck gone", k->k);
 }

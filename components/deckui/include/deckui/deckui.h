@@ -143,7 +143,8 @@ enum {
                               // "8.225"), on one line
 #define DUI_F_TAG 0x4000      // a button (not a choice): its caption is a small tag at the top right (Make
                               // static's "saved" / "lease"); the icon, the label, the hold hint and the lock as ever
-#define DUI_F_WHOLE 0x8000    // a value kept on one key on every deck (a Wi-Fi name's word): over keys only
+#define DUI_F_WHOLE 0x8000    // a value kept on one key on every deck (a Wi-Fi name's word; the hotspot's
+                              // password, captioned): over keys only
                               // when it can't read at DUI_TEXT_MIN_PX on 2 lines; like every value, nothing is
                               // ever added to it (no '-')
 

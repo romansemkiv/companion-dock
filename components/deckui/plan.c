@@ -862,7 +862,9 @@ static void plan_once(const dui_deck_t *d, const dui_screen_t *s, dui_layout_t *
                     add_tile(L, &t);
                 } else if ((t.flags & DUI_F_WHOLE) && memchr(t.text, ' ', (size_t)tlen(&t))) {
                     /* a whole Wi-Fi name (the Network screen's, when its key map can't hold it): word by word,
-                     * each one key when it reads at 16 px, over keys only as the last resort; one run */
+                     * each one key when it reads at 16 px, over keys only as the last resort; one run. Also the
+                     * hotspot's password, which has a caption: the first word keeps it, the others are plain
+                     * words, as add_value makes them (a caption tile without one would sit at the caption baseline) */
                     const int first = L->ntiles, len = tlen(&t);
                     for (int a = 0; a < len;) {
                         while (a < len && t.text[a] == ' ') a++;
@@ -872,7 +874,10 @@ static void plan_once(const dui_deck_t *d, const dui_screen_t *s, dui_layout_t *
                             dui_tile_t w = t;
                             w.text = t.text + a;
                             w.len = (uint8_t)(e - a);
-                            if (L->ntiles > first) w.caption = NULL;
+                            if (L->ntiles > first) { /* the caption on the first key only */
+                                w.kind = DUI_TILE_WORD;
+                                w.caption = NULL;
+                            }
                             if (dui__value_fits(w.text, w.len, d->key_px)) {
                                 w.flags &= (uint16_t)~DUI_F_PIECES;
                                 add_tile(L, &w);

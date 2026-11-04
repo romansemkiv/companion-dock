@@ -24,6 +24,7 @@
 #include "supervisor.h"
 #include "surfaces/surfaces.h"
 #include "svcbtn_logic.h"
+#include "webui/webui.h"
 
 static const char *TAG = "svcbtn";
 
@@ -36,6 +37,11 @@ static void action_task(void *arg)
 {
     if ((svc_event_t)(intptr_t)arg == SVC_RESET) {
         ESP_LOGW(TAG, "service button held 10 s: factory reset");
+        /* the web page's way (webui_restart_later, the same config lock): not over an update's self-check or an upload
+         * being written (erased before such a wait too), and joining a restart already on its way */
+        const esp_err_t r = webui_restart_later(true, BC_WHY_BUTTON_RESET);
+        if (r == ESP_OK) vTaskDelete(NULL);
+        ESP_LOGE(TAG, "factory reset: the restart task didn't take it (%s): here", esp_err_to_name(r));
         /* held until the restart: no config or password save can land after the erase */
         supervisor_cfg_lock();
         esp_err_t e = boxcfg_factory_reset();

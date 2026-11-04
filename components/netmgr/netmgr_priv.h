@@ -41,6 +41,10 @@ esp_netif_t *netmgr_eth_netif(void);
 esp_err_t netmgr_hosted_start(void);
 /* The C6 answers and runs a firmware Wi-Fi can use. */
 bool netmgr_hosted_ready(void);
+/* The C6 stopped answering (ESP-Hosted's transport failure, or a request it never answered, wifi.c): as the
+ * invariants in hosted.c say, Wi-Fi and the hotspot are off until the next start, why is netmgr_hosted_error.
+ * Never talks to the C6 (netmgr_radio_lost); once; any task, also with s_cfg_lock held. */
+void netmgr_hosted_lost(const char *why);
 /* Why not ready: never NULL nor empty while not ready; "" when ready. */
 const char *netmgr_hosted_error(void);
 

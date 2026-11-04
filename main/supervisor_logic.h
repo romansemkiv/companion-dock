@@ -55,7 +55,7 @@ void c6w_rec_set(c6w_rec_t *r, uint32_t count);
  * cause a rollback). */
 #define OTA_FIRST_CHECK_US (30 * 1000000LL)
 #define OTA_RECHECK_US (30 * 1000000LL)
-#define OTA_GIVE_UP_US (5 * 60 * 1000000LL)
+#define OTA_GIVE_UP_US (2 * 60 * 1000000LL) /* a switch or router reboots in about 1 min */
 
 typedef struct {
     netmgr_if_t via; /* the upload's interface; NETMGR_IF_NONE: no record */
@@ -70,6 +70,9 @@ typedef enum { OTA_CONFIRM, OTA_WAIT, OTA_ROLLBACK } ota_verdict_t;
 /* At a check: healthy (everything above holds) confirms; otherwise wait for the next check, or roll
  * back once since_start_us reaches OTA_GIVE_UP_US. */
 ota_verdict_t ota_verdict(bool healthy, int64_t since_start_us);
+/* When the check that rolls back an image that keeps failing runs: the first at or past OTA_GIVE_UP_US after the
+ * start (the checks run OTA_FIRST_CHECK_US after it, then every OTA_RECHECK_US). For the web page's countdown. */
+int64_t ota_rollback_check_us(int64_t start_us);
 
 /* An update that came over the hotspot while the settings have it off (it was forced on by RESET x3
  * or the service button, and a restart forgets a force) would never find its path back, so its

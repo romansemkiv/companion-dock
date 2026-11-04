@@ -68,6 +68,13 @@ static void (*s_lock_fn)(void);
 static void (*s_unlock_fn)(void);
 static atomic_bool s_restarting;
 static const char *s_restart_why; /* set once s_restarting is taken: the breadcrumb's reason */
+/* Factory resets asked for while a plain restart is on its way join it (join_reset): s_reset_join counts them, the
+ * restart task takes them all at once (exchange 0) after setting s_reset_taken (seq_cst: an asker that finds it unset
+ * is always taken; one that finds it set takes one back, unless the task already took them). */
+static atomic_int s_reset_join;
+static atomic_bool s_reset_taken;
+static _Atomic(const char *) s_reset_join_why;
+static atomic_bool s_reset_wanted; /* a factory reset is asked for and on its way (webui_reset_pending) */
 
 void webui_set_cfg_lock(void (*lock)(void), void (*unlock)(void))
 {
@@ -277,36 +284,125 @@ bool webui_apply_satellite(const char *json, bool has_host, bool has_port, const
 
 /* ---- restart and factory reset ---- */
 
+#define UPLOAD_POLL_MS 1000
+#define UPLOAD_WAIT_MAX_MS (10 * 60 * 1000) /* past the longest upload (web.c: 30 s + a slot at OTA_MIN_BYTES_PER_S) */
+#define C6_WAIT_MAX_MS (3 * 60 * 1000)      /* past a C6 update's copy over SDIO (about a megabyte) */
+
+/* The settings erased (a factory reset). hold: with the config lock kept until the restart, so no config or password
+ * save lands after the erase. */
+static void erase_settings(bool hold)
+{
+    webui_cfg_lock();
+    const esp_err_t e = boxcfg_factory_reset();
+    if (!hold) webui_cfg_unlock();
+    if (e != ESP_OK) ESP_LOGE(TAG, "factory reset failed: %s", esp_err_to_name(e));
+    else if (hold) ESP_LOGW(TAG, "factory reset: settings erased");
+}
+
+bool webui_restart_pending(void) { return atomic_load(&s_restarting); }
+bool webui_reset_pending(void) { return atomic_load(&s_reset_wanted); }
+
+/* Joined factory resets, taken once (s_reset_taken first): how many there were. */
+static int take_joined(void)
+{
+    atomic_store(&s_reset_taken, true);
+    return atomic_exchange(&s_reset_join, 0);
+}
+
 static void restart_task(void *arg)
 {
-    const bool reset = (intptr_t)arg != 0;
+    bool reset = (intptr_t)arg != 0;
     const char *why = s_restart_why;
     vTaskDelay(pdMS_TO_TICKS(RESTART_DELAY_MS)); /* the reply goes out first */
-    if (reset) {
-        /* held until the restart: no config or password save can land after the erase */
-        webui_cfg_lock();
-        const esp_err_t e = boxcfg_factory_reset();
-        if (e != ESP_OK) ESP_LOGE(TAG, "factory reset failed: %s", esp_err_to_name(e));
-        else ESP_LOGW(TAG, "factory reset: settings erased");
+    /* A factory reset erases the settings before any wait too (the self-check, an upload, the C6's update): a power cut
+     * meanwhile, or a self-check that fails and goes back to the previous firmware (the supervisor erases again then:
+     * webui_reset_pending), still starts without them (the running box keeps its own, and its PIN, in RAM; the erase
+     * under the lock below takes what was saved meanwhile). */
+    if (reset) erase_settings(false);
+    /* An upload's own restart boots the image it wrote: nothing of this one to keep, and no upload runs. */
+    const bool own = strcmp(why, BC_WHY_OTA) == 0;
+    /* not over an update's self-check (it would roll the update back), and before the erase's lock: the box runs on */
+    if (!own && webui_pending_verify()) webui_wait_confirmed(why);
+    /* nor over an upload being written (one under way before this restart was asked for: a new one is refused while
+     * it is on its way, web.c's ota_upload). One that succeeds restarts into its image right here. Checked after
+     * s_restarting was set (webui_restart_later), as the upload sets its flag and then checks s_restarting. */
+    if (!own && web_ota_writing()) {
+        ESP_LOGW(TAG, "%s: waits for the firmware upload under way", why);
+        for (int waited = 0; web_ota_writing() && waited < UPLOAD_WAIT_MAX_MS; waited += UPLOAD_POLL_MS)
+            vTaskDelay(pdMS_TO_TICKS(UPLOAD_POLL_MS));
     }
+    /* nor over the C6's firmware being written (c6fw: right after this image's confirmation; it sets its flag and then
+     * checks webui_restart_pending, so one of the two sees the other): cut short, the C6 would keep its old firmware
+     * until the next start copied it again. Also for an upload's restart. */
+    if (c6fw_updating()) {
+        ESP_LOGW(TAG, "%s: waits for the C6's firmware update under way", why);
+        for (int waited = 0; c6fw_updating() && waited < C6_WAIT_MAX_MS; waited += UPLOAD_POLL_MS)
+            vTaskDelay(pdMS_TO_TICKS(UPLOAD_POLL_MS));
+    }
+    /* factory resets asked for meanwhile join (join_reset) */
+    if (take_joined() > 0 && !reset) {
+        reset = true;
+        why = atomic_load(&s_reset_join_why);
+    }
+    if (reset) erase_settings(true);
     ESP_LOGW(TAG, "restarting (%s)", why);
     vTaskDelay(pdMS_TO_TICKS(200)); /* let the log line out */
     breadcrumb_restart(why);
 }
 
+/* A factory reset while a restart is on its way: it joins it, unless the restart task has gone past the point where
+ * it takes joined ones (then ESP_ERR_INVALID_STATE, as before: this one taken back). Erased at once too, without the
+ * config lock (the restart task may hold it until it restarts; its own erase under it follows): a power cut or a
+ * failed self-check meanwhile still finds the settings gone. */
+static esp_err_t join_reset(const char *why)
+{
+    atomic_store(&s_reset_join_why, why);
+    atomic_fetch_add(&s_reset_join, 1);
+    if (atomic_load(&s_reset_taken)) { /* past it: take one back, unless the task already took them */
+        int n = atomic_load(&s_reset_join);
+        while (n > 0 && !atomic_compare_exchange_weak(&s_reset_join, &n, n - 1)) {
+        }
+        if (n > 0) return ESP_ERR_INVALID_STATE;
+    }
+    atomic_store(&s_reset_wanted, true);
+    const esp_err_t e = boxcfg_factory_reset();
+    if (e != ESP_OK) ESP_LOGE(TAG, "factory reset failed: %s", esp_err_to_name(e));
+    ESP_LOGW(TAG, "%s: joins the restart on its way", why);
+    return ESP_OK;
+}
+
 esp_err_t webui_restart_later(bool factory_reset, const char *why)
 {
-    if (atomic_exchange(&s_restarting, true)) return ESP_ERR_INVALID_STATE;
+    if (atomic_exchange(&s_restarting, true)) return factory_reset ? join_reset(why) : ESP_ERR_INVALID_STATE;
     s_restart_why = why;
+    if (factory_reset) atomic_store(&s_reset_wanted, true);
     /* before the task exists, so its "restarting" record always comes after this one; a crash
      * meanwhile shows the restart as pending */
     breadcrumb_scheduled(why);
     if (xTaskCreate(restart_task, "restart", RESTART_STACK, (void *)(intptr_t)factory_reset, 6, NULL) != pdPASS) {
+        /* no task: a factory reset that joined meanwhile was told it happens, so it does, from here */
+        if (take_joined() > 0) {
+            const char *jwhy = atomic_load(&s_reset_join_why);
+            ESP_LOGE(TAG, "no memory for the restart task: %s from here", jwhy);
+            erase_settings(true);
+            vTaskDelay(pdMS_TO_TICKS(200)); /* let the log line out */
+            breadcrumb_restart(jwhy);
+        }
+        atomic_store(&s_reset_taken, false);
+        atomic_store(&s_reset_wanted, false);
         breadcrumb_clear();
         atomic_store(&s_restarting, false);
         return ESP_ERR_NO_MEM;
     }
     return ESP_OK;
+}
+
+esp_err_t webui_restart_plain(const char *why)
+{
+    esp_err_t e = webui_restart_later(false, why);
+    /* "on its way" from one whose task couldn't be made a moment ago (it gave s_restarting back): ask again */
+    if (e == ESP_ERR_INVALID_STATE && !webui_restart_pending()) e = webui_restart_later(false, why);
+    return e;
 }
 
 /* ---- status pieces ---- */
@@ -491,6 +587,40 @@ bool webui_pending_verify(void)
     return st == ESP_OTA_IMG_PENDING_VERIFY;
 }
 
+#define CONFIRM_POLL_MS 1000
+/* past the self-check's give-up (OTA_GIVE_UP_US, 2 min, main/supervisor_logic.h): the supervisor has rolled back by then */
+#define CONFIRM_WAIT_MAX_MS (3 * 60 * 1000)
+
+void webui_wait_confirmed(const char *why)
+{
+    if (!webui_pending_verify()) return;
+    ESP_LOGW(TAG, "%s: waits for this firmware's self-check (restarting now would roll the update back)", why);
+    for (int waited = 0; webui_pending_verify() && waited < CONFIRM_WAIT_MAX_MS; waited += CONFIRM_POLL_MS)
+        vTaskDelay(pdMS_TO_TICKS(CONFIRM_POLL_MS));
+    if (webui_pending_verify()) ESP_LOGE(TAG, "%s: this firmware is still not confirmed: going on anyway", why);
+    else ESP_LOGI(TAG, "%s: this firmware is confirmed: going on", why);
+}
+
+/* webui_ota_check_set's: written by the supervisor, read by Sys.GetStatus (whole, under the spinlock) */
+typedef struct {
+    int64_t next_us, rollback_us;
+    char failed[80];
+} ota_check_t;
+static ota_check_t s_chk;
+static portMUX_TYPE s_chk_mux = portMUX_INITIALIZER_UNLOCKED;
+
+void webui_ota_check_set(int64_t next_us, int64_t rollback_us, const char *failed)
+{
+    ota_check_t c = {.next_us = next_us, .rollback_us = rollback_us};
+    strlcpy(c.failed, failed ? failed : "", sizeof c.failed);
+    taskENTER_CRITICAL(&s_chk_mux);
+    s_chk = c;
+    taskEXIT_CRITICAL(&s_chk_mux);
+}
+
+/* esp_timer microseconds as the uptime second they fall in, rounded up (Sys.GetStatus.uptime_s rounds down) */
+static double up_s(int64_t us) { return (double)((us + 999999) / 1000000); }
+
 static cJSON *firmware_json(void)
 {
     const esp_app_desc_t *d = esp_app_get_description();
@@ -503,7 +633,19 @@ static cJSON *firmware_json(void)
     snprintf(b, sizeof b, "%s %s", d->date, d->time);
     cJSON_AddStringToObject(o, "build", b);
     cJSON_AddStringToObject(o, "partition", run ? run->label : "");
-    cJSON_AddBoolToObject(o, "pending_verify", webui_pending_verify());
+    const bool pending = webui_pending_verify();
+    cJSON_AddBoolToObject(o, "pending_verify", pending);
+    if (pending) { /* the self-check's countdown: uptime seconds, so the status changes only when the schedule does */
+        ota_check_t c;
+        taskENTER_CRITICAL(&s_chk_mux);
+        c = s_chk;
+        taskEXIT_CRITICAL(&s_chk_mux);
+        if (c.next_us > 0) {
+            cJSON_AddNumberToObject(o, "check_at_s", up_s(c.next_us));
+            cJSON_AddNumberToObject(o, "rollback_at_s", up_s(c.rollback_us));
+            cJSON_AddStringToObject(o, "check_failed", c.failed);
+        }
+    }
     return o;
 }
 
@@ -726,7 +868,7 @@ static cJSON *restart_to_apply(cJSON *r, const char *why, const char *what)
 {
     cJSON_ReplaceItemInObject(r, "restart_required", cJSON_CreateTrue());
     if (cJSON_IsTrue(cJSON_GetObjectItem(r, "dry_run"))) return r;
-    const esp_err_t e = webui_restart_later(false, why);
+    const esp_err_t e = webui_restart_plain(why);
     const bool restarting = e == ESP_OK || e == ESP_ERR_INVALID_STATE; /* else no memory for the task */
     cJSON_AddBoolToObject(r, "restarting", restarting);
     if (restarting) {
@@ -1274,9 +1416,13 @@ static cJSON *m_log_get(const cJSON *p, rpc_err_t *err)
     return r;
 }
 
+/* c6fw's restart after the C6's update that waited for this image's confirmation (c6fw_set_restart) */
+static esp_err_t c6_restart(const char *why) { return webui_restart_plain(why); }
+
 esp_err_t webui_methods_init(box_config_t *cfg, void (*changed)(void), box_surface_mode_t mode)
 {
     if (!s_lock_fn || !s_unlock_fn) return ESP_ERR_INVALID_STATE;
+    c6fw_set_restart(c6_restart, webui_restart_pending); /* not over an upload being written; not into a restart */
     s_cfg = cfg;
     s_mode = mode;
     s_deck_limit = cfg->deck_limit; /* read before the server starts, as main read it for surfaces */

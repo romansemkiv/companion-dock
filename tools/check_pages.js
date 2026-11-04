@@ -1162,6 +1162,32 @@ async function smoke(file) {
     } catch (e) { errs.push(`backup Wi-Fi: ${e && e.stack || e}`); }
     finally { ctx.h = hOrig; ctx.ic = icOrig; ctx.fill = fillOrig; ctx.rpc = rpcOrig; }
   }
+  // the OTA self-check's countdown on the Firmware page: the next check, the one that goes back, why
+  {
+    const pvText = vm.runInContext('typeof pvText === "function" ? pvText : null', ctx);
+    const clock = vm.runInContext('typeof clock === "function" ? clock : null', ctx);
+    if (!pvText || !clock) errs.push('pvText(fw, up) or clock(s) is missing');
+    else {
+      const fw = (o) => Object.assign({ pending_verify: true, check_at_s: 34, rollback_at_s: 304, check_failed: '' }, o);
+      const cases = [ // [what, fw, the box's uptime, texts it must have, texts it must not]
+        ['no schedule yet', { pending_verify: true }, 10, ['about 30 seconds', 'Uploading works'], ['undefined', 'NaN']],
+        ['before the first check', fw({}), 16, ['checks itself in 0:18', 'restart asked for now waits'], ['NaN', 'goes back']],
+        ['the check running', fw({}), 34.4, ['checking itself now'], ['NaN', 'in 0:']],
+        ['a check failed', fw({ check_at_s: 64, check_failed: 'no network route and no hotspot' }), 40,
+          ['found: no network route and no hotspot', 'Next check in 0:24', 'still fail in 4:24', 'previous firmware'], ['NaN', 'is the last']],
+        ['the recheck due', fw({ check_at_s: 64, check_failed: 'x' }), 70, ['Next check now', 'in 3:54'], ['NaN']],
+        ['the last check next', fw({ check_at_s: 304, check_failed: 'the USB host is not running' }), 290,
+          ['the USB host is not running', 'next check (in 0:14) is the last', 'previous firmware'], ['NaN', 'still fail']],
+      ];
+      for (const [what, f, up, want, not] of cases) {
+        const t = pvText(f, up);
+        for (const w of want) if (!t.includes(w)) errs.push(`self-check countdown (${what}): no "${w}" in: ${t}`);
+        for (const w of not) if (t.includes(w)) errs.push(`self-check countdown (${what}): "${w}" in: ${t}`);
+      }
+      for (const [sec, want] of [[0, '0:00'], [-3, '0:00'], [9.2, '0:10'], [65, '1:05'], [300, '5:00']])
+        if (clock(sec) !== want) errs.push(`clock(${sec}) is ${clock(sec)}, not ${want}`);
+    }
+  }
   // the Firmware page's slots: every sync state, Sync now and Boot other slot. h() and ic() are recorders.
   {
     const slotsView = vm.runInContext('typeof slotsView === "function" ? slotsView : null', ctx);

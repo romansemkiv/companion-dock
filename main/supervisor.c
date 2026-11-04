@@ -10,7 +10,7 @@
  * at the first check where the box is healthy: internal free RAM >= OTA_MIN_INTERNAL_FREE, the USB
  * host running, the web server running, the RPC dispatcher answering Sys.GetStatus, and the network path the update came over back (the interface POST
  * /ota recorded has an address, or the hotspot runs; without a record a route or the hotspot:
- * supervisor_logic.h). Still not healthy 5 min after the start: marked invalid, and the bootloader
+ * supervisor_logic.h). Still not healthy 2 min after the start (OTA_GIVE_UP_US): marked invalid, and the bootloader
  * goes back to the previous image. Confirming also lets c6fw update the C6 if it was waiting for
  * that. A crash or watchdog reset before then rolls back by itself.
  *
@@ -18,6 +18,7 @@
  * didn't answer at boot. When that leaves the box without a network (Wi-Fi or the hotspot
  * configured, Ethernet without link or address for 3 min in a row) the box restarts, which resets
  * the C6: at most 3 times per power-on (a count in RTC no-init memory), then once per 30 min. */
+#include "boxconfig/config.h"
 #include "supervisor.h"
 
 #include <stdatomic.h>
@@ -218,6 +219,7 @@ static void ota_arm(void)
         s_ota_pending = true;
         s_ota_start_us = esp_timer_get_time();
         s_ota_due_us = s_ota_start_us + OTA_FIRST_CHECK_US;
+        webui_ota_check_set(s_ota_due_us, ota_rollback_check_us(s_ota_start_us), NULL); /* the page's countdown */
         ESP_LOGI(TAG, "first boot of this image (%s, uploaded over %s): self-check in 30 s", run->label,
                  via_name(s_ota_via));
         netmgr_status_t ns;
@@ -283,16 +285,29 @@ static void ota_check(void)
     const ota_verdict_t v = ota_verdict(ok, since);
     if (v == OTA_WAIT) {
         s_ota_due_us += OTA_RECHECK_US;
-        ESP_LOGW(TAG, "self-check at %lld s: %s; checking again in 30 s (rollback at 5 min)",
-                 (long long)(since / 1000000), why);
+        webui_ota_check_set(s_ota_due_us, ota_rollback_check_us(s_ota_start_us), why);
+        ESP_LOGW(TAG, "self-check at %lld s: %s; checking again in %lld s (rollback at %lld s)",
+                 (long long)(since / 1000000), why, (long long)(OTA_RECHECK_US / 1000000),
+                 (long long)((ota_rollback_check_us(s_ota_start_us) - s_ota_start_us) / 1000000));
         return;
     }
     s_ota_pending = false;
+    webui_ota_check_set(0, 0, NULL); /* no more checks (confirmed, or rolling back) */
     if (v == OTA_ROLLBACK) {
         ESP_LOGE(TAG, "self-check failed (%s): rolling back to the previous image", why);
+        /* a factory reset waiting for this check (webui's restart task): the previous firmware starts without the
+         * settings, as asked; the lock held into the restart, so no save lands after the erase */
+        const bool reset = webui_reset_pending();
+        if (reset) {
+            supervisor_cfg_lock();
+            const esp_err_t re = boxcfg_factory_reset();
+            if (re != ESP_OK) ESP_LOGE(TAG, "factory reset before the rollback failed: %s", esp_err_to_name(re));
+            else ESP_LOGW(TAG, "factory reset asked for: settings erased before the rollback");
+        }
         vTaskDelay(pdMS_TO_TICKS(200)); /* let the log line out */
         breadcrumb_note(BC_WHY_OTA_ROLLBACK); /* the call below restarts inside IDF */
         esp_ota_mark_app_invalid_rollback_and_reboot(); /* restarts; returns only without a fallback */
+        if (reset) supervisor_cfg_unlock(); /* no fallback: webui's restart task erases and restarts on its own */
         breadcrumb_clear();
         ESP_LOGE(TAG, "no previous image to roll back to: staying on this one");
         return;

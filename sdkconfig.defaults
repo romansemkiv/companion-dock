@@ -18,7 +18,8 @@ CONFIG_COMPILER_OPTIMIZATION_PERF=y
 CONFIG_SPIRAM=y
 CONFIG_SPIRAM_USE_MALLOC=y
 CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=1024
-CONFIG_SPIRAM_ALLOW_STACK_EXTERNAL_MEMORY=y
+# (ESP-IDF 5.x name; it replaced CONFIG_SPIRAM_ALLOW_STACK_EXTERNAL_MEMORY, which the build warned about)
+CONFIG_FREERTOS_TASK_CREATE_ALLOW_EXT_MEM=y
 # A crash leaves an ELF core dump in the "coredump" partition (partitions.csv); read it over USB with
 # idf.py coredump-info -p PORT (docs/manual.md, Recovery)
 CONFIG_ESP_COREDUMP_ENABLE_TO_FLASH=y

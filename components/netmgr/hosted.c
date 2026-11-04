@@ -23,6 +23,7 @@
  *   which resets the C6 (main/supervisor_logic.h).
  * - s_error is non-empty whenever s_ready is false. */
 #include <inttypes.h>
+#include <stdatomic.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
@@ -36,9 +37,19 @@
 static const char *TAG = "c6";
 
 /* Written by netmgr_hosted_start (before Wi-Fi starts) and on_transport;
- * read from netmgr's callers, the event task and wifi.c's retry timer. */
-static volatile bool s_ready;
+ * read from netmgr's callers, the event task and wifi.c's retry timer. Atomic (seq_cst): s_error, written
+ * before it, is what a reader that sees it false finds (volatile orders nothing between the cores). */
+static atomic_bool s_ready;
 static char s_error[128] = "ESP-Hosted not started";
+
+void netmgr_hosted_lost(const char *why)
+{
+    if (!s_ready) return; /* once: a transport failure is posted once per failed transfer */
+    strlcpy(s_error, why, sizeof s_error); /* before s_ready: s_error is non-empty whenever s_ready is false */
+    s_ready = false;
+    ESP_LOGE(TAG, "%s", s_error);
+    netmgr_radio_lost();
+}
 
 static void on_transport(void *arg, esp_event_base_t base, int32_t id, void *data)
 {
@@ -46,11 +57,7 @@ static void on_transport(void *arg, esp_event_base_t base, int32_t id, void *dat
     (void)base;
     (void)id;
     (void)data;
-    if (!s_ready) return; /* posted once per failed transfer */
-    strlcpy(s_error, "the C6 stopped answering over SDIO: Wi-Fi is off until the next start", sizeof s_error);
-    s_ready = false;
-    ESP_LOGE(TAG, "%s", s_error);
-    netmgr_radio_lost();
+    netmgr_hosted_lost("the C6 stopped answering over SDIO: Wi-Fi is off until the next start");
 }
 
 esp_err_t netmgr_hosted_start(void)

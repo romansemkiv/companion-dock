@@ -40,15 +40,18 @@ static esp_timer_handle_t s_retry;
 static bool s_inited;  /* esp_wifi_init done */
 static bool s_running; /* esp_wifi_start done */
 /* Shared between the caller of netmgr_wifi_apply, the event task and the
- * esp_timer task. */
-static volatile bool s_sta_wanted, s_sta_connected;
+ * esp_timer task. Atomic (seq_cst), not volatile: volatile orders nothing between the two cores. */
+static atomic_bool s_sta_wanted, s_sta_connected;
 static atomic_bool s_retry_running; /* a retry task is under way */
 /* A scan of ours (netmgr_wifi_scan_begin) is active / its esp_wifi_scan_start has returned OK. Written
  * under s_cfg_lock, read by the event and esp_timer tasks. s_scan_temp, s_scan_prev: s_cfg_lock. */
-static volatile bool s_scan_active, s_scan_started;
+static atomic_bool s_scan_active, s_scan_started;
 static bool s_scan_temp;
 static wifi_mode_t s_scan_prev;
-static volatile bool s_connect_deferred; /* sta_connect found a scan active: the scan's end retries */
+/* sta_connect found a scan active: the scan's end retries. With s_scan_active a store-then-load handshake on two
+ * tasks (sta_connect: this, then s_scan_active; scan_restore: s_scan_active, then this), which needs seq_cst: with
+ * volatile alone each side may read the other's old value, and the deferred connect is then never retried. */
+static atomic_bool s_connect_deferred;
 
 esp_netif_t *netmgr_wifi_sta_netif(void) { return s_sta; }
 
@@ -251,6 +254,19 @@ static esp_err_t config_ap(const box_config_t *cfg, const char *ssid)
     return esp_wifi_set_config(WIFI_IF_AP, &wc);
 }
 
+/* A request the C6 didn't answer: ESP-Hosted gives ESP_FAIL after its RPC timeout
+ * (CONFIG_ESP_HOSTED_HOST_RPC_TIMEOUT_MS, 5 s) or its link wait (5 s); the C6's own answers keep their codes, and a
+ * request that couldn't even be queued fails at once (ESP_FAIL too, but quick: not this). Every further request would
+ * wait as long, and netmgr_apply's callers include the supervisor, which is on the 10 s task watchdog (panic): two
+ * silent requests in a row would restart the box, which a C6 that stops answering must never do (hosted.c). The apply
+ * stops at the first one instead and the C6 is lost, as at a transport failure (netmgr_hosted_lost). t0: when the
+ * request was made. */
+#define C6_SILENT_US (4 * 1000000LL) /* under ESP-Hosted's 5 s waits, far over any answer (milliseconds) */
+static bool c6_silent(esp_err_t e, int64_t t0)
+{
+    return (e == ESP_FAIL || e == ESP_ERR_TIMEOUT) && esp_timer_get_time() - t0 >= C6_SILENT_US;
+}
+
 esp_err_t netmgr_wifi_apply(const box_config_t *cfg, const char *ap_ssid, const char *hostname, bool sta_same,
                             bool *sta_on)
 {
@@ -259,9 +275,17 @@ esp_err_t netmgr_wifi_apply(const box_config_t *cfg, const char *ap_ssid, const 
     /* the hotspot alone changed: the station comes back on the network it was on (the backup stays) */
     const int start_net = netmgr_wfg_restart_net(sta_same);
 
+    esp_err_t silent = ESP_OK; /* a request the C6 didn't answer (c6_silent): the apply stops below */
     if (s_scan_active) { /* a scan (netmgr_wifi_scan_begin) loses to the new settings */
-        esp_wifi_scan_stop();
-        if (s_scan_temp) esp_wifi_stop();
+        int64_t t0 = esp_timer_get_time();
+        esp_err_t se = esp_wifi_scan_stop();
+        if (c6_silent(se, t0)) {
+            silent = se;
+        } else if (s_scan_temp) {
+            t0 = esp_timer_get_time();
+            se = esp_wifi_stop();
+            if (c6_silent(se, t0)) silent = se;
+        }
         s_scan_started = s_scan_active = false;
         s_connect_deferred = false; /* the new settings start the station themselves */
         netmgr_scan_cancelled();
@@ -270,10 +294,19 @@ esp_err_t netmgr_wifi_apply(const box_config_t *cfg, const char *ap_ssid, const 
     s_sta_wanted = false;
     esp_timer_stop(s_retry);
     netmgr_wfg_stop();
-    if (s_running) {
-        esp_wifi_stop();
-        s_running = false;
+    if (s_running && silent == ESP_OK) {
+        const int64_t t0 = esp_timer_get_time();
+        const esp_err_t se = esp_wifi_stop();
+        if (c6_silent(se, t0)) silent = se;
+        else s_running = false;
         s_sta_connected = false;
+    }
+    if (silent != ESP_OK) {
+        s_sta_connected = false;
+        /* not tried again: Wi-Fi is off until the next start (netmgr_radio_lost resets this file's state), the box goes
+         * on over Ethernet, and without a network the supervisor restarts it, which resets the C6 */
+        netmgr_hosted_lost("the C6 stopped answering (a Wi-Fi request timed out): Wi-Fi is off until the next start");
+        return silent;
     }
 
     bool ap = cfg->ap_enabled;
@@ -401,15 +434,20 @@ esp_err_t netmgr_wifi_scan_begin(void)
 static esp_err_t scan_collect(wifiscan_ap_t *out, size_t *n)
 {
     uint16_t cnt = 0;
-    esp_wifi_scan_get_ap_num(&cnt);
+    if (esp_wifi_scan_get_ap_num(&cnt) != ESP_OK) { /* the count unknown: a failure, the last list kept */
+        esp_wifi_clear_ap_list();
+        return ESP_FAIL;
+    }
     if (cnt > WIFISCAN_RAW_MAX) cnt = WIFISCAN_RAW_MAX;
     wifi_ap_record_t *recs = calloc(cnt ? cnt : 1, sizeof *recs);
     wifiscan_ap_t *tidy = calloc(cnt ? cnt : 1, sizeof *tidy);
     esp_err_t e = ESP_OK;
-    if (!recs || !tidy || esp_wifi_scan_get_ap_records(&cnt, recs) != ESP_OK) {
+    /* no network found is an empty list, not a failure: ESP-Hosted refuses a read of 0 records (ESP_ERR_INVALID_ARG) */
+    if (!recs || !tidy || (cnt > 0 && esp_wifi_scan_get_ap_records(&cnt, recs) != ESP_OK)) {
         esp_wifi_clear_ap_list(); /* frees the driver's copy of the results */
         e = recs && tidy ? ESP_FAIL : ESP_ERR_NO_MEM;
     } else {
+        if (cnt == 0) esp_wifi_clear_ap_list(); /* nothing read: the driver's (empty) list freed as a read would */
         for (uint16_t i = 0; i < cnt; i++) {
             /* the driver's name need not end in a NUL when it is 32 bytes long */
             memcpy(tidy[i].ssid, recs[i].ssid, strnlen((const char *)recs[i].ssid, sizeof recs[i].ssid));

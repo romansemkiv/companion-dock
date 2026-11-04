@@ -15,7 +15,8 @@
  * password is set.
  *
  * Everything here runs on the server's one task (handlers, queued work, the close callback), so the
- * WebSocket table and the OTA state need no lock; web_ws_listening is a plain counter. */
+ * WebSocket table needs no lock; web_ws_listening is a plain counter. A firmware upload is the exception: it runs on
+ * its own task (ota_task), and the OTA state is shared under s_ota_mux. */
 #include <ctype.h>
 #include <stdatomic.h>
 #include <stdio.h>
@@ -476,6 +477,47 @@ static esp_err_t ws_pre_handshake(httpd_req_t *req)
     return ESP_OK;
 }
 
+/* One unfragmented text frame to fd, all of it or a failure: the header, then the payload, each sent until every byte
+ * is out. httpd_ws_send_frame(_async) checks only for a send error: when SO_SNDTIMEO (WS_SEND_TIMEOUT_S) runs out
+ * midway, lwIP returns the bytes it wrote, the frame counts as sent and its rest is never sent, so the browser reads
+ * the next frames' bytes as this one's (garbage, or a failed connection). A short write past the time a frame may
+ * take fails here instead, and the caller ends the session. Server task only (httpd_socket_send). */
+static esp_err_t ws_send_all(httpd_handle_t hd, int fd, const char *p, size_t n, int64_t deadline)
+{
+    while (n > 0) {
+        const int r = httpd_socket_send(hd, fd, p, n, 0);
+        if (r <= 0) return ESP_FAIL;
+        p += r;
+        n -= (size_t)r;
+        if (n > 0 && esp_timer_get_time() > deadline) return ESP_FAIL;
+    }
+    return ESP_OK;
+}
+
+static esp_err_t ws_send_text(httpd_handle_t hd, int fd, const char *text, size_t len)
+{
+    uint8_t h[10];
+    size_t hn;
+    h[0] = 0x80 | HTTPD_WS_TYPE_TEXT; /* FIN, text; a server's frames are not masked */
+    if (len <= 125) {
+        h[1] = (uint8_t)len;
+        hn = 2;
+    } else if (len <= 0xFFFF) {
+        h[1] = 126;
+        h[2] = (uint8_t)(len >> 8);
+        h[3] = (uint8_t)len;
+        hn = 4;
+    } else {
+        h[1] = 127;
+        for (int i = 0; i < 8; i++) h[2 + i] = (uint8_t)((uint64_t)len >> (8 * (7 - i)));
+        hn = 10;
+    }
+    const int64_t deadline = esp_timer_get_time() + WS_SEND_TIMEOUT_S * 1000000LL;
+    esp_err_t e = ws_send_all(hd, fd, (const char *)h, hn, deadline);
+    if (e == ESP_OK) e = ws_send_all(hd, fd, text, len, deadline);
+    return e;
+}
+
 /* A frame on a WebSocket that passed ws_pre_handshake. */
 static esp_err_t h_ws(httpd_req_t *req)
 {
@@ -513,8 +555,9 @@ static esp_err_t h_ws(httpd_req_t *req)
         char *out = rpc_handle_frame_as((const char *)buf, &who);
         if (authed) ws_authed(w); /* a logout in this call drops the socket's sign-in now */
         if (out) {
-            httpd_ws_frame_t r = {.type = HTTPD_WS_TYPE_TEXT, .payload = (uint8_t *)out, .len = strlen(out), .final = true};
-            e = httpd_ws_send_frame(req, &r);
+            const size_t len = strlen(out);
+            web_utf8_scrub(out, len); /* a text frame must be valid UTF-8: names from outside the box need not be */
+            e = ws_send_text(req->handle, fd, out, len); /* a failure ends the session (and its slot: on_close) */
             free(out);
         }
     }
@@ -522,18 +565,19 @@ static esp_err_t h_ws(httpd_req_t *req)
     return e;
 }
 
-void web_ws_broadcast_now(const char *text)
+void web_ws_broadcast_now(char *text)
 {
     if (!s_srv || !text) return;
-    httpd_ws_frame_t f = {.type = HTTPD_WS_TYPE_TEXT, .payload = (uint8_t *)text, .len = strlen(text), .final = true};
+    const size_t len = strlen(text);
+    web_utf8_scrub(text, len); /* as h_ws's replies: the status carries Companion's version and id, an SSID */
     const bool open = !auth_enabled();
     for (int i = 0; i < MAX_WS; i++) {
         wst_slot_t *w = &s_ws.s[i];
         if (!w->fd || w->closing) continue;
         if (!open && !ws_authed(w)) continue; /* not signed in, signed out or expired */
         if (httpd_ws_get_fd_info(s_srv, w->fd) != HTTPD_WS_CLIENT_WEBSOCKET ||
-            httpd_ws_send_frame_async(s_srv, w->fd, &f) != ESP_OK)
-            ws_close(w); /* maybe half a frame went out: the session cannot go on */
+            ws_send_text(s_srv, w->fd, text, len) != ESP_OK)
+            ws_close(w); /* maybe part of a frame went out: the session cannot go on */
     }
 }
 
@@ -544,6 +588,39 @@ esp_err_t web_queue_work(void (*fn)(void *), void *arg)
 
 /* ---------- POST /ota ---------- */
 
+/* ---------- what a handler left of the body ---------- */
+
+#define DRAIN_BUF 512
+#define OTA_DRAIN_MAX (4u * 1024 * 1024) /* an app slot (partitions.csv): no real upload is longer */
+
+/* What is left of the request's body once its handler has replied (a refused or ignored body; nothing for one read
+ * whole, where httpd_req_recv returns 0 at once), read and dropped by a deadline, else the connection closed.
+ * httpd would read it itself after the handler returns, CONFIG_HTTPD_PURGE_BUF_LEN bytes at a time, each read waiting
+ * up to RECV_TIMEOUT_S, with no overall deadline: a client declaring a large body (any request, a GET too) and
+ * sending a byte now and then would hold the server's only task, the page, the API, the pushes and the next update,
+ * for as long as it likes. A client that sends its body in time keeps its connection and reads the reply, sent
+ * before this, as ever; one that doesn't is cut off (ESP_FAIL: httpd closes the socket without reading on). The time
+ * it gets is that of a body of its length at the slowest rate an upload may go (OTA_MIN_BYTES_PER_S), its length
+ * counted up to what the request can be (BODY_MAX; OTA_DRAIN_MAX for POST /ota, whose refusals a browser still
+ * sending its image reads). */
+static esp_err_t drop_rest(httpd_req_t *req, esp_err_t sent, size_t max_body)
+{
+    if (sent != ESP_OK) return sent; /* the session ends anyway */
+    char sink[DRAIN_BUF];
+    const size_t n = req->content_len < max_body ? req->content_len : max_body;
+    const int64_t deadline = esp_timer_get_time() + BODY_DEADLINE_US + (int64_t)n * 1000000LL / OTA_MIN_BYTES_PER_S;
+    for (;;) {
+        const int r = httpd_req_recv(req, sink, sizeof sink);
+        if (r == 0) return ESP_OK; /* all of it read (or the peer gone: httpd ends the session itself) */
+        if (r < 0 && r != HTTPD_SOCK_ERR_TIMEOUT) return ESP_FAIL;
+        if (esp_timer_get_time() > deadline) {
+            ESP_LOGW(TAG, "%.40s: the rest of a %u-byte body didn't come in time: connection closed", req->uri,
+                     (unsigned)req->content_len);
+            return ESP_FAIL;
+        }
+    }
+}
+
 typedef enum { OTA_IDLE, OTA_WRITING, OTA_DONE, OTA_ERROR } ota_state_t;
 
 static struct {
@@ -553,9 +630,22 @@ static struct {
     char version[33]; /* of the image being written / written */
 } s_ota;
 static atomic_bool s_ota_busy; /* writing or done (restarting): webui_ota_busy, read by the supervisor */
-static bool s_ota_claimed;     /* this upload holds the flash against a recovery-slot sync (slotsync) */
+static bool s_ota_claimed;     /* this upload holds the flash against a recovery-slot sync (slotsync); its task's */
+/* s_ota: written by the upload's task (ota_task), read by Ota.GetStatus on the server task: whole, under this */
+static portMUX_TYPE s_ota_mux = portMUX_INITIALIZER_UNLOCKED;
+static atomic_bool s_ota_writing; /* an upload is being written: a deliberate restart waits for it (web_ota_writing) */
+static atomic_bool s_ota_task_on; /* the upload task runs: one upload at a time */
 
 bool webui_ota_busy(void) { return atomic_load(&s_ota_busy); }
+bool web_ota_writing(void) { return atomic_load(&s_ota_writing); }
+
+static void ota_set(ota_state_t st, const char *msg)
+{
+    taskENTER_CRITICAL(&s_ota_mux);
+    s_ota.state = st;
+    if (msg) strlcpy(s_ota.msg, msg, sizeof s_ota.msg);
+    taskEXIT_CRITICAL(&s_ota_mux);
+}
 
 #define APP_DESC_OFF (sizeof(esp_image_header_t) + sizeof(esp_image_segment_header_t))
 #define HDR_LEN (APP_DESC_OFF + sizeof(esp_app_desc_t))
@@ -566,12 +656,16 @@ cJSON *web_ota_status(void)
     const esp_partition_t *run = esp_ota_get_running_partition();
     const esp_partition_t *next = esp_ota_get_next_update_partition(NULL);
     const bool pending = webui_pending_verify();
+    __typeof__(s_ota) o; /* a copy: any RPC caller may ask (about 160 bytes) */
+    taskENTER_CRITICAL(&s_ota_mux);
+    o = s_ota;
+    taskEXIT_CRITICAL(&s_ota_mux);
     cJSON *r = cJSON_CreateObject();
-    cJSON_AddStringToObject(r, "state", names[s_ota.state]);
-    cJSON_AddStringToObject(r, "message", s_ota.msg);
-    cJSON_AddNumberToObject(r, "done", (double)s_ota.done);
-    cJSON_AddNumberToObject(r, "total", (double)s_ota.total);
-    cJSON_AddStringToObject(r, "new_version", s_ota.version);
+    cJSON_AddStringToObject(r, "state", names[o.state]);
+    cJSON_AddStringToObject(r, "message", o.msg);
+    cJSON_AddNumberToObject(r, "done", (double)o.done);
+    cJSON_AddNumberToObject(r, "total", (double)o.total);
+    cJSON_AddStringToObject(r, "new_version", o.version);
     cJSON_AddStringToObject(r, "running", run ? run->label : "");
     cJSON_AddStringToObject(r, "version", esp_app_get_description()->version);
     cJSON_AddBoolToObject(r, "pending_verify", pending);
@@ -598,13 +692,12 @@ cJSON *web_ota_status(void)
 
 static esp_err_t ota_refuse(httpd_req_t *req, const char *status, int code, const char *why)
 {
-    s_ota.state = OTA_ERROR;
+    ota_set(OTA_ERROR, why);
     atomic_store(&s_ota_busy, false);
     if (s_ota_claimed) { /* a held sync goes on; the other slot is checked again first */
         s_ota_claimed = false;
         slotsync_flash_release();
     }
-    strlcpy(s_ota.msg, why, sizeof s_ota.msg);
     ESP_LOGE(TAG, "firmware upload refused: %s", why);
     return send_error(req, status, code, why);
 }
@@ -622,7 +715,9 @@ static const char *check_image(const uint8_t *hdr)
                  run->project_name);
         return why;
     }
+    taskENTER_CRITICAL(&s_ota_mux);
     strlcpy(s_ota.version, d.version, sizeof s_ota.version);
+    taskEXIT_CRITICAL(&s_ota_mux);
     return NULL;
 }
 
@@ -665,16 +760,24 @@ static const char *iface_name(netmgr_if_t i)
     return i == NETMGR_IF_ETH ? "eth" : i == NETMGR_IF_STA ? "sta" : i == NETMGR_IF_AP ? "ap" : "unknown";
 }
 
-/* POST /ota, body = the raw .bin: written to the other slot, checked, made the boot slot; then the
+/* POST /ota's body = the raw .bin: written to the other slot, checked, made the boot slot; then the
  * reply and a restart a second later (the new image confirms itself with the supervisor's check,
  * which also wants the interface the upload came in on back: recorded here). A recovery-slot sync
  * writes the same slot: the upload claims the flash first (409 while a sync runs) and keeps it until
- * the restart, or gives it back when it fails (ota_refuse). */
-static esp_err_t h_ota(httpd_req_t *req)
+ * the restart, or gives it back when it fails (ota_refuse). On the upload's own task (ota_task). */
+static esp_err_t ota_upload(httpd_req_t *req)
 {
-    if (!guard_authed(req)) return ESP_OK;
-    if (s_ota.state == OTA_WRITING || s_ota.state == OTA_DONE)
-        return send_error(req, "409 Conflict", RPC_E_BAD_STATE, "an update is already in progress or done");
+    taskENTER_CRITICAL(&s_ota_mux);
+    const bool busy = s_ota.state == OTA_WRITING || s_ota.state == OTA_DONE;
+    taskEXIT_CRITICAL(&s_ota_mux);
+    if (busy) return send_error(req, "409 Conflict", RPC_E_BAD_STATE, "an update is already in progress or done");
+    /* not into a restart on its way: it would cut the upload off. Set, then checked, as webui's restart task checks
+     * the restart, then this (both seq_cst): one of the two always sees the other */
+    atomic_store(&s_ota_writing, true);
+    if (webui_restart_pending()) {
+        atomic_store(&s_ota_writing, false);
+        return send_error(req, "409 Conflict", RPC_E_BAD_STATE, "the box is restarting: upload once it is back");
+    }
     const esp_partition_t *part = esp_ota_get_next_update_partition(NULL);
     if (!part) return ota_refuse(req, "500 Internal Server Error", RPC_E_UNAVAILABLE, "no OTA slot to write");
     if (req->content_len < HDR_LEN) return ota_refuse(req, "400 Bad Request", RPC_E_INVALID_ARG, "image is too short");
@@ -689,10 +792,12 @@ static esp_err_t h_ota(httpd_req_t *req)
     uint8_t *buf = psram_alloc(OTA_CHUNK);
     if (!buf) return ota_refuse(req, "500 Internal Server Error", RPC_E_UNAVAILABLE, "no memory");
 
+    taskENTER_CRITICAL(&s_ota_mux);
     memset(&s_ota, 0, sizeof s_ota);
     s_ota.state = OTA_WRITING;
-    atomic_store(&s_ota_busy, true);
     s_ota.total = req->content_len;
+    taskEXIT_CRITICAL(&s_ota_mux);
+    atomic_store(&s_ota_busy, true);
     esp_ota_handle_t h = 0;
     esp_err_t e = esp_ota_begin(part, OTA_WITH_SEQUENTIAL_WRITES, &h);
     if (e == ESP_ERR_OTA_ROLLBACK_INVALID_STATE) {
@@ -709,19 +814,22 @@ static esp_err_t h_ota(httpd_req_t *req)
     size_t hdr_n = 0, left = req->content_len;
     int timeouts = 0;
     const char *why = NULL;
-    /* a stall of 15 s, or a rate too slow to finish by the deadline, ends the upload: the server
-     * has one task, and a trickling client must not hold it */
+    bool cut = false; /* too slow or interrupted: the rest isn't waited for (drop_rest) */
+    /* a stall of 15 s, or a rate too slow to finish by the deadline, ends the upload: a trickling client must not
+     * hold the upload's task (and the next upload) for long */
     const int64_t deadline =
         esp_timer_get_time() + (30 + (int64_t)req->content_len / OTA_MIN_BYTES_PER_S) * 1000000LL;
     while (left > 0 && !why) {
         if (esp_timer_get_time() > deadline) {
             why = "upload too slow";
+            cut = true;
             break;
         }
         const int r = httpd_req_recv(req, (char *)buf, left < OTA_CHUNK ? left : OTA_CHUNK);
         if (r == HTTPD_SOCK_ERR_TIMEOUT && ++timeouts < OTA_STALL_TIMEOUTS) continue;
         if (r <= 0) {
             why = "upload interrupted";
+            cut = true;
             break;
         }
         timeouts = 0;
@@ -747,12 +855,15 @@ static esp_err_t h_ota(httpd_req_t *req)
             why = esp_err_to_name(e);
             break;
         }
+        taskENTER_CRITICAL(&s_ota_mux);
         s_ota.done = req->content_len - left;
+        taskEXIT_CRITICAL(&s_ota_mux);
     }
     free(buf);
     if (why) {
         esp_ota_abort(h);
-        return ota_refuse(req, "400 Bad Request", RPC_E_INVALID_ARG, why);
+        const esp_err_t r = ota_refuse(req, "400 Bad Request", RPC_E_INVALID_ARG, why);
+        return cut ? ESP_FAIL : r; /* ESP_FAIL: the connection closes now (Ota.GetStatus keeps why) */
     }
     e = esp_ota_end(h); /* verifies the image */
     if (e != ESP_OK)
@@ -760,25 +871,88 @@ static esp_err_t h_ota(httpd_req_t *req)
                           e == ESP_ERR_OTA_VALIDATE_FAILED ? "image failed verification" : esp_err_to_name(e));
     e = esp_ota_set_boot_partition(part);
     if (e != ESP_OK) return ota_refuse(req, "500 Internal Server Error", RPC_E_UNAVAILABLE, esp_err_to_name(e));
+    char version[sizeof s_ota.version];
+    taskENTER_CRITICAL(&s_ota_mux);
     s_ota.state = OTA_DONE;
     strlcpy(s_ota.msg, "rebooting into the new firmware", sizeof s_ota.msg);
+    strlcpy(version, s_ota.version, sizeof version);
+    taskEXIT_CRITICAL(&s_ota_mux);
     const netmgr_if_t via = netmgr_iface_of_addr(local_ip4(req));
     ota_via_record(via);
-    ESP_LOGW(TAG, "firmware %s written to %s (came in on %s): restarting", s_ota.version, part->label, iface_name(via));
+    ESP_LOGW(TAG, "firmware %s written to %s (came in on %s): restarting", version, part->label, iface_name(via));
     cJSON *o = cJSON_CreateObject();
     cJSON_AddBoolToObject(o, "ok", true);
-    cJSON_AddStringToObject(o, "message", s_ota.msg);
-    cJSON_AddStringToObject(o, "version", s_ota.version);
+    cJSON_AddStringToObject(o, "message", "rebooting into the new firmware");
+    cJSON_AddStringToObject(o, "version", version);
     const esp_err_t r = send_cjson(req, "200 OK", o, "{\"ok\":true}");
-    const esp_err_t re = webui_restart_later(false, BC_WHY_OTA);
+    const esp_err_t re = webui_restart_plain(BC_WHY_OTA);
     if (re == ESP_ERR_NO_MEM) { /* the reply is out; restart from here rather than not at all */
-        ESP_LOGW(TAG, "no memory for the restart task: restarting from the server task");
+        ESP_LOGW(TAG, "no memory for the restart task: restarting from the upload's task");
         vTaskDelay(pdMS_TO_TICKS(1000));
         breadcrumb_restart(BC_WHY_OTA);
     } else if (re != ESP_OK) {
         ESP_LOGW(TAG, "a restart was already on its way");
     }
     return r;
+}
+
+#define OTA_STACK 8192 /* internal: flash writes (esp_ota_*), NVS, the reply; as the server task's */
+#define OTA_PRIO 5     /* the server task's (HTTPD_DEFAULT_CONFIG) */
+
+_Static_assert(sizeof(uintptr_t) <= sizeof(uint32_t), "the request goes to ota_task in a task notification");
+
+/* One upload, on its own task with the request's async copy (httpd_req_async_handler_begin), handed over in a task
+ * notification (0: none, the task just ends): however slowly a client sends its image, the server task (the page, the
+ * API, the pushes, Companion's REST) goes on serving; only another upload waits, refused meanwhile. What a refused
+ * upload leaves of its body is read by its deadline here too (drop_rest, the time a body of that length may take),
+ * and the connection ends when it doesn't come or the upload was cut off. */
+static void ota_task(void *arg)
+{
+    (void)arg;
+    uint32_t v = 0;
+    xTaskNotifyWait(0, UINT32_MAX, &v, portMAX_DELAY);
+    httpd_req_t *req = (httpd_req_t *)(uintptr_t)v;
+    if (req) {
+        const httpd_handle_t hd = req->handle;
+        const int fd = httpd_req_to_sockfd(req);
+        esp_err_t e = ota_upload(req);
+        atomic_store(&s_ota_writing, false); /* written or given up: a waiting restart goes ahead; the drain is none */
+        e = drop_rest(req, e, OTA_DRAIN_MAX);
+        /* the close first, while the session is still the task's (out of the server's select): queued ahead of the
+         * hand-back's wake-up, the rest of the request is never parsed as the next one, and the slot isn't reused */
+        if (e != ESP_OK) httpd_sess_trigger_close(hd, fd);
+        httpd_req_async_handler_complete(req); /* req is freed: the server takes the socket back */
+    }
+    atomic_store(&s_ota_task_on, false);
+    vTaskDelete(NULL);
+}
+
+/* POST /ota: signed in, then handed to the upload's task (ota_task), made first: on the server task nothing has to give
+ * a request copy back (httpd_req_async_handler_complete waits for the server's own control queue). A second upload
+ * while one runs isn't read: its 409 goes out and the connection closes, so the server never waits for its body. */
+static esp_err_t h_ota(httpd_req_t *req)
+{
+    if (!guard_authed(req)) return ESP_OK;
+    if (atomic_exchange(&s_ota_task_on, true)) {
+        send_error(req, "409 Conflict", RPC_E_BAD_STATE,
+                   atomic_load(&s_ota_writing) ? "an update is already in progress"
+                                               : "the last upload is still being ended: try again in a moment");
+        return ESP_FAIL;
+    }
+    TaskHandle_t t = NULL;
+    if (xTaskCreatePinnedToCore(ota_task, "ota", OTA_STACK, NULL, OTA_PRIO, &t, 1) != pdPASS) {
+        atomic_store(&s_ota_task_on, false);
+        send_error(req, "500 Internal Server Error", RPC_E_UNAVAILABLE, "no memory for the upload task");
+        return ESP_FAIL;
+    }
+    httpd_req_t *copy = NULL;
+    if (httpd_req_async_handler_begin(req, &copy) != ESP_OK) copy = NULL;
+    xTaskNotify(t, (uint32_t)(uintptr_t)copy, eSetValueWithOverwrite); /* NULL: the task ends (s_ota_task_on too) */
+    if (!copy) {
+        send_error(req, "500 Internal Server Error", RPC_E_UNAVAILABLE, "no memory");
+        return ESP_FAIL;
+    }
+    return ESP_OK; /* the request is the task's now; httpd reads nothing more of it (remaining_len 0) */
 }
 
 /* ---------- Companion Satellite REST (companion-satellite satellite/src/rest.ts) ---------- */
@@ -1027,11 +1201,20 @@ static esp_err_t redirect_root(httpd_req_t *req)
 static esp_err_t h_captive(httpd_req_t *req) { return redirect_root(req); }
 
 /* Any other GET on the hotspot goes to the page (phones' captive-portal checks). */
+/* Every route but the WebSocket's (web_start): its handler (user_ctx: its uris[] entry), then drop_rest. */
+static esp_err_t h_bounded(httpd_req_t *req)
+{
+    const httpd_uri_t *u = req->user_ctx;
+    /* POST /ota's body is read on its own task (ota_task, with OTA_DRAIN_MAX); on the server only a refused sign-in
+     * leaves it, and gets BODY_MAX's time like any other: no client can hold the server task for long */
+    return drop_rest(req, u->handler(req), BODY_MAX);
+}
+
 static esp_err_t h_404(httpd_req_t *req, httpd_err_code_t code)
 {
     (void)code;
-    if (req->method == HTTP_GET && on_ap(req)) return redirect_root(req);
-    return send_text(req, "404 Not Found", "Not found");
+    const esp_err_t e = req->method == HTTP_GET && on_ap(req) ? redirect_root(req) : send_text(req, "404 Not Found", "Not found");
+    return drop_rest(req, e, BODY_MAX);
 }
 
 static void on_close(httpd_handle_t hd, int fd)
@@ -1100,7 +1283,12 @@ esp_err_t web_start(void)
     /* every route matters (the page, the API, /ota, the Satellite REST): a server missing one is
      * not "running", so the OTA self-check refuses such an image */
     for (size_t i = 0; i < nuris && e == ESP_OK; i++) {
-        e = httpd_register_uri_handler(s_srv, &uris[i]);
+        httpd_uri_t u = uris[i]; /* httpd keeps a copy */
+        if (!u.is_websocket) { /* the body a handler leaves: read by a deadline (drop_rest), never by httpd's */
+            u.user_ctx = (void *)&uris[i];
+            u.handler = h_bounded;
+        }
+        e = httpd_register_uri_handler(s_srv, &u);
         if (e != ESP_OK) ESP_LOGE(TAG, "%s: %s", uris[i].uri, esp_err_to_name(e));
     }
     if (e == ESP_OK) e = httpd_register_err_handler(s_srv, HTTPD_404_NOT_FOUND, h_404);
