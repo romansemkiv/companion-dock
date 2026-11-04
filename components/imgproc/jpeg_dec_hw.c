@@ -22,10 +22,15 @@ static bool engine(void)
 bool img_jpeg_decode(const uint8_t *jpg, size_t len, int w, int h, uint8_t *rgb)
 {
     if (!jpg || !len || !rgb || w <= 0 || h <= 0 || w > 512 || h > 512) return false;
+    static int warned; /* the first few failures logged, with why */
     jpeg_decode_picture_info_t info;
     if (jpeg_decoder_get_info(jpg, (uint32_t)len, &info) != ESP_OK || info.width != (uint32_t)w ||
-        info.height != (uint32_t)h)
+        info.height != (uint32_t)h) {
+        if (warned++ < 3)
+            ESP_LOGW(TAG, "%u bytes: not a %dx%d JPEG (header says %ux%u)", (unsigned)len, w, h, (unsigned)info.width,
+                     (unsigned)info.height);
         return false;
+    }
     if (!engine()) return false;
     /* the codec may pad its output to whole 16-pixel blocks (IDF's jpeg_decode example): room for that */
     const size_t pw = ((size_t)w + 15) & ~(size_t)15, ph = ((size_t)h + 15) & ~(size_t)15;
@@ -42,13 +47,17 @@ bool img_jpeg_decode(const uint8_t *jpg, size_t len, int w, int h, uint8_t *rgb)
                                         .rgb_order = JPEG_DEC_RGB_ELEMENT_ORDER_RGB,
                                         .conv_std = JPEG_YUV_RGB_CONV_STD_BT601};
         uint32_t n = 0;
-        if (jpeg_decoder_process(s_dec, &dcfg, in, (uint32_t)len, out, (uint32_t)out_cap, &n) == ESP_OK) {
+        const esp_err_t e = jpeg_decoder_process(s_dec, &dcfg, in, (uint32_t)len, out, (uint32_t)out_cap, &n);
+        if (e != ESP_OK && warned++ < 3) ESP_LOGW(TAG, "%dx%d, %u bytes: %s", w, h, (unsigned)len, esp_err_to_name(e));
+        if (e == ESP_OK) {
             const size_t row = (size_t)w * 3;
             /* rows exactly w wide, or padded to pw */
             const size_t stride = n == row * (size_t)h ? row : pw * 3;
             if ((size_t)n >= stride * ((size_t)h - 1) + row) {
                 for (int y = 0; y < h; y++) memcpy(rgb + (size_t)y * row, out + (size_t)y * stride, row);
                 ok = true;
+            } else if (warned++ < 3) {
+                ESP_LOGW(TAG, "%dx%d: the codec gave %u bytes", w, h, (unsigned)n);
             }
         }
     } else {

@@ -1653,11 +1653,19 @@ static void dock_dim(int slot)
         hws[c] = sl->ctls[c].hw;
     }
     unlock();
-    if (n) ESP_LOGI(TAG, "slot %d: Companion still gone: \"Reconnecting\"", slot);
+    int keys = 0, images = 0, fills = 0, drawn = 0; /* for the log: what came back under the word */
     for (int c = 0; c < n; c++) {
         job_t *j = NULL;
         if (kinds[c] == CTL_KEY_LCD) {
-            if (snap) store_last_gen(slot, c, gen, snap_key_rgb(m, snap, hws[c])); /* NULL: black under the word */
+            keys++;
+            if (snap) {
+                const uint8_t k = hws[c] < SURF_SNAP_KEYS ? snap->kind[hws[c]] : DC_NONE;
+                uint8_t *img = snap_key_rgb(m, snap, hws[c]); /* NULL: black under the word */
+                images += k == DC_IMAGE;
+                fills += k == DC_FILL;
+                drawn += img != NULL;
+                store_last_gen(slot, c, gen, img);
+            }
             j = last_job(gen, DIM_PCT, true);
         } else if (kinds[c] == CTL_LCD_CELL || kinds[c] == CTL_INFO) {
             j = job_new(JOB_SOLID, 0, gen, true); /* black, as without images */
@@ -1665,6 +1673,9 @@ static void dock_dim(int slot)
         if (j) put_local(slot, c, j, false);
     }
     surf_dock_snap_free(snap);
+    if (n)
+        ESP_LOGI(TAG, "slot %d: Companion still gone: \"Reconnecting\" over %d of %d keys' images (kept: %d images, %d fills)",
+                 slot, drawn, keys, images, fills);
     if (n) kick_imgwork();
 }
 
