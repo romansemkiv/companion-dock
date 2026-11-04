@@ -1,10 +1,10 @@
 {
-  "version": "0.2.4",
-  "date": "2026-11-03",
-  "full": "companion-dock-v0.2.4-full.bin",
-  "full_size": 3308464,
-  "full_sha256": "6757a31101e50cb549673dbce814a55a0fb6378db9494775dd96ebc0d24b800b",
-  "app": "companion-dock-v0.2.4.bin",
-  "app_size": 3177392,
-  "app_sha256": "6d1d4f58ae9eb159dbf48f02a1f1739ca2a8bd062a1b9b7fc6fa5d90ce11b97b"
+  "version": "0.2.5",
+  "date": "2026-11-04",
+  "full": "companion-dock-v0.2.5-full.bin",
+  "full_size": 3309920,
+  "full_sha256": "511e369ec3b42cad9f3a011066df5d119f2f3bb3566790dabf8827b1f6902472",
+  "app": "companion-dock-v0.2.5.bin",
+  "app_size": 3178848,
+  "app_sha256": "cd5b6847bda043fcbc04a7eb25a1de6c0b5950b8ef8b02f4ef5a6f6a16398274"
 }
