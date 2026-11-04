@@ -690,6 +690,7 @@ static void on_detach(usbdeck_t *d)
         surf.dsnap[ev.slot] = NULL;
         surf.dlost_at_us[ev.slot] = 0;
         surf.ddimmed[ev.slot] = false;
+        surf.keeping[ev.slot] = surf.woke[ev.slot] = false;
         surf.ui[ev.slot] = surf.ui_od[ev.slot] = surf.handback[ev.slot] = false;
         memset(surf.rgb_set[ev.slot], 0, sizeof surf.rgb_set[ev.slot]);
         surf.comp_bright[ev.slot] = -1;
@@ -873,7 +874,7 @@ static int64_t corner_step(int64_t now)
         const bool to_companion =
             used && !surf.dock &&
             surf_input_route(deck_model_has_display(m), surf_od_slot_locked(slot), surf.ui[slot], surf.live && sl->added,
-                             surf.handback[slot]) == SURF_TO_COMPANION;
+                             surf.handback[slot], false) == SURF_TO_COMPANION;
         memcpy(id, sl->device_id, sizeof id);
         unlock();
         xSemaphoreTake(surf.inmtx, portMAX_DELAY);
@@ -904,7 +905,7 @@ static void on_input(usbdeck_t *d, const deck_event_t *ev)
     const deck_model_t *m = NULL;
     int slot = -1;
     uint32_t gen = 0;
-    bool ui = false, companion = false, handback = false, od = false;
+    bool ui = false, companion = false, handback = false, od = false, loss = false;
     corner_cfg_t gesture;
     lock();
     gesture = surf.settings.gesture;
@@ -918,10 +919,22 @@ static void on_input(usbdeck_t *d, const deck_event_t *ev)
         handback = surf.handback[slot];
         companion = surf.dock ? surf.owned[slot] : surf.live && sl->added;
         od = surf_od_slot_locked(slot);
+        loss = surf.keeping[slot];
     }
     unlock();
     if (slot < 0 || !m) return; /* not registered (too many decks): nothing */
-    switch (surf_input_route(deck_model_has_display(m), od, ui, companion, handback)) {
+    switch (surf_input_route(deck_model_has_display(m), od, ui, companion, handback, loss)) {
+    case SURF_TO_WAKE: { /* "Reconnecting" (or the images still up): the box's screens, now; the press does nothing else */
+        bool first = false;
+        lock();
+        if (surf.gen[slot] == gen && !surf.woke[slot]) first = surf.woke[slot] = true;
+        unlock();
+        if (first) {
+            ESP_LOGI(TAG, "slot %d: a key pressed while Companion is gone: the box's screens", slot);
+            poke();
+        }
+        return;
+    }
     case SURF_TO_BOX: {
         surf_ev_t e = {.kind = EV_INPUT, .slot = slot, .gen = gen, .deck = d, .in = *ev};
         if (ev->kind == DECK_EV_ENC_ROTATE || ev->kind == DECK_EV_TOUCH_SWIPE)
@@ -1647,7 +1660,7 @@ static void dock_dim(int slot)
     surf_dock_snap_t *snap = surf.dsnap[slot];
     surf.dsnap[slot] = NULL;
     surf.ddimmed[slot] = true;
-    if (m && deck_model_has_display(m) && !surf.owned[slot]) n = sl->nctl;
+    if (m && deck_model_has_display(m) && !surf.owned[slot] && !surf.ui[slot]) n = sl->nctl; /* the box's screen up: no */
     for (int c = 0; c < n; c++) {
         kinds[c] = (uint8_t)sl->ctls[c].kind;
         hws[c] = sl->ctls[c].hw;
@@ -1703,7 +1716,12 @@ static void update_dock_screens(int64_t now, bool msg)
         lock();
         const int64_t at = surf.dlost_at_us[slot];
         const surf_loss_t ph = surf_loss_phase(at, surf.ddimmed[slot], now);
+        const bool woke = surf.woke[slot];
         unlock();
+        if (ph != SURF_LOSS_NONE && woke) { /* a key pressed: the box's screens now, the phase over */
+            dock_loss_end(slot);
+            continue;
+        }
         switch (ph) {
         case SURF_LOSS_NONE: break;
         case SURF_LOSS_GRACE: page_due(at + SURF_LOSS_DIM_US); break;

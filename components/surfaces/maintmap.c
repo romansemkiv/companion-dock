@@ -133,12 +133,13 @@ void surf_maint_box(dui_box_t *b, const surf_maint_in_t *in)
 }
 
 surf_input_to_t surf_input_route(bool has_display, bool ondemand, bool ui_shown, bool companion_drives,
-                                 bool handing_back)
+                                 bool handing_back, bool loss)
 {
     if (ui_shown) return SURF_TO_BOX;
     if (ondemand && has_display) return SURF_TO_DROP; /* on its way: never Companion meanwhile */
     if (handing_back) return SURF_TO_DROP;            /* Companion's images not back yet */
-    return companion_drives ? SURF_TO_COMPANION : SURF_TO_DROP;
+    if (companion_drives) return SURF_TO_COMPANION;
+    return loss && has_display ? SURF_TO_WAKE : SURF_TO_DROP; /* "Reconnecting": the box's screens, now */
 }
 
 static bool od_screen(const deck_model_t *m) { return m && deck_model_has_display(m); }

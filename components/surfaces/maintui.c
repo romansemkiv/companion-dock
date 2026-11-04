@@ -923,8 +923,14 @@ bool maintui_update(int64_t now, bool msg)
         const bool has = used && surf_has_display(sl->model);
         const bool od_here = od_on[slot]; /* every other deck: as without on demand */
         const bool box_drives = surf.dock ? !companion : !live;
-        /* Companion lost a moment ago: its images stay (Satellite: those kept; dock mode: per deck) */
-        const bool keep = surf.dock ? dloss : grace && any_last;
+        /* Companion lost a moment ago: its images stay (Satellite: those kept; dock mode: per deck), unless a key was
+         * pressed on the deck meanwhile (surf_input_route's WAKE): then the box's screens */
+        const bool loss = surf.dock ? dloss : grace && any_last;
+        surf_lock();
+        if (!loss) surf.woke[slot] = false; /* the phase is over: the next one starts unwoken */
+        const bool keep = loss && !surf.woke[slot];
+        surf.keeping[slot] = has && box_drives && keep && !msg && !od_here; /* a press now wakes the box's screens */
+        surf_unlock();
         const bool want = has && (od_here || (box_drives && !msg && !keep));
         if (!want) {
             /* ... and come back, as on the other decks */

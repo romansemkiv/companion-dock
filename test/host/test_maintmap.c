@@ -308,24 +308,31 @@ static void test_end_to_end_home(void)
 static void test_input_route(void)
 {
     /* nothing on demand: Companion when it drives the deck, else the UI when shown, else nobody */
-    TEST_ASSERT_EQUAL(SURF_TO_COMPANION, surf_input_route(true, false, false, true, false));
-    TEST_ASSERT_EQUAL(SURF_TO_BOX, surf_input_route(true, false, true, false, false));
-    TEST_ASSERT_EQUAL(SURF_TO_DROP, surf_input_route(true, false, false, false, false)); /* the dim phase, a message */
+    TEST_ASSERT_EQUAL(SURF_TO_COMPANION, surf_input_route(true, false, false, true, false, false));
+    TEST_ASSERT_EQUAL(SURF_TO_BOX, surf_input_route(true, false, true, false, false, false));
+    TEST_ASSERT_EQUAL(SURF_TO_DROP, surf_input_route(true, false, false, false, false, false)); /* a message */
+    /* Companion gone a moment ago, its last images (dimmed, "Reconnecting") still shown: a press brings the box's
+     * screens on that deck at once (and does nothing else); never for Companion, never under on demand */
+    TEST_ASSERT_EQUAL(SURF_TO_WAKE, surf_input_route(true, false, false, false, false, true));
+    TEST_ASSERT_EQUAL(SURF_TO_COMPANION, surf_input_route(true, false, false, true, false, true)); /* back meanwhile */
+    TEST_ASSERT_EQUAL(SURF_TO_BOX, surf_input_route(true, false, true, false, false, true));
+    TEST_ASSERT_EQUAL(SURF_TO_DROP, surf_input_route(true, true, false, false, false, true));
+    TEST_ASSERT_EQUAL(SURF_TO_DROP, surf_input_route(false, false, false, false, false, true)); /* the Pedal: no screen */
     /* opening: asked for but not drawn yet: nobody, never Companion; drawn: the UI */
-    TEST_ASSERT_EQUAL(SURF_TO_DROP, surf_input_route(true, true, false, true, false));
-    TEST_ASSERT_EQUAL(SURF_TO_DROP, surf_input_route(true, true, false, false, false));
-    TEST_ASSERT_EQUAL(SURF_TO_BOX, surf_input_route(true, true, true, true, false));
+    TEST_ASSERT_EQUAL(SURF_TO_DROP, surf_input_route(true, true, false, true, false, false));
+    TEST_ASSERT_EQUAL(SURF_TO_DROP, surf_input_route(true, true, false, false, false, false));
+    TEST_ASSERT_EQUAL(SURF_TO_BOX, surf_input_route(true, true, true, true, false, false));
     /* closing: the UI while it is still drawn; then nobody until Companion's images are back; then
      * Companion */
-    TEST_ASSERT_EQUAL(SURF_TO_BOX, surf_input_route(true, false, true, true, false));
-    TEST_ASSERT_EQUAL(SURF_TO_DROP, surf_input_route(true, false, false, true, true));
-    TEST_ASSERT_EQUAL(SURF_TO_COMPANION, surf_input_route(true, false, false, true, false));
+    TEST_ASSERT_EQUAL(SURF_TO_BOX, surf_input_route(true, false, true, true, false, false));
+    TEST_ASSERT_EQUAL(SURF_TO_DROP, surf_input_route(true, false, false, true, true, false));
+    TEST_ASSERT_EQUAL(SURF_TO_COMPANION, surf_input_route(true, false, false, true, false, false));
     /* reopened during the hand-back: the UI again once drawn, nobody before */
-    TEST_ASSERT_EQUAL(SURF_TO_DROP, surf_input_route(true, true, false, true, true));
-    TEST_ASSERT_EQUAL(SURF_TO_BOX, surf_input_route(true, true, true, true, true));
+    TEST_ASSERT_EQUAL(SURF_TO_DROP, surf_input_route(true, true, false, true, true, false));
+    TEST_ASSERT_EQUAL(SURF_TO_BOX, surf_input_route(true, true, true, true, true, false));
     /* the Pedal (no screen): Companion's always */
-    TEST_ASSERT_EQUAL(SURF_TO_COMPANION, surf_input_route(false, true, false, true, false));
-    TEST_ASSERT_EQUAL(SURF_TO_DROP, surf_input_route(false, true, false, false, false));
+    TEST_ASSERT_EQUAL(SURF_TO_COMPANION, surf_input_route(false, true, false, true, false, false));
+    TEST_ASSERT_EQUAL(SURF_TO_DROP, surf_input_route(false, true, false, false, false, false));
 }
 
 /* Closing: the hand-back is over once Companion's images are on the deck, not merely queued for it,
@@ -455,11 +462,11 @@ static void test_od_routing(void)
     const surf_od_set_t s = set_of("streamdeck:M32", "streamdeck:MINI");
     const bool m32 = surf_od_here(&s, "streamdeck:M32"), mini = surf_od_here(&s, "streamdeck:MINI"),
                other = surf_od_here(&s, "streamdeck:MK2");
-    TEST_ASSERT_EQUAL(SURF_TO_DROP, surf_input_route(true, m32, false, true, false));
-    TEST_ASSERT_EQUAL(SURF_TO_BOX, surf_input_route(true, m32, true, true, false));
-    TEST_ASSERT_EQUAL(SURF_TO_BOX, surf_input_route(true, mini, true, true, false));
-    TEST_ASSERT_EQUAL(SURF_TO_COMPANION, surf_input_route(true, other, false, true, false));
-    TEST_ASSERT_EQUAL(SURF_TO_BOX, surf_input_route(true, other, true, false, false)); /* its own screen, as before */
+    TEST_ASSERT_EQUAL(SURF_TO_DROP, surf_input_route(true, m32, false, true, false, false));
+    TEST_ASSERT_EQUAL(SURF_TO_BOX, surf_input_route(true, m32, true, true, false, false));
+    TEST_ASSERT_EQUAL(SURF_TO_BOX, surf_input_route(true, mini, true, true, false, false));
+    TEST_ASSERT_EQUAL(SURF_TO_COMPANION, surf_input_route(true, other, false, true, false, false));
+    TEST_ASSERT_EQUAL(SURF_TO_BOX, surf_input_route(true, other, true, false, false, false)); /* its own screen, as before */
 }
 
 static bool held_has(const char **ids, int n, const char *id)
@@ -493,15 +500,15 @@ static void test_od_holds_over_decks(void)
     TEST_ASSERT_EQUAL(2, n);
     TEST_ASSERT_TRUE(held_has(ids, n, "streamdeck:A") && held_has(ids, n, "streamdeck:B"));
     /* A's presses go to neither side meanwhile; B's to the box once drawn */
-    TEST_ASSERT_EQUAL(SURF_TO_DROP, surf_input_route(true, surf_od_here(&s, "streamdeck:A"), false, true, true));
+    TEST_ASSERT_EQUAL(SURF_TO_DROP, surf_input_route(true, surf_od_here(&s, "streamdeck:A"), false, true, true, false));
     c[1].covered = true;
-    TEST_ASSERT_EQUAL(SURF_TO_BOX, surf_input_route(true, surf_od_here(&s, "streamdeck:B"), true, true, false));
+    TEST_ASSERT_EQUAL(SURF_TO_BOX, surf_input_route(true, surf_od_here(&s, "streamdeck:B"), true, true, false, false));
     /* A's own hand-back over: A to Companion again, B still held */
     c[0].handing_back = false;
     n = surf_held_decks(&s, c, 3, ids, 4);
     TEST_ASSERT_EQUAL(1, n);
     TEST_ASSERT_EQUAL_STRING("streamdeck:B", ids[0]);
-    TEST_ASSERT_EQUAL(SURF_TO_COMPANION, surf_input_route(true, surf_od_here(&s, "streamdeck:A"), false, true, false));
+    TEST_ASSERT_EQUAL(SURF_TO_COMPANION, surf_input_route(true, surf_od_here(&s, "streamdeck:A"), false, true, false, false));
     /* all closed (the service button with any open): every deck hands back on its own */
     s.n = 0;
     c[1].covered = false;

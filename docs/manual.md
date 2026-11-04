@@ -266,7 +266,8 @@ has reserved (a reserved one only when all others are taken).
   reconnect shows nothing; then they are dimmed with "Reconnecting" over the keys, as in Satellite mode (the box keeps
   a copy of each key's last image and decodes it then: JPEG in the P4's codec, BMP for the gen1 decks), and the strip
   and info bar go black; after 30 s the maintenance screens come back. Each deck on its own: it has its own
-  connection. Companion reconnecting draws the deck again.
+  connection. Companion reconnecting draws the deck again. A key pressed meanwhile brings the maintenance screens
+  on that deck at once (the press does nothing else), as in Satellite mode.
 - In this mode the Satellite client, Companion browsing and the `_companion-satellite._tcp` announcement
   are off. The deck reports its own serial and firmware version; Companion offers Elgato's firmware updater
   only for Network Docks and Studios, so never for a deck behind the box.
@@ -525,7 +526,7 @@ satellite (Phosphor has none), drawn in Phosphor's stroke.
   Companion. The default is the gesture above, so a box that never touches it works as before. The log says
   `box menu gesture: tap top-right, then hold top-right + bottom-right 2 s` (or `off`) at start and on each change.
 - **When Companion lets go** of a deck, its last images stay 2 s, then dim with "Reconnecting" over them, and
-  after 30 s the deck shows the maintenance home ("Waiting for Companion", the box's IP and, in Network Dock mode, the
+  after 30 s (or at once when a key on it is pressed) the deck shows the maintenance home ("Waiting for Companion", the box's IP and, in Network Dock mode, the
   deck's port). In Network Dock mode each deck on its own; a deck Companion never drew on shows the home at once.
 
 ## Build and flash
@@ -903,7 +904,9 @@ listed on the status page.
 - **Quarantine thresholds were tuned on one Module 32.** A deck is quarantined when it stalls again
   within 30 s of re-attaching after the box's USB reset, or after 4 resets in 10 minutes. Healthy decks
   stall rarely (two stalls 21 s apart were seen on the Module 32, both cured by a reset). Other models,
-  hubs and long soaks may need other numbers.
+  hubs and long soaks may need other numbers. A deck counts as stalled when an image report it was sent is still
+  not taken 2.5 s later (0.5 s late, then 2 s more): an XL took one 1.0 s late, right after a full page, and the
+  1.0 s the box used to allow reset it while it was healthy.
 - The FIFO split caps interrupt-IN packets at 1032 bytes and periodic OUT at 2288 bytes. No known deck uses
   more, but one that did would fail to open.
 - A full-speed deck on a hub is invisible to the firmware (ESP-IDF 5.5 doesn't report the failed

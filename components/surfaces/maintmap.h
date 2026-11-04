@@ -64,17 +64,19 @@ typedef struct {
 void surf_maint_box(dui_box_t *b, const surf_maint_in_t *in);
 
 /* Who gets a deck's input (key, dial, touch). */
-typedef enum { SURF_TO_DROP, SURF_TO_COMPANION, SURF_TO_BOX } surf_input_to_t;
+typedef enum { SURF_TO_DROP, SURF_TO_COMPANION, SURF_TO_BOX, SURF_TO_WAKE } surf_input_to_t;
 
 /* has_display: the deck has a screen (the Pedal has none: it never shows the maintenance UI);
  * ondemand: the maintenance screen on demand is asked for (box-wide); ui_shown: the deck shows the
  * maintenance UI now; companion_drives: Companion drives the deck (Satellite: the session is ready and
  * the deck added; dock mode: Companion has the deck's connection); handing_back: the screen on demand
- * just left this deck and Companion's images are not back on it yet. The UI shown takes every press; on
- * demand asked for but not on this deck yet, or handing back: nobody (never Companion); else
- * Companion when it drives the deck, else nobody. */
+ * just left this deck and Companion's images are not back on it yet; loss: Companion went a moment ago and the
+ * deck still shows its last images (dimmed with "Reconnecting" after 2 s). The UI shown takes every press; on
+ * demand asked for but not on this deck yet, or handing back: nobody (never Companion); Companion when it drives
+ * the deck; in the loss phase, a press wakes the box's screens on the deck at once (WAKE: it does nothing else);
+ * else nobody. */
 surf_input_to_t surf_input_route(bool has_display, bool ondemand, bool ui_shown, bool companion_drives,
-                                 bool handing_back);
+                                 bool handing_back, bool loss);
 
 /* The hand-back after the screen on demand left a deck Companion drives; until it is over, the
  * deck's input goes to nobody (surf_input_route's handing_back). */

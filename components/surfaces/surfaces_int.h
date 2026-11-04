@@ -126,6 +126,10 @@ typedef struct {
     int64_t dlost_at_us[SURF_MAX_DECKS];
     bool ddimmed[SURF_MAX_DECKS];
     struct surf_dock_snap *dsnap[SURF_MAX_DECKS];
+    /* mtx: the box keeps Companion's last images on the deck (the loss phase, both modes; maintui sets it), and a
+     * press on it woke the box's screens meanwhile (surf_input_route's WAKE; cleared once the loss phase is over) */
+    bool keeping[SURF_MAX_DECKS];
+    bool woke[SURF_MAX_DECKS];
     uint32_t msg_seq_on[SURF_MAX_DECKS]; /* msg.seq / gen the slot's message frames were queued for */
     uint32_t msg_gen_on[SURF_MAX_DECKS];
     sui_pager_t msg_pg[SURF_MAX_DECKS];  /* the message's page queued there */
