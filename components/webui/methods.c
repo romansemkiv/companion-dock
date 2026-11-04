@@ -1252,8 +1252,9 @@ static cJSON *m_ota_boot_other(const cJSON *p, rpc_err_t *err)
     return r;
 }
 
-/* Log.Get {since?} -> {seq, text}: log text after `since` (0 = the oldest kept), at most 8 KB (the
- * newest); pass seq back next time. Not public: the ring holds the hotspot password. */
+/* Log.Get {since?, oldest?} -> {seq, text}: log text after `since` (0 = the oldest kept), at most 8 KB: the newest
+ * when more is waiting, or with oldest true the oldest (calls in a row then read the whole 16 KB ring in order, as
+ * the web page's export does); pass seq back next time. Not public: the ring holds the hotspot password. */
 static cJSON *m_log_get(const cJSON *p, rpc_err_t *err)
 {
     const cJSON *since = cJSON_GetObjectItemCaseSensitive(p, "since");
@@ -1261,9 +1262,10 @@ static cJSON *m_log_get(const cJSON *p, rpc_err_t *err)
                   since->valuedouble != (double)(uint32_t)since->valuedouble))
         return rpc_fail(err, RPC_E_INVALID_ARG, "since must be a whole number 0-4294967295 (the seq from the last call)");
     uint32_t seq = since ? (uint32_t)since->valuedouble : 0;
+    const bool oldest = cJSON_IsTrue(cJSON_GetObjectItemCaseSensitive(p, "oldest"));
     char *buf = heap_caps_malloc(LOG_CHUNK + 1, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     if (!buf) return rpc_fail(err, RPC_E_UNAVAILABLE, RPC_MSG_NO_MEMORY);
-    const size_t n = logbuf_read(buf, LOG_CHUNK, &seq);
+    const size_t n = logbuf_read(buf, LOG_CHUNK, &seq, oldest);
     buf[n] = '\0';
     cJSON *r = cJSON_CreateObject();
     cJSON_AddNumberToObject(r, "seq", seq);

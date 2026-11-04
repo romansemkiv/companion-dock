@@ -542,6 +542,39 @@ async function smoke(file) {
     ctx.rpc = rpcR;
     vm.runInContext('S={sys:null,at:0,key:""};INFO={};PG={};page="home"', ctx);
   }
+  // Logs (R129): "Export .log" saves the log shown as <box name>-<YYYY-MM-DD-HHMMSS>.log (a Blob download, the name
+  // made safe: letters, digits, . _ -); the page first reads the box's whole ring, oldest first (Log.Get oldest: true,
+  // again while a full chunk comes back), then follows it live as before.
+  {
+    const idx = fs.readFileSync(file, 'utf8');
+    const logName = vm.runInContext('typeof logName === "function" ? logName : null', ctx);
+    if (!logName) errs.push('R129: logName(name, date) is missing');
+    else for (const [n, d, want] of [
+      ['CompanionBox-8D1C', new Date(2026, 10, 4, 15, 30, 5), 'CompanionBox-8D1C-2026-11-04-153005.log'],
+      ['Studio / FOH box', new Date(2026, 0, 2, 3, 4, 5), 'Studio-FOH-box-2026-01-02-030405.log'],
+      ['', new Date(2026, 0, 2, 3, 4, 5), 'companion-box-2026-01-02-030405.log']]) {
+      const got = logName(n, d);
+      if (got !== want) errs.push(`R129: logName(${JSON.stringify(n)}) gives ${got}, not ${want}`);
+    }
+    if (!/btn\('Export \.log',exportLog,'ghost','download-simple'\)/.test(idx)) errs.push('R129: the Log panel has no "Export .log" button');
+    if (!/<symbol id="i-download-simple" viewBox="0 0 256 256">/.test(idx)) errs.push('R129: i-download-simple (Phosphor) missing');
+    if (!/new Blob\(\[/.test(idx) || !/\.download=/.test(idx)) errs.push('R129: exportLog does not save a file');
+    const calls = [];
+    const rpcL = ctx.rpc;
+    let n = 0;
+    ctx.rpc = async (m, p) => {
+      if (m !== 'Log.Get') return rpcL(m, p);
+      calls.push(JSON.stringify(p));
+      n++;
+      return n === 1 ? { seq: 8192, text: 'x'.repeat(8192) } : n === 2 ? { seq: 8300, text: 'tail\n' } : { seq: 8300, text: '' };
+    };
+    await vm.runInContext('(async()=>{page="logs";PG={};await PAGES.logs(PG)})()', ctx);
+    for (let i = 0; i < 20; i++) await new Promise((r) => setImmediate(r));
+    ctx.rpc = rpcL;
+    if (calls[0] !== '{"since":0,"oldest":true}' || calls[1] !== '{"since":8192,"oldest":true}')
+      errs.push(`R129: the Logs page's first reads are ${calls.slice(0, 3).join(' then ')}, not the whole ring oldest first`);
+    else if (calls.length > 2 && /oldest/.test(calls[2])) errs.push('R129: the Logs page keeps reading oldest first after it caught up');
+  }
   // the network signs after the Companion chip: Ethernet while linked, Wi-Fi and the hotspot always, in that
   // order, each a link to its page, its details in title and aria-label (the same), crossed grey (off) or red (not
   // joined), the route's marked (rt) and no other; phones: each sign (icon and address: the client count and bars hidden

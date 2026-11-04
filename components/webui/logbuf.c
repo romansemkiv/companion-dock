@@ -45,7 +45,7 @@ static int hook(const char *fmt, va_list ap)
 
 /* Copies in small pieces so interrupts stay off for a few hundred bytes at a time. A piece the
  * writers overwrote meanwhile ends the read there; *seq says where to go on. */
-size_t logbuf_read(char *out, size_t max, uint32_t *seq)
+size_t logbuf_read(char *out, size_t max, uint32_t *seq, bool oldest)
 {
     if (!s_buf || !out || !max) return 0;
     taskENTER_CRITICAL(&s_mux);
@@ -53,11 +53,12 @@ size_t logbuf_read(char *out, size_t max, uint32_t *seq)
     taskEXIT_CRITICAL(&s_mux);
     uint32_t start = *seq;
     if (start > end || end - start > LOG_SIZE) start = end > LOG_SIZE ? end - LOG_SIZE : 0;
-    if (end - start > max) start = end - (uint32_t)max;
+    if (!oldest && end - start > max) start = end - (uint32_t)max;
     uint32_t pos = start;
     size_t got = 0;
-    while (pos < end) {
-        const size_t n = end - pos < READ_PIECE ? end - pos : READ_PIECE;
+    const uint32_t stop = end - start > max ? start + (uint32_t)max : end; /* oldest: max bytes from start */
+    while (pos < stop) {
+        const size_t n = stop - pos < READ_PIECE ? stop - pos : READ_PIECE;
         bool lost;
         taskENTER_CRITICAL(&s_mux);
         lost = s_written - pos > LOG_SIZE - n; /* the ring came round over this piece */

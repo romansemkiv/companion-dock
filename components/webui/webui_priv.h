@@ -75,9 +75,10 @@ bool auth_digest_ok(const uint8_t digest[32]);
 
 /* ---- logbuf.c ---- */
 
-/* Copies log text newer than *seq (a running byte count), at most max bytes (the newest ones if
- * more), and moves *seq on. Returns the byte count. */
-size_t logbuf_read(char *out, size_t max, uint32_t *seq);
+/* Copies log text newer than *seq (a running byte count), at most max bytes, and moves *seq on. Returns the byte
+ * count. More than max waiting: the newest max bytes (a live tail catching up), or, with oldest, the oldest ones
+ * still in the ring, so that calls in a row read all of it in order (an export). */
+size_t logbuf_read(char *out, size_t max, uint32_t *seq, bool oldest);
 
 /* ---- notify.c ---- */
 
