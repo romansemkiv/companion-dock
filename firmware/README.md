@@ -1,9 +1,9 @@
-# Firmware 0.2.5
+# Firmware 0.2.6
 
 | File | Write at | Use |
 |---|---|---|
-| `companion-dock-v0.2.5-full.bin` | `0x0` | A new board or a clean start. Erases the settings. |
-| `companion-dock-v0.2.5.bin` | `0x20000`, or upload on the box's Firmware page | Updating a running box. The settings stay. |
+| `companion-dock-v0.2.6-full.bin` | `0x0` | A new board or a clean start. Erases the settings. |
+| `companion-dock-v0.2.6.bin` | `0x20000`, or upload on the box's Firmware page | Updating a running box. The settings stay. |
 | `bootloader.bin` | `0x2000` | File-by-file install |
 | `partition-table.bin` | `0x8000` | File-by-file install |
 | `ota_data_initial.bin` | `0xf000` | File-by-file install |
