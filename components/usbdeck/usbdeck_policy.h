@@ -15,7 +15,10 @@
 /* ---- timing ---- */
 
 #define UPOL_OUT_TIMEOUT_MS 500    /* a deck holds off OUT data for up to ~220 ms when healthy */
-#define UPOL_OUT_STUCK_MS 500      /* after the timeout: a deck that still hasn't taken it is wedged */
+/* after the timeout: a deck that still hasn't taken it is wedged. 500 ms was too short: an XL (fw 1.01.001) took an
+ * image report 1.0 s late, right after a full page, and was reset while healthy (the report went through 1 ms
+ * after the reset started); 2 s more gives 2.5 x that, and a wedged deck is still reset 2.5 s after the report */
+#define UPOL_OUT_STUCK_MS 2000
 #define UPOL_OUT_CHUNK_MAX_US 8000 /* bus time of one gated OUT transfer */
 #define UPOL_INTR_MAX_PACKETS 32   /* IDF 5.5 hcd_dwc.c XFER_LIST_LEN_INTR */
 #define UPOL_BACKOFF_MIN_MS 1000
