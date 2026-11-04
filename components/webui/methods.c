@@ -4,10 +4,11 @@
  * params over the copy with boxcfg_from_json (dry_run stops here), saves the copy and writes it back,
  * unlocks, and only then signals on_config_changed: the supervisor applies network and discovery
  * settings itself. The lock is never held across network I/O, Wi-Fi calls or a wait on the
- * supervisor (the speaker and light settings too: feedback_apply). The one setting that needs a
- * restart is the surface mode (Companion.SetConfig "mode"):
- * when the saved mode differs from the one this run uses, the reply says so and the box
- * restarts a second later (as Device.Restart).
+ * supervisor (the speaker and light settings too: feedback_apply). Two settings need a restart, by
+ * choice: the surface mode (Companion.SetConfig "mode") and the deck limit (Device.SetConfig "deckLimit"). Each
+ * sets up the whole run at start (which services run; how many decks get a dock), none of those services has a
+ * way to stop, and both are set rarely. When the saved value differs from the one this run uses, the reply
+ * says so and the box restarts a second later (as Device.Restart).
  *
  * Secrets: Ap.GetConfig returns the hotspot password, because the page shows it (the
  * decks and the serial console show it too), behind the settings password when one is set.
