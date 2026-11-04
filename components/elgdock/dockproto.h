@@ -69,6 +69,16 @@ size_t dockproto_not_present(uint8_t out[DOCK_REPLY_LEN], uint8_t report_id);
 size_t dockproto_no_child(uint8_t out[DOCK_CHILD_LEN]);
 size_t dockproto_keepalive(uint8_t out[DOCK_REPLY_LEN], uint8_t conn_no);
 
+/* A new connection to a dock's port is vetted before it gets the deck, so a port scan or a stray probe never takes
+ * it from Companion (or blanks the box's screens). The box sends it a keepalive, as a dock does first (the host
+ * library waits for the device's first bytes to learn its framing), and looks at what comes back without taking it
+ * off the socket: peek, n bytes of it; closed, the peer closed or the socket failed; age_ms since it was accepted.
+ * The host answers in Cora framing, so its first 4 bytes are the magic: ACCEPT. A close, other bytes (HTTP, a
+ * probe, the legacy framing this box never speaks), or nothing within DOCK_VET_MS: REJECT. Else WAIT. */
+#define DOCK_VET_MS 3000
+typedef enum { DOCK_VET_WAIT, DOCK_VET_ACCEPT, DOCK_VET_REJECT } dock_vet_t;
+dock_vet_t dockproto_vet(const uint8_t *peek, size_t n, bool closed, uint32_t age_ms);
+
 typedef enum {
     DOCK_MSG_OTHER,       /* nothing a dock acts on */
     DOCK_MSG_ACK,         /* keepalive ACK 03 1a <connection number> */

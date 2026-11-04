@@ -213,3 +213,13 @@ int dockproto_ndocks(int deck_limit, int max)
     const int n = deck_limit >= 1 ? deck_limit : 2;
     return n < max ? n : max;
 }
+
+dock_vet_t dockproto_vet(const uint8_t *peek, size_t n, bool closed, uint32_t age_ms)
+{
+    const size_t m = n < sizeof cora_magic ? n : sizeof cora_magic;
+    if (!peek && n) return DOCK_VET_REJECT;
+    if (m && memcmp(peek, cora_magic, m) != 0) return DOCK_VET_REJECT;
+    if (m == sizeof cora_magic) return DOCK_VET_ACCEPT;
+    if (closed || age_ms >= DOCK_VET_MS) return DOCK_VET_REJECT;
+    return DOCK_VET_WAIT;
+}

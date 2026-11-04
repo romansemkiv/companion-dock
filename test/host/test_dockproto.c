@@ -66,6 +66,29 @@ static cora_msg_t msg(uint16_t flags, uint8_t op, const uint8_t *pl, uint32_t le
     return m;
 }
 
+/* A new connection to a dock's port, after the box's keepalive: the host answers in Cora framing (its first 4 bytes
+ * the magic) and takes the deck; a close, other bytes (a port scan's probe, HTTP, the legacy framing the box never
+ * speaks), or silence for DOCK_VET_MS are turned away, the connection being served untouched */
+static void test_vet(void)
+{
+    const uint8_t cora[] = {0x43, 0x93, 0x8a, 0x41, 0x02, 0x00};
+    TEST_ASSERT_EQUAL(DOCK_VET_ACCEPT, dockproto_vet(cora, 4, false, 10));
+    TEST_ASSERT_EQUAL(DOCK_VET_ACCEPT, dockproto_vet(cora, 6, false, 2999));
+    TEST_ASSERT_EQUAL(DOCK_VET_ACCEPT, dockproto_vet(cora, 4, true, 10)); /* said it, then closed: the session finds out */
+    TEST_ASSERT_EQUAL(DOCK_VET_WAIT, dockproto_vet(cora, 0, false, 0));
+    TEST_ASSERT_EQUAL(DOCK_VET_WAIT, dockproto_vet(cora, 2, false, 100)); /* a partial magic: more to come */
+    TEST_ASSERT_EQUAL(DOCK_VET_WAIT, dockproto_vet(cora, 3, false, DOCK_VET_MS - 1));
+    TEST_ASSERT_EQUAL(DOCK_VET_REJECT, dockproto_vet(cora, 3, false, DOCK_VET_MS));
+    TEST_ASSERT_EQUAL(DOCK_VET_REJECT, dockproto_vet(cora, 0, false, DOCK_VET_MS));
+    TEST_ASSERT_EQUAL(DOCK_VET_REJECT, dockproto_vet(cora, 0, true, 5)); /* nc -z: connect, close */
+    TEST_ASSERT_EQUAL(DOCK_VET_REJECT, dockproto_vet(cora, 2, true, 5));
+    TEST_ASSERT_EQUAL(DOCK_VET_REJECT, dockproto_vet((const uint8_t *)"GET / HTTP/1.1", 14, false, 5));
+    TEST_ASSERT_EQUAL(DOCK_VET_REJECT, dockproto_vet((const uint8_t *)"\x43\x93\x00", 3, false, 5));
+    TEST_ASSERT_EQUAL(DOCK_VET_REJECT, dockproto_vet((const uint8_t *)"\x01\x0a\x00\x00", 4, false, 5));
+    TEST_ASSERT_EQUAL(DOCK_VET_REJECT, dockproto_vet((const uint8_t *)"\r\n", 2, false, 5));
+    TEST_ASSERT_EQUAL(DOCK_VET_REJECT, dockproto_vet(NULL, 4, false, 5));
+}
+
 static void test_classify_ack(void)
 {
     uint8_t ack[32] = {0x03, 0x1a, 0x07};
@@ -604,6 +627,7 @@ int main(void)
     RUN_TEST(test_serial_layout);
     RUN_TEST(test_mac_layout);
     RUN_TEST(test_keepalive_payload);
+    RUN_TEST(test_vet);
     RUN_TEST(test_classify_ack);
     RUN_TEST(test_classify_host_get);
     RUN_TEST(test_classify_child_traffic);

@@ -9,7 +9,12 @@
  * the deck itself on that port); one that comes in the moment after the deck went is closed. No
  * empty Network Dock is ever presented. The task also saves the NVS dock map. It picks up assignment
  * changes within POLL_MS: a deck that goes and comes back faster than that keeps its port and its
- * announcement throughout. */
+ * announcement throughout.
+ *
+ * A new connection is vetted here first (dockproto_vet): it gets a keepalive, as from a dock, and only one that
+ * answers in Cora framing goes to the dock's tasks and takes the deck. A port scan, a probe or a stray connection is
+ * closed without touching the connection being served (before, any connection took the deck from Companion for the
+ * 5 s until it reconnected) or the box's screens. */
 #include "elgdock/elgdock.h"
 
 #include <errno.h>
@@ -39,6 +44,7 @@
 #define MDNS_TYPE "_elg"
 #define MDNS_PROTO "_tcp"
 #define MDNS_DT "215" /* Network Dock (discoveryService.ts) */
+#define VET_MAX 4 /* connections being vetted at once, all docks; a fifth closes the oldest */
 
 elg_t elg;
 
@@ -142,6 +148,81 @@ static void map_save(void)
     if (e != ESP_OK) ESP_LOGW(TAG, "dock map not saved: %s", esp_err_to_name(e));
 }
 
+/* ---- vetting new connections (server task) ---- */
+
+typedef struct {
+    int fd; /* -1: free */
+    dock_t *k;
+    char peer[16];
+    int64_t at_ms;
+    size_t seen; /* bytes peeked last time, still short of the magic: polled, not selected (no busy loop) */
+} vet_t;
+
+static vet_t s_vet[VET_MAX];
+
+static void vet_close(vet_t *v, const char *why)
+{
+    if (why) ESP_LOGI(TAG, "dock %d: %s turned away (%s): not a Stream Deck host", v->k->k, v->peer, why);
+    close(v->fd);
+    v->fd = -1;
+}
+
+/* A connection accepted on k's port: a keepalive, then it waits for its answer in s_vet. */
+static void vet_add(dock_t *k, int fd, const char *peer)
+{
+    uint8_t ka[DOCK_REPLY_LEN];
+    dockproto_keepalive(ka, 0);
+    if (!elg_send_msg(fd, CORA_F_VERBATIM, CORA_OP_WRITE, 0, ka, sizeof ka)) {
+        close(fd);
+        return;
+    }
+    vet_t *v = NULL;
+    for (int i = 0; i < VET_MAX && !v; i++)
+        if (s_vet[i].fd < 0) v = &s_vet[i];
+    if (!v) { /* full: the oldest goes (a host answers within milliseconds; a flood of probes can't starve it) */
+        v = &s_vet[0];
+        for (int i = 1; i < VET_MAX; i++)
+            if (s_vet[i].at_ms < v->at_ms) v = &s_vet[i];
+        vet_close(v, "too many connections at once");
+    }
+    *v = (vet_t){.fd = fd, .k = k, .at_ms = elg_now_ms()};
+    snprintf(v->peer, sizeof v->peer, "%s", peer);
+}
+
+/* After select: each vetted connection's first bytes, peeked (left on the socket for the dock's tasks). */
+static void vet_check(const fd_set *r)
+{
+    const int64_t now = elg_now_ms();
+    for (int i = 0; i < VET_MAX; i++) {
+        vet_t *v = &s_vet[i];
+        if (v->fd < 0) continue;
+        uint8_t pk[4];
+        size_t n = 0;
+        bool closed = false;
+        if (v->seen || FD_ISSET(v->fd, r)) {
+            const ssize_t got = recv(v->fd, pk, sizeof pk, MSG_PEEK | MSG_DONTWAIT);
+            if (got == 0 || (got < 0 && errno != EAGAIN && errno != EWOULDBLOCK)) closed = true;
+            if (got > 0) n = (size_t)got;
+        }
+        v->seen = n;
+        const dock_vet_t verdict = dockproto_vet(pk, n, closed, (uint32_t)(now - v->at_ms));
+        if (verdict == DOCK_VET_WAIT) continue;
+        if (verdict == DOCK_VET_REJECT) {
+            vet_close(v, closed ? "closed without a word" : n ? "other bytes" : "silent");
+            continue;
+        }
+        elg_lock();
+        const bool has = v->k->deck != NULL;
+        elg_unlock();
+        if (!has) { /* the deck went meanwhile: no empty dock */
+            vet_close(v, NULL);
+            continue;
+        }
+        elg_deck_accept(v->k, v->fd, v->peer); /* the deck's now: it takes over from the connection served */
+        v->fd = -1;
+    }
+}
+
 /* ---- listening (server task) ---- */
 
 /* A connection to the dock's port: the deck's (the dock's own tasks). One that comes in the moment
@@ -163,7 +244,7 @@ static void port_accept(dock_t *k)
         return;
     }
     sock_opts(fd);
-    elg_deck_accept(k, fd, ip);
+    vet_add(k, fd, ip); /* the deck only once it answers as a host does */
 }
 
 /* ---- server task ---- */
@@ -269,6 +350,7 @@ static void apply(void)
 static void srv_task(void *arg)
 {
     (void)arg;
+    for (int i = 0; i < VET_MAX; i++) s_vet[i].fd = -1;
     for (;;) {
         apply();
         map_save(); /* after apply, not in it: their stack frames never add up */
@@ -281,9 +363,17 @@ static void srv_task(void *arg)
             FD_SET(fd, &r);
             if (fd > maxfd) maxfd = fd;
         }
+        for (int i = 0; i < VET_MAX; i++) { /* the ones with nothing yet wake the task when it comes */
+            const int fd = s_vet[i].fd;
+            if (fd < 0 || s_vet[i].seen) continue;
+            FD_SET(fd, &r);
+            if (fd > maxfd) maxfd = fd;
+        }
         struct timeval tv = {.tv_sec = 0, .tv_usec = POLL_MS * 1000};
         const int n = maxfd >= 0 ? select(maxfd + 1, &r, NULL, NULL, &tv) : 0;
         if (maxfd < 0) vTaskDelay(pdMS_TO_TICKS(POLL_MS)); /* no deck: nothing to listen for */
+        if (n < 0) FD_ZERO(&r);
+        vet_check(&r); /* before new ones: a connection is vetted from its next round */
         for (int i = 0; i < ELGDOCK_MAX && n > 0; i++) {
             dock_t *k = &elg.dock[i];
             if (k->lp >= 0 && FD_ISSET(k->lp, &r)) port_accept(k);
