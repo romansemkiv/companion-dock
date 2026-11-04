@@ -844,7 +844,7 @@ accepted as Host (no DNS rebinding). The page has a CSP.
 
 ## Stream Deck support
 
-From `components/deckmodel/model.c` (VID 0x0fd9). The **Module 32** and the **XL** have been run on a box;
+From `components/deckmodel/model.c` (VID 0x0fd9). The **Module 32**, the **XL** and the **Mini** have been run on a box;
 the rest follow the documented protocol (`@elgato-stream-deck/core`, Elgato's HID docs) and the official
 Companion mapping (`companion-surface-elgato-stream-deck`). Unknown PIDs with VID 0x0fd9 are ignored and
 listed on the status page.
