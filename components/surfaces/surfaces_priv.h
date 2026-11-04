@@ -46,10 +46,24 @@ void dockmode_apply(const char *box_name, bool announce);
 
 /* ---- surfaces.c ---- */
 
+/* Companion's last state of a deck's LCD keys, taken from its dock cache as Companion lets go (dock mode): if
+ * Companion isn't back within SURF_LOSS_DIM_US the box draws them dimmed with "Reconnecting" over them, as Satellite
+ * mode does. Per key (its HID index): kind (dc_kind_t: none, an image in img/len, a fill in rgb). PSRAM. */
+#define SURF_SNAP_KEYS 40
+typedef struct surf_dock_snap {
+    uint8_t kind[SURF_SNAP_KEYS];
+    uint8_t rgb[SURF_SNAP_KEYS][3];
+    uint8_t *img[SURF_SNAP_KEYS]; /* the image as Companion sent it (JPEG, or BMP with padding), PSRAM */
+    size_t len[SURF_SNAP_KEYS];
+} surf_dock_snap_t;
+void surf_dock_snap_free(surf_dock_snap_t *s); /* NULL: nothing */
+
 /* Companion took deck d over through its dock (owned: the box draws nothing on it from now on but
  * its message frames and the maintenance screen on demand, which go to dockmode_box_*, and nothing it
- * queued before reaches the deck after this returns) or let it go (the box's screens come back). */
-void surfaces_dock_owner(usbdeck_t *d, bool owned, const char *peer_ip);
+ * queued before reaches the deck after this returns) or let it go. Let go with snap (Companion's last key images;
+ * taken over, NULL when none was kept): they stay on the deck, dimmed with "Reconnecting" after SURF_LOSS_DIM_US,
+ * and the box's screens come back after SURF_LOSS_OVER_US; without, the box's screens come back at once. */
+void surfaces_dock_owner(usbdeck_t *d, bool owned, const char *peer_ip, surf_dock_snap_t *snap);
 /* Dock mode (elgdock's corner gate): open, the gesture made on deck d while Companion drives it:
  * the maintenance screen on demand opens on that deck, unless it is open already; else a corner's press
  * reached Companion (its click). Any task: it only records it and wakes the surfaces task, which opens, logs

@@ -52,6 +52,19 @@ int surf_route_keystate(const surf_registry_t *r, const sat_key_state_t *ks, int
                         const deck_ctl_t **ctl, size_t *expected_bytes);
 /* True when a decoded bitmap of `got` bytes may be drawn on a control expecting `expected`. */
 bool surf_bitmap_ok(size_t expected, size_t got);
+/* KEY-STATE's BITMAP (len bytes at v) worth queuing for a control of `expected` RGB bytes: raw RGB in base64 of
+ * exactly that size, or a PNG data URL (BITMAP_FORMAT=png) of at most 1.5 x that + 4 KB, its size checked when it is
+ * decoded. Anything else (webp, another size) can't be drawn. */
+bool surf_bitmap_text_ok(const char *v, size_t len, size_t expected);
+
+/* Companion gone (Satellite: the connection; Network Dock mode: one deck's dock connection), its last images still
+ * on the deck: they stay SURF_LOSS_DIM_US (a quick reconnect shows nothing), then dimmed with "Reconnecting" over
+ * the keys until SURF_LOSS_OVER_US, then the box's screens. */
+#define SURF_LOSS_DIM_US (2000 * 1000LL)
+#define SURF_LOSS_OVER_US (30000 * 1000LL)
+typedef enum { SURF_LOSS_NONE, SURF_LOSS_GRACE, SURF_LOSS_DIM_DUE, SURF_LOSS_DIMMED, SURF_LOSS_OVER } surf_loss_t;
+/* lost_at_us: when it went (0: not gone); dimmed: the dim phase is drawn. */
+surf_loss_t surf_loss_phase(int64_t lost_at_us, bool dimmed, int64_t now_us);
 
 /* ---- Coalescer (pure; one pending item per control) ---- */
 

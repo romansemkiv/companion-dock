@@ -247,6 +247,36 @@ static void reset_cache(usbdeck_t *d)
     xSemaphoreGive(e->work);
 }
 
+/* Companion's last key images, taken before its cache is reset (it let go of the deck): NULL when nothing is kept.
+ * On the dock's task, under the deck's work mutex. */
+static surf_dock_snap_t *snap_keys(dm_deck_t *e)
+{
+    surf_dock_snap_t *s = heap_caps_calloc(1, sizeof *s, MALLOC_CAP_SPIRAM);
+    if (!s) return NULL;
+    bool any = false;
+    xSemaphoreTake(e->work, portMAX_DELAY);
+    const deck_model_t *m = e->dc->m;
+    const unsigned n = m ? (unsigned)m->cols * m->rows : 0;
+    for (unsigned k = 0; k < n && k < SURF_SNAP_KEYS; k++) {
+        const size_t cap = dc_key_image_cap(e->dc, (uint8_t)k);
+        uint8_t *buf = cap ? heap_caps_malloc(cap, MALLOC_CAP_SPIRAM) : NULL;
+        size_t len = 0;
+        const dc_kind_t kind = dc_key_image(e->dc, (uint8_t)k, buf, buf ? cap : 0, &len, s->rgb[k]);
+        s->kind[k] = (uint8_t)kind;
+        if (kind == DC_IMAGE) {
+            s->img[k] = buf;
+            s->len[k] = len;
+        } else {
+            heap_caps_free(buf);
+        }
+        any = any || kind != DC_NONE;
+    }
+    xSemaphoreGive(e->work);
+    if (any) return s;
+    surf_dock_snap_free(s);
+    return NULL;
+}
+
 /* On the dock's task, under its usb_mtx: d stays (elgdock_release waits for it). */
 static void on_owner(usbdeck_t *d, bool companion, const char *peer_ip)
 {
@@ -256,6 +286,7 @@ static void on_owner(usbdeck_t *d, bool companion, const char *peer_ip)
     const bool handover = e && companion && e->owned;
     if (e) e->owned = companion;
     unlock();
+    surf_dock_snap_t *snap = NULL;
     if (handover) { /* the deck still shows what the cache and the frames say */
         ESP_LOGI(TAG, "dock %d: Companion at %s takes the deck over from the connection before (cache kept)", k,
                  peer_ip ? peer_ip : "?");
@@ -267,9 +298,10 @@ static void on_owner(usbdeck_t *d, bool companion, const char *peer_ip)
             ESP_LOGI(TAG, "dock %d: Companion at %s drives the deck", k, peer_ip ? peer_ip : "?");
         else
             ESP_LOGI(TAG, "dock %d: Companion let go of the deck", k);
+        if (!companion && e) snap = snap_keys(e); /* what the deck shows, for "Reconnecting" over it */
         reset_cache(d);
     }
-    surfaces_dock_owner(d, companion, peer_ip); /* a no-op on a hand-over: the slot stays owned */
+    surfaces_dock_owner(d, companion, peer_ip, snap); /* a no-op on a hand-over: the slot stays owned */
 }
 
 esp_err_t dockmode_start(const char *box_name, const uint8_t mac[6], bool announce, int ndocks)

@@ -30,6 +30,27 @@ void img_transform_rgb(const uint8_t *src, int w, int h, img_xform_t xf, uint8_t
     }
 }
 
+void img_untransform_rgb(const uint8_t *src, int w, int h, img_xform_t xf, uint8_t *dst)
+{
+    switch (xf) {
+    case IMG_XF_ROT180:
+    case IMG_XF_MIRROR_H: /* each its own inverse */
+        img_transform_rgb(src, w, h, xf, dst);
+        break;
+    case IMG_XF_ROT90_CCW:
+    case IMG_XF_MINI:
+        // src is h wide and w tall, src[y'][x'] = dst[x'][w-1-y']: so dst[r][c] = src[w-1-c][r].
+        for (int r = 0; r < h; r++)
+            for (int c = 0; c < w; c++)
+                cp(&dst[(r * w + c) * 3], &src[((w - 1 - c) * h + r) * 3]);
+        break;
+    case IMG_XF_NONE:
+    default:
+        memcpy(dst, src, (size_t)w * h * 3);
+        break;
+    }
+}
+
 void img_fill_rgb(uint8_t *dst, int w, int h, uint8_t r, uint8_t g, uint8_t b)
 {
     for (size_t i = 0, n = (size_t)w * h; i < n; i++) {

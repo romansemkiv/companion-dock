@@ -181,6 +181,14 @@ bool dc_settled(const dc_t *c);
 /* Bytes held in images, frames and sequences now. */
 size_t dc_bytes(const dc_t *c);
 
+/* Companion's last state of key hw (the box dims it under "Reconnecting" once Companion lets go): DC_IMAGE with its
+ * image's bytes, the payloads of its reports in order (a gen2 JPEG exactly; a gen1 BMP followed by the zeros that pad
+ * its last report) copied to out (cap bytes; *len), DC_FILL with its colour in rgb, or DC_NONE (nothing kept, a panel
+ * op covered it, no such key, out too small). An image still being sent never counts: the last complete one does. */
+dc_kind_t dc_key_image(const dc_t *c, uint8_t hw, uint8_t *out, size_t cap, size_t *len, uint8_t rgb[3]);
+/* The bytes dc_key_image needs at most for key hw (0: not an image). */
+size_t dc_key_image_cap(const dc_t *c, uint8_t hw);
+
 /* Reports one image of the target may take (0: none kept, e.g. a region larger than the strip):
  * ceil((w * h * 3 + DC_SLACK_BYTES) / payload per report). */
 size_t dc_target_cap(const deck_model_t *m, const deck_img_target_t *t);

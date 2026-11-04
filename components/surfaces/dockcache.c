@@ -633,3 +633,37 @@ bool dc_box_brightness(dc_t *c, uint8_t pct)
     c->box_bright_due = c->box_bright_len > 0;
     return c->box_bright_due;
 }
+
+size_t dc_key_image_cap(const dc_t *c, uint8_t hw)
+{
+    if (!c->m || hw >= DC_KEYS_MAX || hw >= nkeys(c)) return 0;
+    const dc_entry_t *e = &c->key[hw];
+    return e->kind == DC_IMAGE && e->reps ? (size_t)e->n * rlen(c) : 0;
+}
+
+dc_kind_t dc_key_image(const dc_t *c, uint8_t hw, uint8_t *out, size_t cap, size_t *len, uint8_t rgb[3])
+{
+    *len = 0;
+    if (!c->m || hw >= DC_KEYS_MAX || hw >= nkeys(c)) return DC_NONE;
+    const dc_entry_t *e = &c->key[hw];
+    if (e->kind == DC_FILL) {
+        memcpy(rgb, e->rgb, 3);
+        return DC_FILL;
+    }
+    if (e->kind != DC_IMAGE || !e->reps) return DC_NONE;
+    size_t at = 0;
+    for (unsigned i = 0; i < e->n; i++) {
+        deck_img_target_t t;
+        uint16_t idx;
+        bool last;
+        const uint8_t *pl;
+        size_t pn;
+        if (!deckproto_parse_image_report(c->m, e->reps + (size_t)i * rlen(c), rlen(c), &t, &idx, &last, &pl, &pn) ||
+            pn > cap - at)
+            return DC_NONE;
+        memcpy(out + at, pl, pn);
+        at += pn;
+    }
+    *len = at;
+    return DC_IMAGE;
+}

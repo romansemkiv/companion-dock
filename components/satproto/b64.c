@@ -1,5 +1,7 @@
 #include "satproto/b64.h"
 
+#include <string.h>
+
 static const char ALPHA[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
 size_t sat_b64_encode(const uint8_t *in, size_t n, char *out, size_t cap)
@@ -69,4 +71,16 @@ bool sat_b64_decode(const char *in, size_t n, uint8_t *out, size_t cap, size_t *
     }
     if (out_len) *out_len = o;
     return true;
+}
+
+sat_bitmap_fmt_t sat_bitmap_split(const char *v, size_t len, const char **b64, size_t *b64_len)
+{
+    static const char DATA[] = "data:", PNG[] = "data:image/png;base64,";
+    *b64 = v;
+    *b64_len = len;
+    if (len < sizeof DATA - 1 || memcmp(v, DATA, sizeof DATA - 1) != 0) return SAT_BITMAP_RGB; /* base64 has no ':' */
+    if (len < sizeof PNG - 1 || memcmp(v, PNG, sizeof PNG - 1) != 0) return SAT_BITMAP_UNSUPPORTED;
+    *b64 = v + sizeof PNG - 1;
+    *b64_len = len - (sizeof PNG - 1);
+    return SAT_BITMAP_PNG;
 }

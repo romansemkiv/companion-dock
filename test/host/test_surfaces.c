@@ -184,6 +184,45 @@ void test_bitmap_wrong_size_dropped(void)
     TEST_ASSERT_TRUE(surf_bitmap_ok(exp, 27648));
 }
 
+/* KEY-STATE's BITMAP before it is queued: raw RGB in base64 of exactly the key's size, or a PNG data URL (the size
+ * is checked when it is decoded) of at most 1.5 x the raw size + 4 KB; webp, or anything else, is dropped */
+void test_bitmap_text_size(void)
+{
+    const size_t exp = 27648; /* an XL key, 96 x 96 RGB */
+    static char v[60000];
+    memset(v, 'A', sizeof v);
+    TEST_ASSERT_TRUE(surf_bitmap_text_ok(v, 36864, exp));
+    TEST_ASSERT_FALSE(surf_bitmap_text_ok(v, 36860, exp));
+    TEST_ASSERT_FALSE(surf_bitmap_text_ok(v, 36868, exp));
+    TEST_ASSERT_FALSE(surf_bitmap_text_ok(v, 0, exp));
+    TEST_ASSERT_FALSE(surf_bitmap_text_ok(NULL, 36864, exp));
+    const char *png = "data:image/png;base64,";
+    memcpy(v, png, strlen(png));
+    TEST_ASSERT_TRUE(surf_bitmap_text_ok(v, strlen(png) + 600, exp));
+    TEST_ASSERT_TRUE(surf_bitmap_text_ok(v, strlen(png) + 4, exp));
+    TEST_ASSERT_FALSE(surf_bitmap_text_ok(v, strlen(png), exp)); /* empty */
+    const size_t cap = (exp + exp / 2 + 4096 + 2) / 3 * 4; /* 1.5 x raw + 4 KB, in base64 */
+    TEST_ASSERT_TRUE(surf_bitmap_text_ok(v, strlen(png) + cap, exp));
+    TEST_ASSERT_FALSE(surf_bitmap_text_ok(v, strlen(png) + cap + 4, exp));
+    TEST_ASSERT_FALSE(surf_bitmap_text_ok("data:image/webp;base64,UklGRg==", 31, exp));
+    TEST_ASSERT_FALSE(surf_bitmap_text_ok("data:image/png;base64,AAAA", 26, 0));
+}
+
+/* A deck Companion let go of (dock mode), or Companion lost (Satellite): its last images stay 2 s (a quick
+ * reconnect shows nothing), then dimmed with "Reconnecting" until 30 s, then the box's screens */
+void test_loss_phase(void)
+{
+    const int64_t s = 1000000;
+    TEST_ASSERT_EQUAL(SURF_LOSS_NONE, surf_loss_phase(0, false, 50 * s));
+    TEST_ASSERT_EQUAL(SURF_LOSS_GRACE, surf_loss_phase(10 * s, false, 10 * s));
+    TEST_ASSERT_EQUAL(SURF_LOSS_GRACE, surf_loss_phase(10 * s, false, 12 * s - 1));
+    TEST_ASSERT_EQUAL(SURF_LOSS_DIM_DUE, surf_loss_phase(10 * s, false, 12 * s));
+    TEST_ASSERT_EQUAL(SURF_LOSS_DIMMED, surf_loss_phase(10 * s, true, 12 * s));
+    TEST_ASSERT_EQUAL(SURF_LOSS_DIMMED, surf_loss_phase(10 * s, true, 40 * s - 1));
+    TEST_ASSERT_EQUAL(SURF_LOSS_OVER, surf_loss_phase(10 * s, true, 40 * s));
+    TEST_ASSERT_EQUAL(SURF_LOSS_OVER, surf_loss_phase(10 * s, false, 40 * s)); /* never dimmed (a message): over too */
+}
+
 void test_keystate_expected_bytes_per_kind(void)
 {
     static surf_registry_t r;
@@ -565,6 +604,8 @@ int main(void)
     RUN_TEST(test_keystate_unknown_device_dropped);
     RUN_TEST(test_keystate_unknown_control_dropped);
     RUN_TEST(test_bitmap_wrong_size_dropped);
+    RUN_TEST(test_bitmap_text_size);
+    RUN_TEST(test_loss_phase);
     RUN_TEST(test_keystate_expected_bytes_per_kind);
     RUN_TEST(test_coalesce_replaces_pending);
     RUN_TEST(test_coalesce_round_robin);

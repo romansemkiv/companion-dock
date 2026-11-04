@@ -240,6 +240,37 @@ static void test_add_device_format(void)
     TEST_ASSERT_EQUAL('\n', l[strlen(l) - 1]);
 }
 
+/* CAPS BITMAP_FORMATS (API 1.12+, a comma-separated list): with png in it, ADD-DEVICE asks for PNG button images
+ * (BITMAP_FORMAT=png); without it, or before CAPS, nothing is asked and Companion sends raw RGB */
+static bool asks_png(const char *caps_line)
+{
+    sat_session_reset(&S, 0);
+    feed("BEGIN CompanionVersion=5.1.1 ApiVersion=1.14.0", 0);
+    if (caps_line) feed(caps_line, 0);
+    nsent = 0;
+    sat_device_desc_t d = {"streamdeck:A1", "Elgato Stream Deck XL", "{}", true, NULL};
+    TEST_ASSERT_TRUE(sat_session_add_device(&S, &d));
+    TEST_ASSERT_EQUAL(1, nsent);
+    return strstr(sent[0], " BITMAP_FORMAT=\"png\"") != NULL; /* quoted, as every string the box sends */
+}
+
+static void test_add_device_bitmap_format(void)
+{
+    TEST_ASSERT_TRUE(asks_png("CAPS SUBSCRIPTIONS=1 BITMAP_FORMATS=rgb,png,webp"));
+    TEST_ASSERT_TRUE(S.caps.png);
+    TEST_ASSERT_TRUE(asks_png("CAPS BITMAP_FORMATS=png"));
+    TEST_ASSERT_TRUE(asks_png("CAPS BITMAP_FORMATS=\"rgb, png\""));
+    TEST_ASSERT_FALSE(asks_png("CAPS SUBSCRIPTIONS=1 BITMAP_FORMATS=rgb,webp"));
+    TEST_ASSERT_FALSE(S.caps.png);
+    TEST_ASSERT_FALSE(asks_png("CAPS BITMAP_FORMATS=rgb,pngx,apng"));
+    TEST_ASSERT_FALSE(asks_png("CAPS SUBSCRIPTIONS=1 NONSQUARE=1"));
+    TEST_ASSERT_FALSE(asks_png(NULL)); /* before CAPS */
+    /* a new connection forgets the last one's formats */
+    TEST_ASSERT_TRUE(asks_png("CAPS BITMAP_FORMATS=rgb,png"));
+    sat_session_reset(&S, 0);
+    TEST_ASSERT_FALSE(S.caps.png);
+}
+
 static void test_add_device_change_page_label(void)
 {
     sat_device_desc_t d = {"d", "P", "{}", false, "Horizontal Swipe Changes Page"};
@@ -551,6 +582,7 @@ int main(void)
     RUN_TEST(test_key_state_parsed);
     RUN_TEST(test_key_state_key_fallback);
     RUN_TEST(test_key_state_bad_color_and_missing_ids);
+    RUN_TEST(test_add_device_bitmap_format);
     RUN_TEST(test_add_device_format);
     RUN_TEST(test_add_device_change_page_label);
     RUN_TEST(test_add_device_too_big_dropped);

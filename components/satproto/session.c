@@ -117,11 +117,28 @@ static void handle_begin(sat_session_t *s, const sat_msg_t *m, uint32_t now_ms)
     s->last_ping_ms = now_ms;
 }
 
+/* list ("rgb,png,webp": comma-separated, spaces around a name allowed) names fmt */
+static bool lists_format(const char *list, const char *fmt)
+{
+    const size_t n = strlen(fmt);
+    for (const char *p = list; p && *p;) {
+        while (*p == ' ' || *p == ',') p++;
+        const char *e = p;
+        while (*e && *e != ',') e++;
+        const char *t = e;
+        while (t > p && t[-1] == ' ') t--;
+        if ((size_t)(t - p) == n && !strncmp(p, fmt, n)) return true;
+        p = e;
+    }
+    return false;
+}
+
 static void handle_caps(sat_session_t *s, const sat_msg_t *m)
 {
     s->caps.nonsquare = truthy(sat_msg_get(m, "NONSQUARE"));
     s->caps.rotary_amount = truthy(sat_msg_get(m, "ROTARY_AMOUNT"));
     s->caps.leds = truthy(sat_msg_get(m, "LEDS"));
+    s->caps.png = lists_format(sat_msg_get(m, "BITMAP_FORMATS"), "png");
     s->state = SAT_S_READY;
     if (s->cb.on_ready) s->cb.on_ready(s->ctx, &s->caps);
 }
@@ -238,6 +255,7 @@ bool sat_session_add_device(sat_session_t *s, const sat_device_desc_t *d)
     sat_w_bool(&w, "BRIGHTNESS", d->brightness);
     sat_w_str(&w, "SERIAL", d->device_id);
     sat_w_bool(&w, "SERIAL_IS_UNIQUE", true);
+    if (s->caps.png) sat_w_str(&w, "BITMAP_FORMAT", "png"); /* smaller than raw RGB: several times less to receive */
     if (d->change_page_label) sat_w_str(&w, "CAN_CHANGE_PAGE", d->change_page_label);
     return finish(s, &w);
 }

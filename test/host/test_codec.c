@@ -182,6 +182,40 @@ static void test_b64_round_trip(void)
     TEST_ASSERT_EQUAL(0, sat_b64_encode((const uint8_t *)"hello", 5, enc, 8)); /* no room for NUL */
 }
 
+/* KEY-STATE's BITMAP: bare base64 is raw RGB; with BITMAP_FORMAT a data URL, png the one the box decodes */
+static void split(const char *v, sat_bitmap_fmt_t want, const char *want_b64)
+{
+    const char *b = NULL;
+    size_t n = 99;
+    TEST_ASSERT_EQUAL_MESSAGE(want, sat_bitmap_split(v, strlen(v), &b, &n), v);
+    if (want_b64) {
+        TEST_ASSERT_NOT_NULL(b);
+        TEST_ASSERT_EQUAL_MESSAGE(strlen(want_b64), n, v);
+        if (n) TEST_ASSERT_EQUAL_MEMORY_MESSAGE(want_b64, b, n, v);
+    }
+}
+
+static void test_bitmap_split(void)
+{
+    split("AAAA", SAT_BITMAP_RGB, "AAAA");
+    split("", SAT_BITMAP_RGB, "");
+    split("data:image/png;base64,iVBORw0KGgo=", SAT_BITMAP_PNG, "iVBORw0KGgo=");
+    split("data:image/png;base64,", SAT_BITMAP_PNG, "");
+    split("data:image/webp;base64,UklGRg==", SAT_BITMAP_UNSUPPORTED, NULL);
+    split("data:image/png,iVBOR", SAT_BITMAP_UNSUPPORTED, NULL);   /* not base64 */
+    split("data:image/pngx;base64,AAAA", SAT_BITMAP_UNSUPPORTED, NULL);
+    split("data:", SAT_BITMAP_UNSUPPORTED, NULL);
+    split("data:text/plain;base64,AAAA", SAT_BITMAP_UNSUPPORTED, NULL);
+    /* the value's own length counts, not a NUL: a prefix cut short is no data URL */
+    const char *v = "data:image/png;base64,AAAA";
+    const char *b;
+    size_t n;
+    TEST_ASSERT_EQUAL(SAT_BITMAP_PNG, sat_bitmap_split(v, strlen(v) - 2, &b, &n));
+    TEST_ASSERT_EQUAL(2, n);
+    TEST_ASSERT_EQUAL(SAT_BITMAP_UNSUPPORTED, sat_bitmap_split(v, 10, &b, &n));
+    TEST_ASSERT_EQUAL(SAT_BITMAP_RGB, sat_bitmap_split(v, 4, &b, &n)); /* "data" alone: no colon, so base64 */
+}
+
 static void test_b64_decode_rejects_garbage(void)
 {
     uint8_t dec[16];
@@ -386,6 +420,7 @@ int main(void)
     RUN_TEST(test_parse_line_edge_cases);
     RUN_TEST(test_parse_params_caps_at_max);
     RUN_TEST(test_writer_overflow);
+    RUN_TEST(test_bitmap_split);
     RUN_TEST(test_b64_round_trip);
     RUN_TEST(test_b64_decode_rejects_garbage);
     RUN_TEST(test_b64_decode_matches_old);

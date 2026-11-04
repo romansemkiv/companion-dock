@@ -3,6 +3,8 @@
 #include <string.h>
 #include "surfaces/surfaces.h"
 
+#include "satproto/b64.h"
+
 static bool slot_used(const surf_slot_t *s) { return s->device_id[0] != '\0'; }
 
 int surfreg_find(const surf_registry_t *r, const char *device_id)
@@ -94,3 +96,27 @@ int surf_route_keystate(const surf_registry_t *r, const sat_key_state_t *ks, int
 }
 
 bool surf_bitmap_ok(size_t expected, size_t got) { return expected != 0 && got == expected; }
+
+bool surf_bitmap_text_ok(const char *v, size_t len, size_t expected)
+{
+    if (!v || !expected) return false;
+    const char *b64;
+    size_t n;
+    switch (sat_bitmap_split(v, len, &b64, &n)) {
+    case SAT_BITMAP_RGB:
+        return n == (expected + 2) / 3 * 4;
+    case SAT_BITMAP_PNG: /* even an incompressible RGBA PNG stays under this; a bigger one is no button image */
+        return n > 0 && n <= (expected + expected / 2 + 4096 + 2) / 3 * 4;
+    default:
+        return false;
+    }
+}
+
+surf_loss_t surf_loss_phase(int64_t lost_at_us, bool dimmed, int64_t now_us)
+{
+    if (!lost_at_us) return SURF_LOSS_NONE;
+    const int64_t gone = now_us - lost_at_us;
+    if (gone >= SURF_LOSS_OVER_US) return SURF_LOSS_OVER;
+    if (dimmed) return SURF_LOSS_DIMMED;
+    return gone >= SURF_LOSS_DIM_US ? SURF_LOSS_DIM_DUE : SURF_LOSS_GRACE;
+}

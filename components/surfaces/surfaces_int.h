@@ -22,7 +22,7 @@
 
 #define SAT_DOWN_MAX 8   /* Satellite: controls held down that Companion knows of, per deck */
 /* shared by surfaces.c and maintui.c */
-#define STATUS_AFTER_US (30000 * 1000LL) /* Companion lost this long: the maintenance screens take over */
+#define STATUS_AFTER_US SURF_LOSS_OVER_US /* Companion lost this long: the maintenance screens take over */
 #define TOAST_US (2200 * 1000LL)         /* a notice on the decks this long (the box-wide one and a deck's own) */
 #define DEVICE_ID_PREFIX "streamdeck:"   /* + serial */
 /* The serial of a device id: id without DEVICE_ID_PREFIX (id itself when it has none). */
@@ -121,6 +121,11 @@ typedef struct {
     /* --- surfaces task only --- */
     int64_t lost_at_us; /* Companion lost at; 0 = not in the lost grace period */
     bool dimmed;
+    /* dock mode, per deck (each has its own connection): Companion let go of it at (0: not in the loss phase), the
+     * dim phase drawn on it, and its last key images until they are drawn dimmed (mtx) */
+    int64_t dlost_at_us[SURF_MAX_DECKS];
+    bool ddimmed[SURF_MAX_DECKS];
+    struct surf_dock_snap *dsnap[SURF_MAX_DECKS];
     uint32_t msg_seq_on[SURF_MAX_DECKS]; /* msg.seq / gen the slot's message frames were queued for */
     uint32_t msg_gen_on[SURF_MAX_DECKS];
     sui_pager_t msg_pg[SURF_MAX_DECKS];  /* the message's page queued there */

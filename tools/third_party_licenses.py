@@ -112,6 +112,8 @@ def parts(idf, mc):
          "MIT License", r"libelgdock\.a\(", "Copyright (c) 2024 Julian Waller\n\n" + MIT),
         ("Barlow Condensed Bold (the deck font), (C) 2017 The Barlow Project Authors. SIL Open Font License 1.1",
          r"libstatusui\.a\(", read(os.path.join(ROOT, "tools/fonts/OFL.txt"))),
+        ("LodePNG 20261006 (the PNG decoder for Satellite mode's PNG button images), (C) 2005-2018 Lode Vandevenne. "
+         "zlib License", r"lodepng\.c\.obj", read(os.path.join(ROOT, "components/imgproc/lodepng/LICENSE")).strip("\n")),
     ]
 
 

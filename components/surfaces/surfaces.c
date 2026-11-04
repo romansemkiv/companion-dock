@@ -73,6 +73,8 @@
 #include "freertos/task.h"
 #include "imgproc/imgproc.h"
 #include "imgproc/jpeg_enc.h"
+#include "imgproc/jpeg_dec.h"
+#include "imgproc/png.h"
 #include "maintmap.h"
 #include "netmgr/netmgr.h"
 #include "satclient/satclient.h"
@@ -82,6 +84,7 @@
 #include "statusui/statusui.h"
 #include "surfaces_int.h"
 #include "surfaces_priv.h"
+#include "dockcache.h"
 #include "usbdeck/usbdeck.h"
 
 #define TAG "surfaces"
@@ -92,7 +95,7 @@
 #define IMG_PRIO 4
 #define EVQ_DEPTH 48 /* attach / detach events and the maintenance screens' input */
 #define TICK_MS 1000
-#define DIM_AFTER_US (2000 * 1000LL)
+#define DIM_AFTER_US SURF_LOSS_DIM_US
 #define DIM_PCT SURF_DIM_PCT
 #define RETRY_US (20 * 1000LL)           /* deck queue full: try that deck again this much later */
 #define IMG_MAX_BYTES (256 * 128 * 3)    /* largest control: Plus LCD cell 200x100; keys <= 120x120 */
@@ -216,7 +219,7 @@ static job_t *last_job(uint32_t gen, uint8_t pct, bool overlay)
     return j;
 }
 
-static void cache_job(int slot, int idx, const job_t *j, deck_ctl_kind_t kind, size_t bytes);
+static void cache_job(int slot, int idx, const job_t *j, deck_ctl_kind_t kind, int w, int h);
 
 /* Companion image: replaces whatever is pending for the control. A box-drawn frame it replaces
  * would have shown the active message, so then this job draws the message too. Under the screen on
@@ -226,20 +229,21 @@ static void put_companion(int slot, int idx, job_t *j)
     void *drop = j;
     bool cache = false;
     deck_ctl_kind_t kind = CTL_KEY_NONE;
-    size_t bytes = 0;
+    int w = 0, h = 0;
     lock();
     if (surf.gen[slot] == j->gen && surf.ui_od[slot] && idx < surf.reg.slot[slot].nctl) {
         const deck_ctl_t *c = &surf.reg.slot[slot].ctls[idx];
         cache = true;
         kind = c->kind;
-        bytes = (size_t)c->w * c->h * 3;
+        w = c->w;
+        h = c->h;
     } else if (surf.gen[slot] == j->gen) {
         const job_t *p = surf.co.pending[slot][idx];
         if (p && (p->local || p->msg)) j->msg = true;
         drop = coalesce_put(&surf.co, slot, idx, j);
     }
     unlock();
-    if (cache) cache_job(slot, idx, j, kind, bytes);
+    if (cache) cache_job(slot, idx, j, kind, w, h);
     if (drop) job_free(drop);
 }
 
@@ -384,21 +388,44 @@ static void on_ready(void *ctx, const sat_caps_t *caps)
     surf.too_old = false;
     surf.sat_lost = false;
     unlock();
-    ESP_LOGI(TAG, "Companion %s ready (API %d.%d.%d)", caps->companion_version, caps->major, caps->minor,
-             caps->patch);
+    ESP_LOGI(TAG, "Companion %s ready (API %d.%d.%d), %s images", caps->companion_version, caps->major, caps->minor,
+             caps->patch, caps->png ? "PNG" : "raw RGB");
     poke();
 }
 
 static void store_last_gen(int slot, int idx, uint32_t gen, uint8_t *img);
 
-/* On the satclient task, while the screen on demand covers the deck: Companion's image straight into the
- * cache it comes back from (a base64 decode of one key, about 30 KB at most). */
-static void cache_companion(int slot, int idx, uint32_t gen, const char *b64, size_t len, size_t bytes)
+/* Companion's image (KEY-STATE's BITMAP: raw RGB in base64, or a PNG data URL with BITMAP_FORMAT=png) into img,
+ * w x h RGB (bytes). False when it doesn't decode to exactly that. A PNG is decoded through a scratch copy of its
+ * bytes in PSRAM. */
+static bool decode_bitmap(const char *v, size_t len, int w, int h, uint8_t *img, size_t bytes)
 {
-    size_t got = 0;
-    uint8_t *img = heap_caps_malloc(bytes, MALLOC_CAP_SPIRAM);
+    const char *b64;
+    size_t n, got = 0;
+    switch (sat_bitmap_split(v, len, &b64, &n)) {
+    case SAT_BITMAP_RGB:
+        return sat_b64_decode(b64, n, img, bytes, &got) && surf_bitmap_ok(bytes, got);
+    case SAT_BITMAP_PNG: {
+        const size_t cap = n / 4 * 3 + 3;
+        uint8_t *png = heap_caps_malloc(cap, MALLOC_CAP_SPIRAM);
+        if (!png) return false;
+        const bool ok = sat_b64_decode(b64, n, png, cap, &got) && img_png_decode_rgb(png, got, w, h, img);
+        heap_caps_free(png);
+        return ok;
+    }
+    default:
+        return false;
+    }
+}
+
+/* On the satclient task, while the screen on demand covers the deck: Companion's image straight into the
+ * cache it comes back from (one key's image, about 30 KB at most once decoded). */
+static void cache_companion(int slot, int idx, uint32_t gen, const char *v, size_t len, int w, int h)
+{
+    const size_t bytes = (size_t)w * h * 3;
+    uint8_t *img = bytes ? heap_caps_malloc(bytes, MALLOC_CAP_SPIRAM) : NULL;
     if (!img) return;
-    if (!sat_b64_decode(b64, len, img, bytes, &got) || !surf_bitmap_ok(bytes, got)) {
+    if (!decode_bitmap(v, len, w, h, img, bytes)) {
         heap_caps_free(img);
         return;
     }
@@ -406,7 +433,7 @@ static void cache_companion(int slot, int idx, uint32_t gen, const char *b64, si
 }
 
 /* A Companion job that came under the screen on demand: what it says, into the cache only. */
-static void cache_job(int slot, int idx, const job_t *j, deck_ctl_kind_t kind, size_t bytes)
+static void cache_job(int slot, int idx, const job_t *j, deck_ctl_kind_t kind, int w, int h)
 {
     if (kind == CTL_KEY_RGB) {
         if (j->kind != JOB_SOLID) return;
@@ -417,7 +444,7 @@ static void cache_job(int slot, int idx, const job_t *j, deck_ctl_kind_t kind, s
         surf.rgb_set[slot][idx] = true;
         unlock();
     } else if (j->kind == JOB_B64) {
-        cache_companion(slot, idx, j->gen, (const char *)j->data, j->len, bytes);
+        cache_companion(slot, idx, j->gen, (const char *)j->data, j->len, w, h);
     } else if (j->kind == JOB_SOLID) {
         store_last_gen(slot, idx, j->gen, NULL); /* cleared: black when it comes back */
     }
@@ -449,6 +476,7 @@ static void on_key_state(void *ctx, const sat_key_state_t *ks)
     size_t expected = 0;
     uint32_t gen = 0;
     deck_ctl_kind_t kind = CTL_KEY_NONE;
+    int cw = 0, ch = 0;
 
     bool cache_only = false;
     lock();
@@ -457,6 +485,8 @@ static void on_key_state(void *ctx, const sat_key_state_t *ks)
         idx = (int)(ctl - surf.reg.slot[slot].ctls);
         gen = surf.gen[slot];
         kind = ctl->kind;
+        cw = ctl->w;
+        ch = ctl->h;
         cache_only = surf.ui_od[slot];
     }
     unlock();
@@ -472,8 +502,8 @@ static void on_key_state(void *ctx, const sat_key_state_t *ks)
         unlock();
     }
     if (cache_only) { /* the screen on demand is over this deck: the image only to the cache */
-        if (kind != CTL_KEY_RGB && ks->bitmap_b64 && ks->bitmap_b64_len == (expected + 2) / 3 * 4)
-            cache_companion(slot, idx, gen, ks->bitmap_b64, ks->bitmap_b64_len, expected);
+        if (kind != CTL_KEY_RGB && surf_bitmap_text_ok(ks->bitmap_b64, ks->bitmap_b64_len, expected))
+            cache_companion(slot, idx, gen, ks->bitmap_b64, ks->bitmap_b64_len, cw, ch);
         return;
     }
 
@@ -485,8 +515,8 @@ static void on_key_state(void *ctx, const sat_key_state_t *ks)
         j->b = ks->b;
     } else {
         if (!ks->bitmap_b64) return;
-        /* padded base64 of exactly w*h*3 bytes; anything else can't decode to the right size */
-        if (ks->bitmap_b64_len != (expected + 2) / 3 * 4) {
+        /* raw RGB of exactly w*h*3 bytes in base64, or a PNG data URL; anything else can't be drawn */
+        if (!surf_bitmap_text_ok(ks->bitmap_b64, ks->bitmap_b64_len, expected)) {
             if (!warned) ESP_LOGW(TAG, "%s %s: bitmap of the wrong size dropped", ks->device_id, ks->control_id);
             warned = true;
             return;
@@ -631,6 +661,7 @@ static void on_detach(usbdeck_t *d)
 {
     surf_ev_t ev = {.kind = EV_DETACHED, .deck = d, .slot = -1};
     bool od_was = false;
+    surf_dock_snap_t *dsnap = NULL;
     lock(); /* an ignored deck unplugged is ignored no more */
     for (int i = 0; i < surf.nignored; i++)
         if (surf.ignored[i] == d) {
@@ -655,6 +686,10 @@ static void on_detach(usbdeck_t *d)
         surf.gen[ev.slot]++;
         surf.owned[ev.slot] = false;
         surf.lost[ev.slot] = false;
+        dsnap = surf.dsnap[ev.slot]; /* freed below, outside the lock */
+        surf.dsnap[ev.slot] = NULL;
+        surf.dlost_at_us[ev.slot] = 0;
+        surf.ddimmed[ev.slot] = false;
         surf.ui[ev.slot] = surf.ui_od[ev.slot] = surf.handback[ev.slot] = false;
         memset(surf.rgb_set[ev.slot], 0, sizeof surf.rgb_set[ev.slot]);
         surf.comp_bright[ev.slot] = -1;
@@ -666,6 +701,7 @@ static void on_detach(usbdeck_t *d)
         lock();
     }
     unlock();
+    surf_dock_snap_free(dsnap);
     if (od_was) ESP_LOGI(TAG, "box menu closed on %s: its deck was unplugged", ev.device_id);
     feedback_event(FB_EV_DECK_OUT);
     if (ev.slot >= 0) post_event(&ev);
@@ -1045,10 +1081,9 @@ static void draw_reconnecting(const target_t *t, uint8_t *buf)
 
 static esp_err_t decode_b64(int slot, const target_t *t, const job_t *j, size_t bytes, uint8_t **out)
 {
-    size_t got = 0;
     uint8_t *img = heap_caps_malloc(bytes, MALLOC_CAP_SPIRAM);
     if (!img) return ESP_ERR_NO_MEM;
-    if (!sat_b64_decode((const char *)j->data, j->len, img, bytes, &got) || !surf_bitmap_ok(bytes, got)) {
+    if (!decode_bitmap((const char *)j->data, j->len, t->ctl.w, t->ctl.h, img, bytes)) {
         ESP_LOGD(TAG, "slot %d ctl %d: bad bitmap dropped", slot, t->idx);
         heap_caps_free(img);
         return ESP_ERR_INVALID_SIZE;
@@ -1525,6 +1560,11 @@ static void end_message(int64_t now)
     }
     kick_imgwork();
     surf.dimmed = false;
+    if (surf.dock) { /* each deck in its dim phase gets it drawn again over the message (update_dock_screens) */
+        lock();
+        for (int slot = 0; slot < SURF_MAX_DECKS; slot++) surf.ddimmed[slot] = false;
+        unlock();
+    }
 }
 
 /* Expires the message, draws it on every deck (also decks that come later) and redraws the decks
@@ -1569,6 +1609,103 @@ static void update_screens(int64_t now, bool msg)
     }
 }
 
+/* Dock mode: key hw's last image from the snapshot, upright (the deck's transform undone), key_px square RGB in
+ * PSRAM; NULL: none kept or it doesn't decode (black under "Reconnecting"). */
+static uint8_t *snap_key_rgb(const deck_model_t *m, const surf_dock_snap_t *s, uint8_t hw)
+{
+    if (!s || hw >= SURF_SNAP_KEYS || s->kind[hw] == DC_NONE) return NULL;
+    const int px = m->key_px;
+    const size_t bytes = (size_t)px * px * 3;
+    uint8_t *out = heap_caps_malloc(bytes, MALLOC_CAP_SPIRAM);
+    if (!out) return NULL;
+    if (s->kind[hw] == DC_FILL) {
+        img_fill_rgb(out, px, px, s->rgb[hw][0], s->rgb[hw][1], s->rgb[hw][2]);
+        return out;
+    }
+    uint8_t *dev = heap_caps_malloc(bytes, MALLOC_CAP_SPIRAM);
+    const bool ok = dev && (m->fmt == DECK_IMG_JPEG ? img_jpeg_decode(s->img[hw], s->len[hw], px, px, dev)
+                            : m->fmt == DECK_IMG_BMP ? img_bmp_unpack(s->img[hw], s->len[hw], px, px, dev)
+                                                     : false);
+    if (ok) img_untransform_rgb(dev, px, px, m->key_xf, out);
+    heap_caps_free(dev);
+    if (ok) return out;
+    heap_caps_free(out);
+    return NULL;
+}
+
+/* Dock mode, Companion still gone from the slot's deck: its last key images (the snapshot, decoded the first time;
+ * kept, when a message ended over them) dimmed with "Reconnecting" over the LCD keys, as Satellite mode's dim phase;
+ * the strip and the info bar black. */
+static void dock_dim(int slot)
+{
+    uint8_t kinds[SURF_MAX_CTLS], hws[SURF_MAX_CTLS];
+    int n = 0;
+    lock();
+    const uint32_t gen = surf.gen[slot];
+    const surf_slot_t *sl = &surf.reg.slot[slot];
+    const deck_model_t *m = sl->device_id[0] ? sl->model : NULL;
+    surf_dock_snap_t *snap = surf.dsnap[slot];
+    surf.dsnap[slot] = NULL;
+    surf.ddimmed[slot] = true;
+    if (m && deck_model_has_display(m) && !surf.owned[slot]) n = sl->nctl;
+    for (int c = 0; c < n; c++) {
+        kinds[c] = (uint8_t)sl->ctls[c].kind;
+        hws[c] = sl->ctls[c].hw;
+    }
+    unlock();
+    if (n) ESP_LOGI(TAG, "slot %d: Companion still gone: \"Reconnecting\"", slot);
+    for (int c = 0; c < n; c++) {
+        job_t *j = NULL;
+        if (kinds[c] == CTL_KEY_LCD) {
+            if (snap) store_last_gen(slot, c, gen, snap_key_rgb(m, snap, hws[c])); /* NULL: black under the word */
+            j = last_job(gen, DIM_PCT, true);
+        } else if (kinds[c] == CTL_LCD_CELL || kinds[c] == CTL_INFO) {
+            j = job_new(JOB_SOLID, 0, gen, true); /* black, as without images */
+        }
+        if (j) put_local(slot, c, j, false);
+    }
+    surf_dock_snap_free(snap);
+    if (n) kick_imgwork();
+}
+
+/* Dock mode: the loss phase of the slot's deck is over (SURF_LOSS_OVER_US without Companion): the box's screens. */
+static void dock_loss_end(int slot)
+{
+    lock();
+    surf_dock_snap_t *snap = surf.dsnap[slot];
+    surf.dsnap[slot] = NULL;
+    surf.dlost_at_us[slot] = 0;
+    surf.ddimmed[slot] = false;
+    free_last_locked(slot);
+    unlock();
+    surf_dock_snap_free(snap);
+    atomic_store(&surf.snap_dirty, true);
+}
+
+/* Network Dock mode, Companion gone from a deck it drove: each deck on its own (its own connection), as Satellite mode
+ * for all of them: the images stay SURF_LOSS_DIM_US, then dimmed with "Reconnecting" until SURF_LOSS_OVER_US, then
+ * the box's screens (maintui). The message outranks the dim phase, as in Satellite mode. */
+static void update_dock_screens(int64_t now, bool msg)
+{
+    if (!surf.dock) return;
+    for (int slot = 0; slot < SURF_MAX_DECKS; slot++) {
+        lock();
+        const int64_t at = surf.dlost_at_us[slot];
+        const surf_loss_t ph = surf_loss_phase(at, surf.ddimmed[slot], now);
+        unlock();
+        switch (ph) {
+        case SURF_LOSS_NONE: break;
+        case SURF_LOSS_GRACE: page_due(at + SURF_LOSS_DIM_US); break;
+        case SURF_LOSS_DIM_DUE:
+            if (!msg) dock_dim(slot);
+            page_due(at + SURF_LOSS_OVER_US);
+            break;
+        case SURF_LOSS_DIMMED: page_due(at + SURF_LOSS_OVER_US); break;
+        case SURF_LOSS_OVER: dock_loss_end(slot); break;
+        }
+    }
+}
+
 static bool s_ui_any; /* a deck shows the maintenance screen, or is handing back after it */
 
 /* Until the next pass: TICK_MS, UI_TICK_MS while a deck shows the maintenance screen or hands back, or
@@ -1610,6 +1747,7 @@ static void surf_task(void *arg)
         surf.page_due_us = 0; /* the message's pages set it again */
         const bool msg = update_message(now);
         update_screens(now, msg);
+        update_dock_screens(now, msg);
         s_ui_any = maintui_update(now, msg);
     }
 }
@@ -1735,11 +1873,19 @@ void surfaces_dock_apply(const char *box_name, bool announce)
     if (surf.dock) dockmode_apply(box_name, announce);
 }
 
-void surfaces_dock_owner(usbdeck_t *d, bool owned, const char *peer_ip)
+void surf_dock_snap_free(surf_dock_snap_t *s)
+{
+    if (!s) return;
+    for (int k = 0; k < SURF_SNAP_KEYS; k++) heap_caps_free(s->img[k]);
+    heap_caps_free(s);
+}
+
+void surfaces_dock_owner(usbdeck_t *d, bool owned, const char *peer_ip, surf_dock_snap_t *snap)
 {
     int slot = -1, n = 0;
     uint8_t kinds[SURF_MAX_CTLS];
-    bool released = false;
+    bool released = false, keep = false;
+    surf_dock_snap_t *old = NULL;
     lock();
     slot = slot_of_locked(d);
     if (slot >= 0 && owned && peer_ip) /* a take-over or a hand-over: the Companion that drives it now */
@@ -1754,17 +1900,34 @@ void surfaces_dock_owner(usbdeck_t *d, bool owned, const char *peer_ip)
         coalesce_drop_slot(&surf.co, slot, job_free);
         surf.gen[slot]++;
     }
+    if (slot >= 0 && (owned || released)) { /* a new owner ends the loss phase; a release starts one, with images */
+        old = surf.dsnap[slot];
+        surf.dsnap[slot] = NULL;
+        surf.dlost_at_us[slot] = 0;
+        surf.ddimmed[slot] = false;
+        free_last_locked(slot); /* dock mode keeps last images only for the dim phase */
+        keep = released && snap && surf.reg.slot[slot].model && deck_model_has_display(surf.reg.slot[slot].model);
+        if (keep) {
+            surf.dsnap[slot] = snap;
+            snap = NULL;
+            surf.dlost_at_us[slot] = esp_timer_get_time();
+        }
+    }
     while (owned && inuse_locked(d)) { /* imgwork is handing it one more frame */
         unlock();
         vTaskDelay(1);
         lock();
     }
     const uint32_t gen = slot >= 0 ? surf.gen[slot] : 0;
-    if (released && surf.reg.slot[slot].model && deck_model_has_display(surf.reg.slot[slot].model)) {
+    if (released && !keep && surf.reg.slot[slot].model && deck_model_has_display(surf.reg.slot[slot].model)) {
         n = surf.reg.slot[slot].nctl;
         for (int c = 0; c < n; c++) kinds[c] = (uint8_t)surf.reg.slot[slot].ctls[c].kind;
     }
     unlock();
+    surf_dock_snap_free(old);
+    surf_dock_snap_free(snap); /* not taken: nothing to dim */
+    if (keep) ESP_LOGI(TAG, "slot %d: Companion let go: its images stay, \"Reconnecting\" in %d s", slot,
+                       (int)(SURF_LOSS_DIM_US / 1000000));
     for (int c = 0; c < n; c++) { /* Companion's last strip and info bar images go at once (black), until the
                                     * maintenance screen's next pass draws its status bar there */
         if (kinds[c] != CTL_LCD_CELL && kinds[c] != CTL_INFO) continue;
@@ -1772,7 +1935,7 @@ void surfaces_dock_owner(usbdeck_t *d, bool owned, const char *peer_ip)
         if (j) put_local(slot, c, j, false);
     }
     if (n) kick_imgwork();
-    if (slot >= 0) poke(); /* the maintenance screen comes back, or shows "Connected" on demand */
+    if (slot >= 0) poke(); /* the maintenance screen comes back (or not yet: the loss phase), or "Connected" on demand */
 }
 
 void surfaces_net_changed(void) { poke(); }

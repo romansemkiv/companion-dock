@@ -201,10 +201,15 @@ itself takes 4.5 s; the rest is Wi-Fi association).
 | Who connects | the box connects to Companion (TCP 16622, configurable) | Companion connects to the box (TCP 5343 + 2k) |
 | Setup in Companion | none: decks appear by themselves (or *Surfaces → Discover*) | *Surfaces → Remote → Add Remote Surface* once per deck (or the discovered list) |
 | Who draws the keys | Companion sends bitmaps; the box encodes JPEG/BMP for each model | Companion's own Stream Deck driver; the box passes HID reports through unchanged |
-| Box-drawn screens | the maintenance screens, dimmed keys + "Reconnecting", custom messages | the maintenance screens, custom messages (the last images come back after) |
+| Box-drawn screens | the maintenance screens, dimmed keys + "Reconnecting", custom messages | the maintenance screens, dimmed keys + "Reconnecting" (each deck on its own), custom messages (the last images come back after) |
 | Pick it when | the normal case: zero configuration, one TCP connection for all decks | you want Companion's own Stream Deck driver to draw every key, strip and info bar exactly as for a deck on the Companion machine, or the network lets Companion reach the box but not the box reach Companion |
 
-**Satellite mode.** Companion 5.0 or newer is needed (API ≥ 1.11). With exactly one Companion visible
+**Satellite mode.** Companion 5.0 or newer is needed (API ≥ 1.11). When Companion offers PNG button images
+(`CAPS BITMAP_FORMATS` lists `png`: API 1.12, Companion 5.0, and newer), the box asks for them
+(`ADD-DEVICE BITMAP_FORMAT="png"`) instead of raw RGB: lossless, and several times less to receive (a full XL page
+is about 1.2 MB as raw RGB in base64). The box decodes them with LodePNG before the same JPEG or BMP step; a key's
+image that isn't a PNG of the key's size, or a data URL of another format, is dropped. The log says which:
+`Companion 5.1.1 ready (API 1.14.0), PNG images`. With exactly one Companion visible
 over mDNS (`_companion-satellite-tcp._tcp`) the box connects to it and stays pinned to that instance's
 `id`. It follows that instance if its IP changes and never switches to another one by itself. With
 several, the decks say "Choose Companion" with "Web page" and the box IP, and the web page lists them. You can also
@@ -250,9 +255,18 @@ has reserved (a reserved one only when all others are taken).
   in it gets the same dock (the map), the port opens and is announced again, and Companion reconnects by
   itself, about 5 s later at most. No empty "Network Dock" is ever presented, so none appears in
   Companion.
-- **One client per port.** Any TCP connection to a deck's port takes the deck over from Companion: a
-  port check (`nc -z <box IP> 5343`) or a tool such as `dock_check` included. Companion is off the deck
-  until it reconnects, about 5 s later.
+- **A new connection is vetted first.** The box sends it a keepalive, as a dock does (Companion's library waits for
+  the device's first bytes to learn its framing), and gives it the deck only once it answers in the dock protocol (its
+  first bytes the Cora magic `43 93 8a 41`), within 3 s. A port check (`nc -z <box IP> 5343`), a port scan or any
+  other probe is closed (log: `dock 0: 10.0.0.9 turned away (closed without a word): not a Stream Deck host`) without
+  touching Companion's connection or the box's screens; up to 4 are vetted at once, a fifth closes the oldest. A
+  connection that does answer as a host (another Companion, `dock_check`) takes the deck over from the one being
+  served, as before: that Companion reconnects about 5 s later.
+- **When Companion lets go of a deck** (its connection ends), the deck keeps Companion's images for 2 s, so a quick
+  reconnect shows nothing; then they are dimmed with "Reconnecting" over the keys, as in Satellite mode (the box keeps
+  a copy of each key's last image and decodes it then: JPEG in the P4's codec, BMP for the gen1 decks), and the strip
+  and info bar go black; after 30 s the maintenance screens come back. Each deck on its own: it has its own
+  connection. Companion reconnecting draws the deck again.
 - In this mode the Satellite client, Companion browsing and the `_companion-satellite._tcp` announcement
   are off. The deck reports its own serial and firmware version; Companion offers Elgato's firmware updater
   only for Network Docks and Studios, so never for a deck behind the box.
@@ -509,9 +523,9 @@ satellite (Phosphor has none), drawn in Phosphor's stroke.
   Companion, only in the 3 s after the last tap are the two keys held back 0.1 s, the chord never reaches
   Companion. The default is the gesture above, so a box that never touches it works as before. The log says
   `box menu gesture: tap top-right, then hold top-right + bottom-right 2 s` (or `off`) at start and on each change.
-- **When Companion lets go** of a deck in Network Dock mode, the deck shows the maintenance home ("Waiting
-  for Companion", the box's IP and the deck's port) at once. In Satellite mode the last images still dim with "Reconnecting" over
-  them for 30 s first.
+- **When Companion lets go** of a deck, its last images stay 2 s, then dim with "Reconnecting" over them, and
+  after 30 s the deck shows the maintenance home ("Waiting for Companion", the box's IP and, in Network Dock mode, the
+  deck's port). In Network Dock mode each deck on its own; a deck Companion never drew on shows the home at once.
 
 ## Build and flash
 
@@ -977,6 +991,10 @@ in particular for the decks and setups not covered yet.
   the quarantine and the 10 s reset floor with injected stalls, the deck record surviving a restart.
 
 **Still to check on hardware:**
+- PNG button images in Satellite mode (Companion 5.1: the log's "PNG images"), and a full page's time against raw RGB;
+- Network Dock mode: "Reconnecting" over the dimmed images when Companion lets go (the colours: the decoded images'
+  colour order), on gen2 and gen1 decks; a port scan and `nc -z` against a dock's port while Companion drives the deck
+  (the deck stays Companion's);
 - four decks at once (deck limit 4), full-speed decks behind a hub and direct;
 - the +, + XL, Neo, Mini and Pedal; the strip, the info bar, the dials and the touch keys; the PIN pad and the
   static-address editor on each layout; the QR codes scanned with a phone;

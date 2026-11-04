@@ -58,6 +58,15 @@ add_host_test(deckproto_parse SOURCES test_deckproto_parse.c
 add_host_test(imgproc SOURCES test_imgproc.c
   ../../components/imgproc/transform.c ../../components/imgproc/bmp.c)
 
+# lodepng (third party, zlib licence) built as the firmware builds it: the decoder only, without -Werror
+add_library(lodepng STATIC ${REPO_ROOT}/components/imgproc/lodepng/lodepng.c)
+target_include_directories(lodepng PUBLIC ${REPO_ROOT}/components/imgproc/lodepng)
+target_compile_definitions(lodepng PUBLIC LODEPNG_NO_COMPILE_ENCODER LODEPNG_NO_COMPILE_DISK LODEPNG_NO_COMPILE_CPP
+  LODEPNG_NO_COMPILE_ANCILLARY_CHUNKS LODEPNG_NO_COMPILE_ERROR_TEXT)
+add_host_test(png SOURCES test_png.c ../../components/imgproc/png.c)
+target_link_libraries(test_png PRIVATE lodepng)
+target_compile_definitions(test_png PRIVATE PNG_FIXTURES="${CMAKE_CURRENT_SOURCE_DIR}/fixtures/png")
+
 add_host_test(statusui SOURCES test_statusui.c statusui_fixtures.c
   ../../components/statusui/layout.c ../../components/statusui/render.c ../../components/statusui/deck_font.c
   ../../components/deckmodel/model.c)
@@ -117,7 +126,7 @@ add_host_test(select SOURCES test_select.c ../../components/discovery/select.c)
 add_host_test(surfaces SOURCES test_surfaces.c
   ../../components/surfaces/registry.c ../../components/surfaces/coalesce.c
   ../../components/surfaces/inputmap.c ../../components/surfaces/message.c
-  ../../components/deckmodel/model.c)
+  ../../components/deckmodel/model.c ../../components/satproto/b64.c)
 
 add_host_test(c6fw_logic SOURCES test_c6fw_logic.c ../../components/c6fw/c6fw_logic.c)
 target_include_directories(test_c6fw_logic PRIVATE ${REPO_ROOT}/components/c6fw)

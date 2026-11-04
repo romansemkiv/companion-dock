@@ -1,4 +1,6 @@
 #include "unity.h"
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include "imgproc/imgproc.h"
 
@@ -112,6 +114,72 @@ void test_rgb_to_bgr_in_place(void)
     TEST_ASSERT_EQUAL_MEMORY(((const uint8_t[]){ 3, 2, 1, 6, 5, 4 }), b, 6);
 }
 
+/* img_untransform_rgb undoes img_transform_rgb exactly (the box's dimmed "Reconnecting" in dock mode: Companion's
+ * key images come back from the deck's orientation to the upright one), on odd, non-square sizes too */
+static void fill_rand(uint8_t *b, size_t n, uint32_t seed)
+{
+    for (size_t i = 0; i < n; i++) {
+        seed = seed * 1103515245u + 12345u;
+        b[i] = (uint8_t)(seed >> 16);
+    }
+}
+
+void test_untransform_inverts_every_transform(void)
+{
+    const img_xform_t xf[] = {IMG_XF_NONE, IMG_XF_ROT180, IMG_XF_ROT90_CCW, IMG_XF_MIRROR_H, IMG_XF_MINI};
+    const int sizes[][2] = {{7, 5}, {5, 7}, {1, 4}, {96, 96}, {9, 9}};
+    for (size_t i = 0; i < sizeof xf / sizeof xf[0]; i++)
+        for (size_t s = 0; s < sizeof sizes / sizeof sizes[0]; s++) {
+            const int w = sizes[s][0], h = sizes[s][1];
+            if (xf[i] == IMG_XF_MINI && w != h) continue; /* square only */
+            const size_t n = (size_t)w * h * 3;
+            uint8_t *a = malloc(n), *t = malloc(n), *b = malloc(n);
+            fill_rand(a, n, (uint32_t)(i * 31 + s));
+            img_transform_rgb(a, w, h, xf[i], t);
+            memset(b, 0, n);
+            img_untransform_rgb(t, w, h, xf[i], b);
+            char msg[48];
+            snprintf(msg, sizeof msg, "xform %d, %dx%d", (int)xf[i], w, h);
+            TEST_ASSERT_EQUAL_MEMORY_MESSAGE(a, b, n, msg);
+            free(a);
+            free(t);
+            free(b);
+        }
+}
+
+/* img_bmp_unpack reads back what img_bmp_pack writes (and what a gen1 deck takes from Companion): rows in file
+ * order, BGR, padded to 4 bytes; trailing bytes (a gen1 report's zero padding) ignored; anything else refused */
+void test_bmp_unpack_round_trip(void)
+{
+    const int sizes[][2] = {{72, 72}, {80, 80}, {5, 3}, {1, 1}};
+    for (size_t s = 0; s < sizeof sizes / sizeof sizes[0]; s++) {
+        const int w = sizes[s][0], h = sizes[s][1];
+        const size_t n = (size_t)w * h * 3, cap = 54 + (size_t)h * ((w * 3 + 3) & ~3) + 64;
+        uint8_t *a = malloc(n), *b = malloc(n), *bmp = calloc(1, cap);
+        fill_rand(a, n, (uint32_t)s + 7);
+        const size_t len = img_bmp_pack(a, w, h, bmp, cap);
+        TEST_ASSERT_TRUE(len > 0);
+        TEST_ASSERT_TRUE(img_bmp_unpack(bmp, len, w, h, b));
+        TEST_ASSERT_EQUAL_MEMORY(a, b, n);
+        TEST_ASSERT_TRUE(img_bmp_unpack(bmp, cap, w, h, b)); /* zeros after it */
+        TEST_ASSERT_EQUAL_MEMORY(a, b, n);
+        TEST_ASSERT_FALSE(img_bmp_unpack(bmp, len - 1, w, h, b)); /* cut short */
+        TEST_ASSERT_FALSE(img_bmp_unpack(bmp, len, w + 1, h, b)); /* another size */
+        TEST_ASSERT_FALSE(img_bmp_unpack(bmp, len, w, h + 1, b));
+        bmp[0] = 'X';
+        TEST_ASSERT_FALSE(img_bmp_unpack(bmp, len, w, h, b)); /* not "BM" */
+        bmp[0] = 'B';
+        bmp[28] = 32;
+        TEST_ASSERT_FALSE(img_bmp_unpack(bmp, len, w, h, b)); /* not 24 bpp */
+        free(a);
+        free(b);
+        free(bmp);
+    }
+    uint8_t one[3];
+    TEST_ASSERT_FALSE(img_bmp_unpack(NULL, 100, 1, 1, one));
+    TEST_ASSERT_FALSE(img_bmp_unpack((const uint8_t *)"BM", 2, 1, 1, one));
+}
+
 int main(void)
 {
     UNITY_BEGIN();
@@ -119,5 +187,6 @@ int main(void)
     RUN_TEST(test_mini_transform); RUN_TEST(test_bmp_header_and_rows); RUN_TEST(test_bmp_72px_size);
     RUN_TEST(test_fill); RUN_TEST(test_dim_halves);
     RUN_TEST(test_rgb_to_bgr_swaps_red_and_blue); RUN_TEST(test_rgb_to_bgr_in_place);
+    RUN_TEST(test_untransform_inverts_every_transform); RUN_TEST(test_bmp_unpack_round_trip);
     return UNITY_END();
 }

@@ -515,6 +515,7 @@ static void ui_stop(int slot, bool grace_keep, int64_t now)
     ui_t *u = s_ui[slot];
     surf_lock();
     const bool od = surf.ui_od[slot];
+    const bool dim = surf.dock ? surf.ddimmed[slot] : surf.dimmed; /* dock mode: this deck's own dim phase */
     surf.ui[slot] = surf.ui_od[slot] = false;
     if (od) { /* until Companion's images are back: nobody's input */
         surf.handback[slot] = true;
@@ -532,7 +533,7 @@ static void ui_stop(int slot, bool grace_keep, int64_t now)
         restore_last(slot, 100, false);
         bright_handback(slot);
     } else if (grace_keep)
-        restore_last(slot, surf.dimmed ? SURF_DIM_PCT : 100, surf.dimmed);
+        restore_last(slot, dim ? SURF_DIM_PCT : 100, dim);
     ESP_LOGI(TAG, "slot %d: maintenance screen gone%s", slot, od ? ": Companion's images coming back" : "");
 }
 
@@ -906,7 +907,7 @@ bool maintui_update(int64_t now, bool msg)
         ui_t *u = s_ui[slot];
         if (!u) continue;
         surf_slot_t *const sl = &s_st->sl; /* a copy: ~1 KB, off the stack (in PSRAM) */
-        bool any_last = false, companion = false, used;
+        bool any_last = false, companion = false, used, dloss = false;
         uint32_t gen;
         surf_lock();
         used = surf.reg.slot[slot].device_id[0] && surf.reg.slot[slot].model;
@@ -914,14 +915,20 @@ bool maintui_update(int64_t now, bool msg)
         gen = surf.gen[slot];
         if (used) companion = surf.dock ? surf.owned[slot] : live && sl->added;
         for (int k = 0; k < SURF_MAX_CTLS && !any_last; k++) any_last = surf.last[slot][k] != NULL;
+        if (surf.dock) { /* this deck's own loss phase: Companion's images on it, dimmed from SURF_LOSS_DIM_US */
+            const surf_loss_t ph = surf_loss_phase(surf.dlost_at_us[slot], surf.ddimmed[slot], now);
+            dloss = ph == SURF_LOSS_GRACE || ph == SURF_LOSS_DIM_DUE || ph == SURF_LOSS_DIMMED;
+        }
         surf_unlock();
         const bool has = used && surf_has_display(sl->model);
         const bool od_here = od_on[slot]; /* every other deck: as without on demand */
         const bool box_drives = surf.dock ? !companion : !live;
-        const bool want = has && (od_here || (box_drives && !msg && !(grace && any_last)));
+        /* Companion lost a moment ago: its images stay (Satellite: those kept; dock mode: per deck) */
+        const bool keep = surf.dock ? dloss : grace && any_last;
+        const bool want = has && (od_here || (box_drives && !msg && !keep));
         if (!want) {
-            /* Satellite, Companion lost a moment ago: its kept images come back, as on the other decks */
-            if (u->shown) ui_stop(slot, has && box_drives && grace && any_last && !msg, now);
+            /* ... and come back, as on the other decks */
+            if (u->shown) ui_stop(slot, has && box_drives && keep && !msg, now);
             continue;
         }
         if (!u->shown || u->deck != sl->deck || u->m != sl->model) {

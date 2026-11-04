@@ -995,6 +995,51 @@ static void test_hold_all_info_and_back_to_message(void)
 }
 
 /* The bounds (the report quotes them). */
+/* dc_key_image: Companion's last state of a key, for the box's dimmed "Reconnecting" once it lets go: a complete
+ * image's bytes (gen2 exactly; gen1 with its last report's zero padding), a fill's colour (a panel clear: black), or
+ * nothing (never drawn, the logo, out too small); a sequence still open never counts */
+static void test_key_image(void)
+{
+    static uint8_t out[16384];
+    size_t len = 0;
+    uint8_t rgb[3] = {0};
+    fx_init(0x006C); /* XL, gen2 JPEG */
+    TEST_ASSERT_EQUAL(DC_NONE, dc_key_image(&F.dc, 3, out, sizeof out, &len, rgb));
+    TEST_ASSERT_EQUAL_size_t(0, dc_key_image_cap(&F.dc, 3));
+    host_key_part(3, 41, 2500, 0, -1);
+    TEST_ASSERT_TRUE(dc_key_image_cap(&F.dc, 3) >= 2500);
+    TEST_ASSERT_EQUAL(DC_IMAGE, dc_key_image(&F.dc, 3, out, sizeof out, &len, rgb));
+    make_img(41, 2500);
+    TEST_ASSERT_EQUAL_size_t(2500, len);
+    TEST_ASSERT_EQUAL_MEMORY(imgbuf, out, 2500);
+    TEST_ASSERT_EQUAL(DC_NONE, dc_key_image(&F.dc, 3, out, 2499, &len, rgb)); /* too small */
+    host_key_part(3, 42, 3000, 0, 1);                                       /* a newer one, not finished */
+    TEST_ASSERT_EQUAL(DC_IMAGE, dc_key_image(&F.dc, 3, out, sizeof out, &len, rgb));
+    make_img(41, 2500);
+    TEST_ASSERT_EQUAL_MEMORY(imgbuf, out, 2500); /* still the complete one */
+    host_fill(5, 10, 20, 30);
+    TEST_ASSERT_EQUAL(DC_FILL, dc_key_image(&F.dc, 5, out, sizeof out, &len, rgb));
+    TEST_ASSERT_EQUAL_UINT8(10, rgb[0]);
+    TEST_ASSERT_EQUAL_UINT8(20, rgb[1]);
+    TEST_ASSERT_EQUAL_UINT8(30, rgb[2]);
+    TEST_ASSERT_EQUAL(DC_NONE, dc_key_image(&F.dc, 200, out, sizeof out, &len, rgb)); /* no such key */
+    host_simple(0x05, 0); /* clear: every key black */
+    TEST_ASSERT_EQUAL(DC_FILL, dc_key_image(&F.dc, 3, out, sizeof out, &len, rgb));
+    TEST_ASSERT_EQUAL_UINT8(0, rgb[0] | rgb[1] | rgb[2]);
+    host_simple(0x02, 0); /* the logo: no image of the key's own kept */
+    TEST_ASSERT_EQUAL(DC_NONE, dc_key_image(&F.dc, 3, out, sizeof out, &len, rgb));
+    fx_done();
+
+    fx_init(0x0063); /* Mini, gen1 BMP: the payloads keep their padding */
+    host_key_part(2, 77, 1500, 0, -1);
+    TEST_ASSERT_EQUAL(DC_IMAGE, dc_key_image(&F.dc, 2, out, sizeof out, &len, rgb));
+    TEST_ASSERT_TRUE(len >= 1500);
+    make_img(77, 1500);
+    TEST_ASSERT_EQUAL_MEMORY(imgbuf, out, 1500);
+    for (size_t i = 1500; i < len; i++) TEST_ASSERT_EQUAL_HEX8(0, out[i]);
+    fx_done();
+}
+
 static void test_bounds(void)
 {
     const deck_model_t *m32 = deck_model_find(0x0FD9, 0x00BA), *orig = deck_model_find(0x0FD9, 0x0060);
@@ -1014,6 +1059,7 @@ int main(void)
 {
     UNITY_BEGIN();
     RUN_TEST(test_passthrough_unchanged);
+    RUN_TEST(test_key_image);
     RUN_TEST(test_message_then_replay_gives_latest);
     RUN_TEST(test_open_sequence_finishes_before_frames);
     RUN_TEST(test_held_sequence_finishing_after_hold);

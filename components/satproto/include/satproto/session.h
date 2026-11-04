@@ -7,6 +7,7 @@ typedef struct {
     int major, minor, patch;
     char companion_version[32];
     bool nonsquare, rotary_amount, leds;
+    bool png; /* CAPS BITMAP_FORMATS (API 1.12+) lists png: ADD-DEVICE then asks for PNG images (BITMAP_FORMAT=png) */
 } sat_caps_t;
 
 typedef struct {
@@ -59,7 +60,8 @@ typedef struct {
     const char *change_page_label; /* non-NULL: device can change page; sent as CAN_CHANGE_PAGE="<label>" */
 } sat_device_desc_t;
 
-/* False if the formatted line did not fit in txbuf (nothing is sent). */
+/* False if the formatted line did not fit in txbuf (nothing is sent). With caps.png it asks for PNG button images
+ * (BITMAP_FORMAT=png): KEY-STATE's BITMAP is then a data URL (sat_bitmap_split). */
 bool sat_session_add_device(sat_session_t *s, const sat_device_desc_t *d);
 void sat_session_remove_device(sat_session_t *s, const char *device_id);
 void sat_session_key(sat_session_t *s, const char *device_id, const char *control_id, bool pressed);
