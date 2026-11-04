@@ -336,7 +336,8 @@ satellite (Phosphor has none), drawn in Phosphor's stroke.
   "Companion connected" (on demand only: a grey *Connected Companion* label, then the Companion's *IP*, and
   in dock mode its *PORT*; where the label can't share a page with the address, as on the Mini in
   dock mode, there is no label and the address's first key says *COMPANION IP*). The hotspot's name (captioned *HOTSPOT*) and password
-  sit at the bottom while it is on.
+  sit at the bottom while it is on, then its Wi-Fi join QR code: wherever the decks show the hotspot, they show the
+  code to join it.
 - **Network**: Ethernet, the primary and backup Wi-Fi, the box's `.local` name, on a **fixed key map per model**:
   every key stays where it is whatever the state, so it can be pressed from memory. On the 32-key
   decks and the + XL one row per network, Ethernet / Primary / Backup in that order (the deck says
@@ -398,8 +399,8 @@ satellite (Phosphor has none), drawn in Phosphor's stroke.
   (`Companion.SetConfig {companionAuto: false, companionHost}`): automatic discovery off, the box connects to
   that address, and the deck says "Saved". *Set IP* and *Auto find* are locked under the settings PIN, and
   neither is shown in dock mode. **Hotspot**: name (captioned *HOTSPOT*) and
-  password, *Turn off* (hold 1.5 s) or *Always on* (the hotspot setting on and kept, as the web page
-  turns it on; locked under the settings PIN), *Show QR* (a code to join the hotspot and one for
+  password, then its Wi-Fi join QR code, *Turn off* (hold 1.5 s) or *Always on* (the hotspot setting on and kept, as the web page
+  turns it on; locked under the settings PIN), *Show QR* (the code to join the hotspot again, with one for
   the setup page). **Box** (Phosphor's *Circuitry*): name, uptime, version, both firmware slots,
   the **Sync** button, always there: *Sync now* while the other slot differs, is empty or invalid;
   in sync its tag says *In sync* and a tap copies the running firmware again all the same; disabled with the
@@ -660,8 +661,8 @@ or that can cut you off (network changes, the settings password).
 - **On all the time** next to Ethernet and Wi-Fi unless turned off. It follows the station's channel. Turning
   Wi-Fi off leaves it as it is.
 - Its name and password ("Open" / "No password" if it is made open) are shown on the decks' maintenance
-  screens (home, whenever Companion isn't driving them; and *Hotspot*, with QR codes to join it and open the
-  page), on the web page and on the serial console.
+  screens, each time with its Wi-Fi join QR code (home, whenever Companion isn't driving them; and *Hotspot*,
+  whose *Show QR* adds the setup page's code), on the web page and on the serial console.
 - Join it and the phone opens the page (captive portal); otherwise go to `http://192.168.4.1/`.
 - Turned off and the box unreachable: press RESET 3 times (hotspot for 15 minutes) or hold the service
   button 5 s. That hotspot is open or has the password, as the settings say.

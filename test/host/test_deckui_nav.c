@@ -624,17 +624,26 @@ static void test_tap_to_page_on_the_mini(void)
         TEST_ASSERT_TRUE(o.all);
         TEST_ASSERT_EQUAL((before + 1) % pages, dui_nav_pg(&R.n));
     }
-    /* a blank content key turns it too */
+    /* a blank content key turns it too (on a home that has one: the hotspot's join code fills the dock home's last) */
     int bp = -1, bc = -1;
-    for (int p = 0; p < pages && bp < 0; p++)
-        for (int c = 0; c < R.d.cols && bp < 0; c++)
-            if (!dui_layout_key(&R.L, p, c, 1, &t)) bp = p, bc = c;
-    TEST_ASSERT_TRUE_MESSAGE(bp >= 0, "no blank content key on the Mini's home");
+    static const int SAT[] = {-1, DUI_SAT_FINDING, DUI_SAT_RECON, DUI_SAT_CONNECTED};
+    for (size_t k = 0; k < sizeof SAT / sizeof SAT[0] && bp < 0; k++) {
+        dui_box_t hb = box_default();
+        if (SAT[k] >= 0) {
+            hb.mode = DUI_MODE_SAT;
+            hb.sat.state = SAT[k];
+        }
+        rig(PID_MINI, hb);
+        for (int p = 0; R.L.pages >= 2 && p < R.L.pages && bp < 0; p++)
+            for (int c = 0; c < R.d.cols && bp < 0; c++)
+                if (!dui_layout_key(&R.L, p, c, 1, &t)) bp = p, bc = c;
+    }
+    TEST_ASSERT_TRUE_MESSAGE(bp >= 0, "no blank content key on any of the Mini's homes");
     show_page(bp);
     R.now += 50;
     o = tap(bc, 1);
     TEST_ASSERT_TRUE(o.all);
-    TEST_ASSERT_EQUAL((bp + 1) % pages, dui_nav_pg(&R.n));
+    TEST_ASSERT_EQUAL((bp + 1) % R.L.pages, dui_nav_pg(&R.n));
     /* a button (a choice) doesn't: it picks */
     dui_box_t b = box_default();
     b.mode = DUI_MODE_SAT;

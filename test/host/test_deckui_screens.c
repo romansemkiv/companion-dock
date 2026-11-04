@@ -204,7 +204,7 @@ static int tile_with(const char *text)
 
 /* ---- home ---- */
 
-#define HOTSPOT "^S Hotspot:CompanionBox-8D1C|Password:k7m2p9xq"
+#define HOTSPOT "^S Hotspot:CompanionBox-8D1C|Password:k7m2p9xq|QR" /* its join code after it */
 
 static void test_home_dock_waiting(void)
 {
@@ -229,7 +229,7 @@ static void test_home_dock_waiting(void)
     b.net.ap_secured = false;
     b.net.ap_pass[0] = '\0';
     build(DUI_PAGE_HOME, &b);
-    TEST_ASSERT_EQUAL_STRING("#1 Add|Box IP:192|168|8|225|Port:5343 / ^S Hotspot:CompanionBox-8D1C|Open", content(&S));
+    TEST_ASSERT_EQUAL_STRING("#1 Add|Box IP:192|168|8|225|Port:5343 / ^S Hotspot:CompanionBox-8D1C|Open|QR", content(&S));
     TEST_ASSERT_EQUAL(DUI_ROLE_LABEL, find(&S, NULL, "Open")->role);
     b.net.ap_on = false;
     build(DUI_PAGE_HOME, &b);
@@ -378,8 +378,9 @@ static int qr_payloads(const char *out[4])
 }
 
 /* the setup screen (no network, the hotspot on) carries the QR page's two codes, the join code (an open
- * hotspot's without a password) and the setup page's URL, each right after its step's words; no other home state
- * has them. On every model each code is placed, the URL code on its step's page, the join code too where the row has
+ * hotspot's without a password) and the setup page's URL, each right after its step's words. Every other home with
+ * the hotspot on shows its join code after its name and password (wherever the hotspot shows, its code to join it);
+ * the hotspot off, none. On every model each code is placed, the URL code on its step's page, the join code too where the row has
  * room (the 32-key decks, the + XL, the 15-key decks, the + and the Neo; the Mini: the next page). */
 static void test_setup_screen_qr(void)
 {
@@ -398,19 +399,30 @@ static void test_setup_screen_qr(void)
     TEST_ASSERT_EQUAL_STRING(join, q[0]);
     TEST_ASSERT_NULL(strstr(q[0], "k7m2p9xq"));
     TEST_ASSERT_NULL(strstr(q[0], "P:"));
-    /* no QR on any other home (the hotspot off, a network, each Satellite state, dock mode) */
+    /* the hotspot off: no code */
     b.net.ap_on = false;
     build(DUI_PAGE_HOME, &b);
     TEST_ASSERT_EQUAL(0, qr_payloads(q));
+    /* every other home with the hotspot on: its join code, once (each Satellite state, dock mode, open or not) */
+    dui_wifi_join(join, sizeof join, "CompanionBox-8D1C", "k7m2p9xq");
     static const int SAT[] = {DUI_SAT_FINDING, DUI_SAT_CHOOSE, DUI_SAT_TOO_OLD, DUI_SAT_RECON, DUI_SAT_CONNECTED};
     for (size_t i = 0; i < sizeof SAT / sizeof SAT[0]; i++) {
         b = sat(SAT[i]);
+        build(DUI_PAGE_HOME, &b);
+        TEST_ASSERT_EQUAL(1, qr_payloads(q));
+        TEST_ASSERT_EQUAL_STRING(join, q[0]);
+        b.net.ap_on = false;
         build(DUI_PAGE_HOME, &b);
         TEST_ASSERT_EQUAL(0, qr_payloads(q));
     }
     b = box_default();
     build(DUI_PAGE_HOME, &b);
-    TEST_ASSERT_EQUAL(0, qr_payloads(q));
+    TEST_ASSERT_EQUAL(1, qr_payloads(q));
+    TEST_ASSERT_EQUAL_STRING(join, q[0]);
+    b.net.ap_secured = false;
+    build(DUI_PAGE_HOME, &b);
+    TEST_ASSERT_EQUAL(1, qr_payloads(q));
+    TEST_ASSERT_NULL(strstr(q[0], "P:")); /* open: no password in it */
     /* positions per model */
     static const struct {
         uint16_t pid;
@@ -1498,7 +1510,7 @@ static void test_hotspot(void)
 {
     dui_box_t b = box_default();
     build(DUI_PAGE_HOTSPOT, &b);
-    TEST_ASSERT_EQUAL_STRING("S Hotspot:CompanionBox-8D1C / S Password:k7m2p9xq / [Turn off]|[Show QR]", content(&S));
+    TEST_ASSERT_EQUAL_STRING("S Hotspot:CompanionBox-8D1C / S Password:k7m2p9xq|QR / [Turn off]|[Show QR]", content(&S));
     const dui_tile_t *t = button(&S, "Turn off");
     TEST_ASSERT_TRUE(t->flags & DUI_F_DANGER);
     TEST_ASSERT_TRUE(t->flags & DUI_F_ON);
@@ -1508,7 +1520,7 @@ static void test_hotspot(void)
     TEST_ASSERT_EQUAL(DUI_A_GO_QR, button(&S, "Show QR")->action);
     b.net.ap_secured = false;
     build(DUI_PAGE_HOTSPOT, &b);
-    TEST_ASSERT_EQUAL_STRING("S Hotspot:CompanionBox-8D1C / S No|password / [Turn off]|[Show QR]", content(&S));
+    TEST_ASSERT_EQUAL_STRING("S Hotspot:CompanionBox-8D1C / S No|password|QR / [Turn off]|[Show QR]", content(&S));
     b.net.ap_on = false;
     build(DUI_PAGE_HOTSPOT, &b);
     TEST_ASSERT_EQUAL_STRING("Hotspot|is off / [Always on]", content(&S));

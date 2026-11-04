@@ -321,9 +321,10 @@ void dui_build_home(dui_screen_t *s, const dui_box_t *b)
         }
         break;
     }
-    if (b->net.ap_on) { /* the service zone, anchored at the bottom */
+    if (b->net.ap_on) { /* the service zone, anchored at the bottom: wherever the hotspot shows, its code to join it */
         dui_group(s, DUI_ZONE_SVC, DUI_G_ANCHOR);
         hotspot_tiles(s, b, false);
+        qr_join(s, b);
     }
 }
 
@@ -565,6 +566,7 @@ void dui_build_hotspot(dui_screen_t *s, const dui_box_t *b)
         } else {
             password_tile(s, b->net.ap_pass);
         }
+        qr_join(s, b); /* the code to join it, after its password; Show QR adds the setup page's */
         dui_group(s, DUI_ZONE_MAIN, 0);
         hold_button(s, b, DUI_ICON_POWER, "Turn off", DUI_A_AP_OFF, DUI_HOLD_AP_OFF_MS, "cuts users", true)->flags |=
             DUI_F_ON;
