@@ -84,17 +84,17 @@ firmware can neither power-cycle the port nor see an overcurrent. A "USB port re
 reset of the root port by the USB host controller, not a power cut. A powered hub is allowed; the switch
 blocks back-feed.
 
-**PoE power budget (an estimate, still to be measured, see [Measurements](#measurements)).** 802.3af
+**PoE power budget (from the ratings; the deck counts tested on a box, see [Measurements](#measurements)).** 802.3af
 gives about 12.95 W at the device, roughly 10–11 W at 5 V. Less about 1–1.5 W for the board, plan on
 **about 1.5 A (7.5 W) for the hub and decks**. Decks enumerate at up to 500 mA (XL, Original v2) and the
-Plus XL is rated 900 mA. So expect 2 decks at worst-case draw and 3–4 typically on PoE alone; more needs a
-powered hub. For a Wi-Fi-only install powered from USB-C, use a 5 V supply of at least 3 A. The USB-A
-switch still caps the decks at about 2 A.
+Plus XL is rated 900 mA. So expect 2 decks at worst-case draw. On a box, PoE alone through an unpowered hub ran
+2 XL and a Mini, or 3 XL while their pages changed little; more needs a powered hub. For a Wi-Fi-only install
+powered from USB-C, use a 5 V supply of at least 3 A. The USB-A switch still caps the decks at about 2 A.
 
 **Full-speed decks and hubs.** The P4's USB host has no Transaction Translator. A full-speed device
 behind a high-speed hub does not work, while a full-speed device plugged straight into the box does. The
-Stream Deck Mini family and the Pedal may be full-speed. If one does not appear on a hub, plug it into the
-box directly (the web page shows this hint).
+Stream Deck Mini family and the Pedal may be full-speed (a Mini tested through a hub worked). If one does not
+appear on a hub, plug it into the box directly (the web page shows this hint).
 
 ## Speaker and status light
 
@@ -282,18 +282,19 @@ box can restart; a powered USB hub gives the extra decks their own power; at you
 *Back to 2 decks…* undoes it. The setting is `deckLimit` (`Device.SetConfig`, 2 or 4), behind the settings PIN.
 
 The box has one USB-A port, so two or more decks go through a USB 2.0 high-speed hub. How many decks the power
-allows (estimates from the ratings, see [the PoE power budget](#hardware) and [Measurements](#measurements)):
+allows (the PoE row tested on a box, the others estimates from the ratings; see [the PoE power budget](#hardware) and
+[Measurements](#measurements)):
 
 | The decks are powered by | Budget for the hub and the decks | Decks |
 |---|---|---|
-| PoE (802.3af), through an unpowered hub | about 1.5 A (7.5 W), what is left once the board has its share | **2** at full draw. 3 or 4 often work with the limit at 4, at your own risk |
+| PoE (802.3af), through an unpowered hub | about 1.5 A (7.5 W), what is left once the board has its share | **Tested: 2 XL and a Mini**, or **3 XL** while their pages change little (the limit at 4) |
 | USB-C, a 5 V supply of 3 A or more (Wi-Fi only), through an unpowered hub | about 2 A, the USB-A switch's limit | **3** at full draw, 4 often |
 | A powered hub (with its own power supply), the box on PoE or USB-C | the hub's supply | **4**, the firmware's maximum |
 
 *Full draw* is 500 mA per deck, the most a deck asks for when it enumerates (XL, Original v2); a Stream Deck + XL
-is rated 900 mA and counts as almost two. An unpowered hub takes its own share from the same budget. A full-speed
-deck (some Minis, the Pedal) doesn't work behind a high-speed hub, so it only works plugged into the box directly,
-on its own.
+is rated 900 mA and counts as almost two. An unpowered hub takes its own share from the same budget. Images drawn on
+the keys take power, so 3 XL with busy pages may be more than PoE gives. A full-speed deck (some older Minis, the
+Pedal) doesn't work behind a high-speed hub, so it only works plugged into the box directly, on its own.
 
 A deck beyond the limit is ignored as long as it stays plugged in: it gets no dock and no screen, Companion never
 sees it, the problem list says "Too many Stream Decks (max 2): <serial> ignored", and Home's banner says "Deck
@@ -851,7 +852,7 @@ listed on the status page.
 | Model | PID | Keys | Key image | Extras | Status |
 |---|---|---|---|---|---|
 | Stream Deck (Original v1) | 0x0060 | 5×3 | 72 px BMP, mirrored | gen1, 8191-byte reports | protocol only |
-| Stream Deck Mini | 0x0063, 0x0090 | 3×2 | 80 px BMP, rotated | gen1; may be full-speed (direct only) | protocol only |
+| Stream Deck Mini | 0x0063, 0x0090 | 3×2 | 80 px BMP, rotated | gen1; may be full-speed (direct only) | **run on the box** (through a hub, with 2 XL) |
 | Stream Deck Mini Discord Edition | 0x00B3 | 3×2 | 80 px BMP | as Mini | protocol only |
 | Stream Deck Module 6 | 0x00B8 | 3×2 | 80 px BMP | as Mini | protocol only |
 | Stream Deck (Original v2) | 0x006D | 5×3 | 72 px JPEG, 180° | gen2 | protocol only |
@@ -867,9 +868,9 @@ listed on the status page.
 
 ## Known limitations
 
-- **Hardware-tested on the Module 32 and the XL only.** Hubs, several decks at once and full-speed decks
-  have not been verified on a box yet. The hub path depends on the USB workarounds below holding for a hub's
-  own interrupt pipe.
+- **Hardware-tested on the Module 32, the XL and the Mini.** Hubs and several decks at once work (2 XL and a Mini,
+  3 XL, through one unpowered hub on PoE). Four decks at once and a full-speed deck have not been tried on a box
+  yet.
 - **USB FIFO and OUT/IN gate.** With ESP-IDF's periodic-OUT FIFO bias the RX FIFO is 130 lines, just one
   512-byte packet: the controller then closed the decks' interrupt-IN transfer every ~250 µs without
   receiving anything, so keys never worked, and the IDF driver could skip a packet of an interrupt-OUT
@@ -965,6 +966,7 @@ in particular for the decks and setups not covered yet.
 - the Module 32 and the XL; on the Module 32, Satellite mode (handshake, `ADD-DEVICE`, images) and Network Dock
   mode (`dock_check` passes with the deck directly on 5343, Companion 5.1.1 lists one surface per deck, key
   presses reach Companion, a custom message over Companion's images and the replay after it);
+- a hub with several decks at once: 2 XL and a Mini, and 3 XL, through one unpowered hub, the box on PoE alone;
 - a clean boot log, the C6 on ESP-Hosted 3.0.9, the Wi-Fi station, NVS settings across restarts;
 - mode switches both ways (24 restarts in a row with no panic), the restart breadcrumb, a core dump read back
   with `idf.py coredump-info`;
@@ -975,7 +977,7 @@ in particular for the decks and setups not covered yet.
   the quarantine and the 10 s reset floor with injected stalls, the deck record surviving a restart.
 
 **Still to check on hardware:**
-- hubs, two or more decks at once (and four at deck limit 4), full-speed decks behind a hub and direct;
+- four decks at once (deck limit 4), full-speed decks behind a hub and direct;
 - the +, + XL, Neo, Mini and Pedal; the strip, the info bar, the dials and the touch keys; the PIN pad and the
   static-address editor on each layout; the QR codes scanned with a phone;
 - PoE: board idle power, the PoE class negotiated, the most decks PoE alone can run ([Measurements](#measurements));
@@ -1010,7 +1012,7 @@ in particular for the decks and setups not covered yet.
 | Lowest free task stack (bytes) | captive_dns 880, deck task 1420, tiT 1368, usb_client 1816, docktx 2168, sys_evt 2228, satclient 3224, surfaces 3276, imgwork 5972, httpd 4832 | high-water marks in both modes, Companion connected and `dock_check` run |
 | Board idle power | not measured yet | |
 | PoE class negotiated | not measured yet | |
-| Maximum decks on PoE alone | not measured yet | |
+| Decks on PoE alone | 2 XL and a Mini; 3 XL while their pages change little | an unpowered hub, deck limit 4 |
 
 ## Credits and licences
 
