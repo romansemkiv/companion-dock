@@ -575,6 +575,38 @@ async function smoke(file) {
       errs.push(`R129: the Logs page's first reads are ${calls.slice(0, 3).join(' then ')}, not the whole ring oldest first`);
     else if (calls.length > 2 && /oldest/.test(calls[2])) errs.push('R129: the Logs page keeps reading oldest first after it caught up');
   }
+  // Logs: timestamps, Copy, Clear view. Each stamped line ("I (ms) tag: …") gets its local time from Log.Get's up_ms
+  // (the box's log clock as read: the line is up_ms - ms old, mod 2^32), shown as HH:MM:SS.mmm when the Timestamps
+  // switch is on; unstamped lines get blanks of that width; an unfinished line waits for its end; Copy copies the
+  // text shown (the clipboard API needs https, so a textarea copy stands in on the box's plain http).
+  {
+    const idx = fs.readFileSync(file, 'utf8');
+    const f = vm.runInContext('typeof logAppend==="function"&&typeof logText==="function"?{logAppend,logText,logTime}:null', ctx);
+    if (!f) errs.push('logs: logAppend / logText missing');
+    else {
+      const T = new Date(2026, 10, 8, 14, 0, 10, 0).getTime();
+      vm.runInContext(`globalThis.__now=Date.now;Date.now=()=>${T}`, ctx);
+      const pg = { lines: [], len: 0, tail: '', ts: true };
+      f.logAppend(pg, '\x1b[0;32mI (4000) main: ready\x1b[0m\n  more\nW (9500) net: sl', 10000);
+      f.logAppend(pg, 'ow\n', 10000);
+      const wrap = { lines: [], len: 0, tail: '', ts: true };
+      f.logAppend(wrap, 'I (4294967000) x: before the wrap\n', 200);   // 296 + 200 ms ago
+      vm.runInContext('Date.now=globalThis.__now', ctx);
+      const want = '14:00:04.000 I (4000) main: ready\n' + ' '.repeat(13) + '  more\n14:00:09.500 W (9500) net: slow\n';
+      if (f.logText(pg) !== want) errs.push(`logs: timestamped text is ${JSON.stringify(f.logText(pg))}, not ${JSON.stringify(want)}`);
+      if (wrap.lines[0] && wrap.lines[0].t !== T - 496) errs.push('logs: a stamp from before the log clock wrapped gets the wrong time');
+      pg.ts = false;
+      if (f.logText(pg) !== 'I (4000) main: ready\n  more\nW (9500) net: slow\n') errs.push('logs: with timestamps off the text is not the box\'s own');
+      const old = { lines: [], len: 0, tail: '', ts: true };
+      f.logAppend(old, 'I (5) a: b\n');
+      if (old.lines[0].t !== null) errs.push('logs: a reply without up_ms still gets a time');
+    }
+    if (!/btn\('Copy',copyLog,'ghost','copy'\)/.test(idx)) errs.push('logs: the Log panel has no Copy button');
+    if (!/<symbol id="i-copy" viewBox="0 0 256 256">/.test(idx)) errs.push('logs: i-copy (Phosphor) missing');
+    if (!/chk\('logts','Timestamps'/.test(idx)) errs.push('logs: the Log panel has no Timestamps switch');
+    if (!/execCommand\('copy'\)/.test(idx)) errs.push('logs: Copy has no fallback for plain http');
+    if (!/btn\('Clear view',\(\)=>\{pg\.lines=\[\];pg\.len=0;pg\.tail=''/.test(idx)) errs.push('logs: Clear view does not clear the lines kept');
+  }
   // the network signs after the Companion chip: Ethernet while linked, Wi-Fi and the hotspot always, in that
   // order, each a link to its page, its details in title and aria-label (the same), crossed grey (off) or red (not
   // joined), the route's marked (rt) and no other; phones: each sign (icon and address: the client count and bars hidden

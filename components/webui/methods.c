@@ -1394,9 +1394,11 @@ static cJSON *m_ota_boot_other(const cJSON *p, rpc_err_t *err)
     return r;
 }
 
-/* Log.Get {since?, oldest?} -> {seq, text}: log text after `since` (0 = the oldest kept), at most 8 KB: the newest
- * when more is waiting, or with oldest true the oldest (calls in a row then read the whole 16 KB ring in order, as
- * the web page's export does); pass seq back next time. Not public: the ring holds the hotspot password. */
+/* Log.Get {since?, oldest?} -> {seq, text, up_ms}: log text after `since` (0 = the oldest kept), at most 8 KB: the
+ * newest when more is waiting, or with oldest true the oldest (calls in a row then read the whole 16 KB ring in order,
+ * as the web page's export does); pass seq back next time. up_ms is the log's own clock (the "(12345)" each line
+ * carries) as the text was read, so a reader can put the lines on its own clock. Not public: the ring holds the
+ * hotspot password. */
 static cJSON *m_log_get(const cJSON *p, rpc_err_t *err)
 {
     const cJSON *since = cJSON_GetObjectItemCaseSensitive(p, "since");
@@ -1408,10 +1410,12 @@ static cJSON *m_log_get(const cJSON *p, rpc_err_t *err)
     char *buf = heap_caps_malloc(LOG_CHUNK + 1, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     if (!buf) return rpc_fail(err, RPC_E_UNAVAILABLE, RPC_MSG_NO_MEMORY);
     const size_t n = logbuf_read(buf, LOG_CHUNK, &seq, oldest);
+    const uint32_t up = esp_log_timestamp(); /* after the read: no line in it is newer */
     buf[n] = '\0';
     cJSON *r = cJSON_CreateObject();
     cJSON_AddNumberToObject(r, "seq", seq);
     cJSON_AddStringToObject(r, "text", buf);
+    cJSON_AddNumberToObject(r, "up_ms", up);
     free(buf);
     return r;
 }

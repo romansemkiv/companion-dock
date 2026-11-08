@@ -16,7 +16,7 @@
 #include "webui_priv.h"
 
 #define LOG_SIZE (16 * 1024)
-#define LINE_MAX_LEN 256 /* longer lines are cut in the ring (the console gets them whole) */
+#define LINE_MAX_LEN 256 /* longer lines are cut in the ring, still ending in a newline (the console gets them whole) */
 #define READ_PIECE 512  /* bytes copied per critical section */
 
 static char *s_buf;
@@ -32,7 +32,10 @@ static int hook(const char *fmt, va_list ap)
     int n = vsnprintf(line, sizeof line, fmt, ap2);
     va_end(ap2);
     if (n > 0 && s_buf) {
-        if (n >= (int)sizeof line) n = sizeof line - 1;
+        if (n >= (int)sizeof line) {
+            n = sizeof line - 1;
+            line[n - 1] = '\n'; /* a cut line still ends its line: the next one keeps its own start (and stamp) */
+        }
         taskENTER_CRITICAL(&s_mux);
         const size_t len = (size_t)n, at = s_written % LOG_SIZE, first = LOG_SIZE - at < len ? LOG_SIZE - at : len;
         memcpy(s_buf + at, line, first);          /* up to the end of the ring... */

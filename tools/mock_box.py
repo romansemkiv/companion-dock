@@ -163,7 +163,7 @@ def answer(method):
                                "soundProblem": True, "soundDeckPlug": True, "soundKeyClick": True, "ledEnabled": True,
                                "ledFlash": True, "ledPin": 23, "ledBrightness": 30,
                                "ledPins": [0, 1, 2, 3, 4, 5, 20, 21, 22, 23, 26, 27, 33, 46, 47, 48]},
-        "Log.Get": {"seq": 3, "text": "I (1) boot: ready\nI (4659) main: ready in 4659 ms\n"},
+        "Log.Get": {"seq": 3, "text": "I (1) boot: ready\nI (4659) main: ready in 4659 ms\n", "up_ms": 5000},
     }.get(method, {})
 
 

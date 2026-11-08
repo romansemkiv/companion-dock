@@ -1,0 +1,17 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "icon-tile-stack",
+        "value": "*",
+        "files": [
+          "components/webui/www/index.html"
+        ],
+        "createdAt": "2026-11-08T08:09:48.647Z",
+        "reason": "user confirmed: the flagged 40x40 tile is the header's menu button beside the page title (<h1 id=title>, empty until the script fills it), a control, not an icon tile above a heading"
+      }
+    ]
+  }
+}
