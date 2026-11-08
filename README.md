@@ -136,21 +136,21 @@ From the command line, write the full image at `0x0` over the board's USB-C port
 
 ```sh
 python3 -m pip install "esptool>=4.12"
-esptool.py --chip esp32p4 -p <PORT> -b 460800 write_flash 0x0 companion-dock-v0.2.6-full.bin
+esptool.py --chip esp32p4 -p <PORT> -b 460800 write_flash 0x0 companion-dock-v0.2.7-full.bin
 ```
 
 Or file by file:
 
 ```sh
 esptool.py --chip esp32p4 -p <PORT> -b 460800 write_flash --flash_mode dio --flash_size 16MB --flash_freq 80m \
-  0x2000 bootloader.bin 0x8000 partition-table.bin 0xf000 ota_data_initial.bin 0x20000 companion-dock-v0.2.6.bin
+  0x2000 bootloader.bin 0x8000 partition-table.bin 0xf000 ota_data_initial.bin 0x20000 companion-dock-v0.2.7.bin
 ```
 
 `SHA256SUMS` lists the checksums. [docs/flashing.md](docs/flashing.md) goes through it step by step, including a
 way to flash from the browser with nothing to install.
 
 The full image erases the settings. For a box that already runs this firmware, upload
-`companion-dock-v0.2.6.bin` on the web page's **Firmware** page instead: the settings stay, and the box rolls back
+`companion-dock-v0.2.7.bin` on the web page's **Firmware** page instead: the settings stay, and the box rolls back
 if the new image doesn't start properly.
 
 ### 2. Set it up
