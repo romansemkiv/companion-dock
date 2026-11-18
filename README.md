@@ -34,7 +34,8 @@ web page.
   and the Pedal. Each deck keeps its Companion page across replugs and reboots (it is known by its serial).
 - **A box menu on the decks.** While Companion isn't driving a deck, the deck shows the box's own screens: the
   state, the box's address, Network, Companion, Hotspot and Box settings, with holds for anything that restarts
-  or cuts people off. A key gesture or the web page opens the menu over Companion too.
+  or cuts people off. A [key gesture](#4-open-the-box-menu-on-a-deck) or the web page opens the menu over
+  Companion too.
 - **A web page** for status, settings, firmware updates, the log and a live performance view (CPU, memory, tasks,
   network counters), laid out for a phone as well as a desktop.
 - **Ethernet and Wi-Fi**, with a backup Wi-Fi network for when the main one is out of reach, and a setup
@@ -56,14 +57,16 @@ web page.
 |---|---|---|
 | [Waveshare ESP32-P4-WIFI6-POE-ETH](https://www.waveshare.com/esp32-p4-wifi6-poe-eth.htm?sku=32832) | $24.99 | ESP32-P4 with 32 MB PSRAM, Ethernet, 802.3af PoE, an ESP32-C6 for Wi-Fi 6. Comes with a speaker, an antenna and cables |
 | [Adafruit Breadboard-friendly RGB Smart NeoPixel (#1312)](https://www.adafruit.com/product/1312) | $7.95 for 5 | optional status light, SK6812 (WS2812B-compatible). You need one |
+| [Adafruit NeoKey Socket Breakout for CHOC (#5756)](https://www.adafruit.com/product/5756) | $1.75 | optional, instead of the NeoPixel above: a key socket with a NeoPixel under the key, so one small board is the **service key** and the **status light**. Add a Kailh Choc v1 switch and a keycap. The case's Button lid is made for it |
 | A PoE switch or injector (802.3af) | | or USB-C power and Wi-Fi |
 
 Prices from the vendors' sites, November 2026; shipping not included. That is about **$33** for the box itself.
 
 The NeoPixel takes 5 V and GND from the board's header and its data input on GPIO 23, header pin 8 (another pin can be set on
-the web page). Pin tables, power notes and the optional service key (a push button or a NeoKey: short press, long
-press, 5 s and 10 s holds) are in the
-[manual](docs/manual.md#hardware).
+the web page). The NeoKey's switch goes between GPIO 32 and GND, and its NeoPixel takes 3V3, GND and the same data
+pin. The status light and the service key are off on a new box: switch them on, on the web page's **Speaker & LED**
+page, once they are wired. Pin tables, power notes, the NeoKey's wiring and what the service key does (a short
+press, a long press, 5 s and 10 s holds) are in the [manual](docs/manual.md#service-key).
 
 ### How many Stream Decks
 
@@ -174,6 +177,35 @@ The web page is at `http://<box IP>/` or `http://companionbox-xxxx.local/`.
 - **Satellite mode** (switch on the web page's Companion page): with one Companion 5 on the network, the decks
   appear by themselves. With several, pick one on the web page or on the deck. *Surfaces → Discover* in Companion
   also finds the box.
+
+### 4. Open the box menu on a deck
+
+While Companion drives a deck, the box's own menu is one gesture away, on that deck: its address, the network,
+Companion, the hotspot and the box's settings.
+
+<p align="center">
+  <img src="docs/images/box-menu-gesture.svg" alt="Step 1: tap the top-right key. Step 2: within 3 seconds, hold the top-right and bottom-right keys together for 2 seconds." width="80%">
+</p>
+
+1. **Tap the top-right key.** Companion still gets this press, like any other.
+2. **Within 3 seconds, press the top-right and bottom-right keys together and hold both for 2 seconds.** The box
+   clicks and its menu opens on that deck.
+
+<p align="center">
+  <img src="docs/images/deck-mk2-box-menu.png" alt="The box menu on a 15-key Stream Deck: a Close key at the top-left, Connected, the box's IP address and port, and the Network, Companion, Hotspot and Box keys" width="46%">
+</p>
+
+Companion stays connected meanwhile. **✕** at the top-left closes the menu, and so does leaving it alone for 60
+seconds; Companion's images come straight back. The gesture works on every deck with a screen, on the top and bottom
+keys of its right column.
+
+Other ways to open it:
+
+- the web page: **Home → Show box menu** next to the deck;
+- a short press of the [service key](docs/manual.md#service-key), which opens it on the biggest deck.
+
+The gesture's keys, taps and hold time can be changed, or the gesture turned off, on the web page's **Device** page.
+A deck that Companion isn't driving shows the box's screens by itself.
 
 The [manual](docs/manual.md) covers the rest: [connection modes](docs/manual.md#connection-modes), the
 [deck screens](docs/manual.md#maintenance-screens-on-the-decks), [recovery](docs/manual.md#recovery) and the
