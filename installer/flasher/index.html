@@ -95,8 +95,14 @@ p, li { text-wrap: pretty; }
 .two { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); gap: clamp(28px, 6vw, 88px); align-items: start; }
 @media (max-width: 860px) { .two { grid-template-columns: 1fr; } }
 .intro .lede { margin-top: 1.4rem; }
-.latest { margin-top: 1.1rem; color: var(--muted); }
-.latest b { font: 600 1.25em/1 var(--font-display); color: var(--text); font-variant-numeric: tabular-nums; }
+/* the version this page installs: the hero's right side, in the headline's own letters */
+.intro .two { grid-template-columns: minmax(0, 1fr) auto; align-items: end; }
+.latest { margin: 0; text-align: right; }
+.latest dt { font: 500 0.72rem/1.3 var(--font-mono); letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
+.latest dd { margin: 0; }
+#hero-num { margin-top: 0.3rem; font: 600 clamp(4.5rem, 11vw, 9rem)/0.9 var(--font-display); letter-spacing: -0.02em; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.latest .when { margin-top: 0.9rem; color: var(--muted); font-size: 0.95rem; }
+@media (max-width: 860px) { .intro .two { grid-template-columns: 1fr; } .latest { text-align: left; } }
 /* the firmware, named in step 2 */
 .release { margin: 0.2rem 0 0; }
 .release dt { font: 500 0.72rem/1.3 var(--font-mono); letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
@@ -206,10 +212,16 @@ p, li { text-wrap: pretty; }
 <main id="main">
 
 <section class="intro">
-  <div class="wrap">
-    <h1>Install or update over USB.</h1>
-    <p class="lede">This page puts the Companion Dock firmware on a Waveshare ESP32-P4-WIFI6-POE-ETH board. A box that already runs it can be updated here and keeps its settings.</p>
-    <p class="latest" id="hero-ver" hidden>The latest version is <b id="hero-num"></b><span id="hero-date"></span>. An update installs it.</p>
+  <div class="wrap two">
+    <div>
+      <h1>Install or update over USB.</h1>
+      <p class="lede">This page puts the Companion Dock firmware on a Waveshare ESP32-P4-WIFI6-POE-ETH board. A box that already runs it can be updated here and keeps its settings.</p>
+    </div>
+    <dl class="latest" id="hero-ver" hidden>
+      <dt>The version this page installs</dt>
+      <dd id="hero-num"></dd>
+      <dd class="when" id="hero-date"></dd>
+    </dl>
   </div>
   <div class="wrap" id="unsupported" hidden>
     <p class="alert"><b>This browser can't talk to the board.</b> Open this page in Chrome or Edge on a computer (Windows, macOS or Linux). Safari, Firefox and phones don't support USB serial devices.</p>
@@ -470,7 +482,7 @@ async function loadLatest() {
   }
   if (latest) {
     $("#hero-num").textContent = latest.version;
-    $("#hero-date").textContent = latest.date ? `, released ${latest.date}` : "";
+    $("#hero-date").textContent = latest.date ? `Released ${latest.date}` : "";
     $("#hero-ver").hidden = false;
   }
   showFirmware();
