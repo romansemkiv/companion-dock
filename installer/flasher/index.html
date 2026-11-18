@@ -2,254 +2,604 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Companion Dock installer</title>
-<meta name="description" content="Install the latest Companion Dock firmware on a Waveshare ESP32-P4-WIFI6-POE-ETH board from your browser.">
+<meta name="description" content="Install or update the Companion Dock firmware on a Waveshare ESP32-P4-WIFI6-POE-ETH board from your browser. An update keeps the box's settings.">
+<meta name="theme-color" content="#000000">
+<meta name="color-scheme" content="dark">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%230a0a0a'/%3E%3Cg fill='none' stroke='%23fff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M13 5H19M13 5V12M19 5V12M13 12 5 27H27L19 12'/%3E%3C/g%3E%3Cg fill='none' stroke='%23fff' stroke-width='1.5'%3E%3Ccircle cx='12' cy='21' r='2.4'/%3E%3Ccircle cx='20' cy='23' r='2'/%3E%3C/g%3E%3C/svg%3E">
+<link rel="preload" as="font" type="font/woff2" href="fonts/BarlowSemiCondensed-SemiBold.woff2" crossorigin>
+<link rel="preload" as="font" type="font/woff2" href="fonts/Barlow-Regular.woff2" crossorigin>
 <style>
-:root{
-  --bg:#0b0e12;--panel:#11161c;--panel2:#161d25;--line:#1e2731;--line2:#2b3644;
-  --fg:#e6edf3;--mut:#8b98a8;--field-line:#617086;
-  --acc:#4cc2ff;--acc-ink:#04131c;--acc-soft:rgba(76,194,255,.12);
-  --ok:#3ddc84;--ok-soft:rgba(61,220,132,.13);--warn:#f5b942;--warn-soft:rgba(245,185,66,.14);--bad:#ff5d6c;--bad-soft:rgba(255,93,108,.13);
-  --shadow:0 1px 0 rgba(255,255,255,.03) inset,0 8px 24px rgba(0,0,0,.25);
-  --mono:ui-monospace,SFMono-Regular,"Cascadia Mono","JetBrains Mono",Menlo,Consolas,monospace;
-  --sans:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",sans-serif;
-  color-scheme:dark
+/* The look of dock.semkivlabs.tech: pure black, quiet left-aligned bands, labels set like the engraving on the
+   case (mono, tracked caps). The fonts are in fonts/ (SIL OFL 1.1, fonts/OFL.txt). */
+@font-face { font-family: "Barlow"; font-weight: 400; font-style: normal; font-display: swap; src: url("fonts/Barlow-Regular.woff2") format("woff2"); }
+@font-face { font-family: "Barlow"; font-weight: 500; font-style: normal; font-display: swap; src: url("fonts/Barlow-Medium.woff2") format("woff2"); }
+@font-face { font-family: "Barlow"; font-weight: 600; font-style: normal; font-display: swap; src: url("fonts/Barlow-SemiBold.woff2") format("woff2"); }
+@font-face { font-family: "Barlow Semi Condensed"; font-weight: 600; font-style: normal; font-display: swap; src: url("fonts/BarlowSemiCondensed-SemiBold.woff2") format("woff2"); }
+@font-face { font-family: "JetBrains Mono"; font-weight: 500; font-style: normal; font-display: swap; src: url("fonts/JetBrainsMono-Medium.woff2") format("woff2"); }
+:root {
+  color-scheme: dark;
+  --bg: #000000;
+  --surface: #0b0c0e;
+  --lit: #0e141b;           /* a surface the key's light falls on: the chosen option, the finished run */
+  --line: #1e2125;
+  --field: #555c66;
+  --text: #f1f2f4;
+  --soft: #c9ced5;
+  --muted: #9ba2ab;
+  --glow: #a9d4ff;          /* the key's light */
+  --warm: #f2b84b;          /* kapton / brass: what erases */
+  --bad: #ff8a80;
+  --font-display: "Barlow Semi Condensed", "Barlow", "DIN Alternate", "Helvetica Neue", Arial, sans-serif;
+  --font-body: "Barlow", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --wrap: 1120px;
+  --gutter: clamp(18px, 4vw, 48px);
+  --nav-h: 60px;
 }
-@media (prefers-color-scheme:light){:root{
-  --bg:#f3f5f8;--panel:#fff;--panel2:#f6f8fb;--line:#e3e8ee;--line2:#d3dae3;--fg:#0f1720;--mut:#5b6878;--field-line:#7a8594;
-  --acc:#0067b0;--acc-ink:#fff;--acc-soft:rgba(10,132,214,.09);--ok:#0a7340;--ok-soft:rgba(19,154,85,.1);--warn:#8a5a00;--warn-soft:rgba(183,121,31,.1);
-  --bad:#b3202f;--bad-soft:rgba(214,52,71,.09);--shadow:0 1px 2px rgba(15,23,32,.04),0 6px 18px rgba(15,23,32,.05);color-scheme:light
-}}
-*{box-sizing:border-box}
-html{-webkit-text-size-adjust:100%}
-body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.55 var(--sans)}
-main{max-width:700px;margin:0 auto;padding:36px 16px 56px}
-header{display:flex;align-items:center;gap:14px;margin-bottom:8px}
-.logo{width:44px;height:44px;border-radius:11px;background:var(--panel);border:1px solid var(--line);display:grid;place-items:center;flex:none}
-.logo svg{width:24px;height:24px;fill:var(--acc)}
-h1{margin:0;font-size:21px;font-weight:650;letter-spacing:-.01em}
-.sub{margin:0;color:var(--mut);font-size:14px}
-.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px 22px;margin-top:16px;box-shadow:var(--shadow)}
-h2{margin:0 0 12px;font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--mut)}
-p{margin:0 0 12px}
-.fw{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 12px;margin-bottom:14px}
-.fw b{font:600 20px var(--mono)}
-.fw span{color:var(--mut);font-size:13px}
-ol{margin:0 0 16px;padding-left:22px}
-li{margin:0 0 6px}
-li::marker{color:var(--mut)}
-.callout{border:1px solid transparent;border-radius:10px;padding:12px 14px;margin:0 0 16px}
-.callout.warn{background:var(--warn-soft)}
-.callout.warn b{color:var(--warn)}
-.callout.bad{background:var(--bad-soft)}
-.callout.bad b{color:var(--bad)}
-label.chk{display:flex;gap:10px;align-items:flex-start;margin:0 0 16px;cursor:pointer}
-label.chk input{width:18px;height:18px;margin:2px 0 0;accent-color:var(--acc);flex:none}
-button{font:600 15px var(--sans);border-radius:10px;padding:11px 18px;cursor:pointer;border:1px solid var(--field-line);background:transparent;color:var(--fg)}
-button.primary{background:var(--acc);color:var(--acc-ink);border-color:transparent}
-button:disabled{opacity:.45;cursor:not-allowed}
-:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
-.bar{height:8px;border-radius:99px;background:var(--panel2);border:1px solid var(--line);overflow:hidden;margin:16px 0 0}
-.bar>div{height:100%;width:0;background:var(--acc);transition:width .2s}
-#status{margin:12px 0 0;min-height:1.55em}
-#status.ok{color:var(--ok)}
-#status.bad{color:var(--bad)}
-details{margin-top:14px}
-details summary{cursor:pointer;color:var(--mut)}
-details[open] summary{margin-bottom:10px}
-input[type=file]{font:14px var(--sans);color:var(--mut);max-width:100%}
-.note{color:var(--mut);font-size:14px}
-ul{margin:0;padding-left:20px}
-ul li{margin:0 0 8px}
-kbd,code{font:13px var(--mono);background:var(--panel2);border:1px solid var(--line);border-radius:5px;padding:1px 5px;white-space:nowrap}
-pre{margin:0;max-height:260px;overflow:auto;font:12px/1.5 var(--mono);color:var(--mut);white-space:pre-wrap;word-break:break-word}
-footer{margin-top:24px;color:var(--mut);font-size:13px}
-footer a,.panel a{color:var(--acc)}
-@media (max-width:480px){.panel{padding:18px 16px}button{width:100%}}
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; scroll-padding-top: calc(var(--nav-h) + 12px); }
+body { margin: 0; background: var(--bg); color: var(--text); font: 400 17px/1.6 var(--font-body); -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+a { color: inherit; text-underline-offset: 0.18em; text-decoration-thickness: 1px; text-decoration-color: color-mix(in srgb, currentColor 45%, transparent); }
+a:hover { text-decoration-color: currentColor; }
+:focus-visible { outline: 2px solid var(--glow); outline-offset: 3px; border-radius: 4px; }
+code, kbd { font: 500 0.88em var(--font-mono); background: var(--surface); border: 1px solid var(--line); border-radius: 5px; padding: 0.08em 0.38em; white-space: nowrap; }
+em { font-style: normal; color: var(--text); font-weight: 500; }
+h1, h2, h3 { font-family: var(--font-display); font-weight: 600; line-height: 1.04; letter-spacing: -0.012em; margin: 0; text-wrap: balance; }
+h1 { font-size: clamp(2.5rem, 5.4vw, 4.6rem); }
+h2 { font-size: clamp(2rem, 4.2vw, 3.4rem); }
+h3 { font-size: 1.35rem; line-height: 1.15; letter-spacing: 0; }
+p { margin: 0; }
+p, li { text-wrap: pretty; }
+[hidden] { display: none !important; }
+.lede { font-size: clamp(1.06rem, 1.35vw, 1.22rem); line-height: 1.5; color: var(--soft); max-width: 34em; }
+.fine { font-size: 0.86rem; color: var(--muted); }
+.skip { position: absolute; left: -9999px; top: 8px; background: var(--text); color: #000; padding: 8px 12px; border-radius: 6px; z-index: 100; }
+.skip:focus { left: 8px; }
+.wrap { width: min(100% - 2 * var(--gutter), var(--wrap)); margin-inline: auto; }
+
+/* buttons */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 0.5em;
+  min-height: 40px; padding: 0 1.05em; border-radius: 999px; border: 1px solid transparent;
+  font: 500 0.95rem/1 var(--font-body); text-decoration: none; white-space: nowrap; cursor: pointer;
+  transition: background-color .18s, border-color .18s, color .18s, transform .18s;
+}
+.btn svg { width: 1.15em; height: 1.15em; flex: none; }
+.btn-lg { min-height: 48px; padding: 0 1.35em; font-size: 1.02rem; }
+.btn-solid { background: var(--text); color: #000; }
+.btn-solid:hover:not(:disabled) { background: #fff; transform: translateY(-1px); }
+.btn-ghost { border-color: #3a3f46; color: var(--text); background: rgba(0,0,0,.35); }
+.btn-ghost:hover:not(:disabled) { border-color: var(--text); }
+.btn:disabled { background: var(--line); border-color: transparent; color: var(--muted); cursor: not-allowed; }
+
+/* nav */
+.nav {
+  position: fixed; inset: 0 0 auto 0; z-index: 50; height: var(--nav-h);
+  display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 0 var(--gutter);
+  background: linear-gradient(#000c, #0000); backdrop-filter: blur(10px) saturate(140%); -webkit-backdrop-filter: blur(10px) saturate(140%);
+  -webkit-mask-image: linear-gradient(#000 70%, #0000); mask-image: linear-gradient(#000 70%, #0000);
+}
+.brand { display: inline-flex; align-items: center; text-decoration: none; font: 600 1.12rem/1 var(--font-display); letter-spacing: 0.01em; }
+.brand-row { display: flex; align-items: baseline; gap: 0.5em; white-space: nowrap; }
+.brand-by { font-size: 0.86rem; color: var(--muted); }
+.brand-by a { color: #c3c8cf; text-decoration: none; padding-block: 8px; }
+.brand-by a:hover { color: var(--text); text-decoration: underline; }
+.nav-cta { display: flex; gap: 8px; }
+@media (max-width: 560px) { .brand-row { flex-direction: column; align-items: flex-start; gap: 4px; } .brand-by { font-size: 0.76rem; line-height: 1; } }
+@media (max-width: 420px) { .nav-gh span { display: none; } .nav-gh { padding: 0 0.8em; } }
+
+/* intro: what this page is, and the firmware it carries */
+.intro { padding-block: calc(var(--nav-h) + clamp(44px, 8vw, 110px)) clamp(48px, 7vw, 96px); }
+.two { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); gap: clamp(28px, 6vw, 88px); align-items: start; }
+.intro .two { grid-template-columns: minmax(0, 7fr) minmax(0, 4fr); align-items: end; }
+@media (max-width: 860px) { .two, .intro .two { grid-template-columns: 1fr; } }
+.intro .lede { margin-top: 1.4rem; }
+.release { margin: 0; border-top: 1px solid var(--line); padding-top: 22px; }
+.release dt { font: 500 0.72rem/1.3 var(--font-mono); letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
+.release dd { margin: 0.5rem 0 0; font: 600 clamp(2.2rem, 4.6vw, 3.6rem)/1 var(--font-display); font-variant-numeric: tabular-nums; }
+.release .fine { margin-top: 0.7rem; }
+.own { margin-top: 1rem; font-size: 0.92rem; color: var(--muted); }
+.own summary { cursor: pointer; }
+.own[open] summary { margin-bottom: 0.7rem; }
+.own input { font: 400 0.9rem var(--font-body); color: var(--muted); max-width: 100%; }
+.own p { margin-top: 0.6rem; }
+
+.alert { margin-top: clamp(28px, 4vw, 44px); padding: 1rem 1.1rem; border: 1px solid var(--warm); border-radius: 12px; color: var(--soft); max-width: 46em; }
+.alert b { color: var(--warm); font-weight: 600; }
+
+/* bands */
+.band { padding: 96px 0; padding-block: clamp(64px, 9vw, 120px); border-top: 1px solid var(--line); }
+.prose { display: grid; gap: 1.05em; color: var(--soft); font-size: 1.08rem; max-width: 36em; }
+.prose ol { margin: 0; padding-left: 1.3em; display: grid; gap: 0.45em; }
+.prose li::marker { color: var(--muted); }
+.prose h3 { color: var(--text); margin-top: 0.6em; }
+.prose h3:first-child { margin-top: 0; }
+
+/* the three steps. A step that can't be used yet has its number and title unlit; its text stays readable. */
+.steps { list-style: none; margin: clamp(32px, 4vw, 56px) 0 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: clamp(20px, 3vw, 40px); counter-reset: step; }
+.steps > li { counter-increment: step; display: grid; gap: 0.8rem; align-content: start; justify-items: start; border-top: 1px solid var(--line); padding-top: 1.4rem; min-width: 0; }
+.steps > li::before { content: "0" counter(step); font: 500 0.78rem/1 var(--font-mono); letter-spacing: 0.14em; color: var(--glow); }
+.steps > li.wait::before, .steps > li.wait h3 { color: var(--muted); }
+.steps p { color: var(--muted); }
+.steps .btn { margin-top: 0.4rem; }
+.steps .found { color: var(--text); }
+.btn-row { display: flex; flex-wrap: wrap; gap: 8px; }
+@media (max-width: 860px) { .steps { grid-template-columns: 1fr; } }
+
+/* update or fresh install: two keys, one lit */
+.modes { justify-self: stretch; display: grid; gap: 8px; border: 0; margin: 0.2rem 0 0; padding: 0; min-width: 0; }
+.modes label { position: relative; display: block; }
+.modes input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.mode { display: block; padding: 0.8rem 0.9rem; border: 1px solid var(--field); border-radius: 12px; background: var(--surface); font-size: 0.9rem; line-height: 1.35; color: var(--muted); transition: border-color .15s, background .15s; }
+.mode b { display: block; margin-bottom: 0.25rem; font: 600 1.15rem/1.1 var(--font-display); color: var(--text); }
+.modes input:hover:not(:disabled) + .mode { border-color: var(--muted); }
+.modes input:checked + .mode { border-color: var(--glow); background: var(--lit); box-shadow: inset 0 0 0 1px var(--glow); }
+.modes input:focus-visible + .mode { outline: 2px solid var(--glow); outline-offset: 3px; }
+.modes input:disabled { cursor: not-allowed; }
+.modes input:disabled + .mode { border-color: var(--line); }
+.modes input:disabled + .mode b { color: var(--muted); }
+.pick { justify-self: stretch; display: grid; gap: 0.45rem; font: 500 0.88rem/1.2 var(--font-body); color: var(--muted); }
+.pick select { width: 100%; padding: 0.7rem 0.85rem; border: 1px solid var(--field); border-radius: 10px; background: var(--surface); color: var(--text); font: 400 1rem/1.4 var(--font-body); font-variant-numeric: tabular-nums; }
+.erase { display: flex; gap: 0.7rem; align-items: flex-start; color: var(--soft); font-size: 0.95rem; line-height: 1.4; cursor: pointer; }
+.erase input { width: 18px; height: 18px; margin: 2px 0 0; accent-color: var(--warm); flex: none; }
+.erase b { color: var(--warm); font-weight: 600; }
+
+/* the run: one line that says what is happening, and how far it is */
+.run { margin-top: clamp(24px, 3vw, 36px); display: grid; gap: 0.9rem; align-content: start; min-height: 3.4rem; }
+.meter { height: 3px; background: var(--line); border-radius: 3px; overflow: hidden; }
+.meter > div { height: 100%; width: 0; background: var(--glow); transition: width .25s linear; }
+#status { color: var(--soft); max-width: 60em; }
+#status.bad { color: var(--bad); }
+.run.done { padding: 1rem 1.1rem; border: 1px solid var(--glow); border-radius: 12px; background: var(--lit); min-height: 0; }
+.run.done #status { color: var(--text); font-size: 1.05rem; }
+
+/* questions */
+.faq details { border-top: 1px solid var(--line); }
+.faq details:last-child { border-bottom: 1px solid var(--line); }
+.faq summary { cursor: pointer; list-style: none; padding: 1.15rem 2.2rem 1.15rem 0; position: relative; font: 600 1.3rem/1.3 var(--font-display); }
+.faq summary::-webkit-details-marker { display: none; }
+.faq summary::after { content: ""; position: absolute; right: 4px; top: 50%; width: 11px; height: 11px; border-right: 1.5px solid var(--muted); border-bottom: 1.5px solid var(--muted); transform: translateY(-70%) rotate(45deg); transition: transform .2s; }
+.faq details[open] summary::after { transform: translateY(-30%) rotate(-135deg); }
+.faq p { color: #c3c8cf; padding: 0 2rem 1.3rem 0; max-width: 42em; }
+.faq pre { margin: 0 0 1.3rem; max-height: 300px; overflow: auto; padding: 0.9rem 1rem; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); font: 500 0.74rem/1.55 var(--font-mono); color: var(--muted); white-space: pre-wrap; word-break: break-word; }
+.faq pre:empty::before { content: "Nothing yet."; }
+
+/* footer */
+.foot { border-top: 1px solid var(--line); padding-block: 48px 56px; color: var(--muted); font-size: 0.92rem; }
+.foot-row { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 24px 48px; }
+.foot-brand { font: 600 1.15rem/1 var(--font-display); color: var(--text); margin-bottom: 0.5rem; }
+.foot nav { display: flex; flex-wrap: wrap; gap: 8px 22px; align-content: start; max-width: 34em; }
+.legal { margin-top: 28px; font-size: 0.8rem; max-width: 60em; }
+
+@media (prefers-reduced-motion: reduce) {
+  .btn, .mode, .meter > div, .faq summary::after { transition: none; }
+}
 </style>
 </head>
 <body>
-<main>
-  <header>
-    <div class="logo" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="5" cy="5" r="2.4"/><circle cx="12" cy="5" r="2.4"/><circle cx="19" cy="5" r="2.4"/><circle cx="5" cy="12" r="2.4"/><circle cx="12" cy="12" r="2.4"/><circle cx="19" cy="12" r="2.4"/><circle cx="5" cy="19" r="2.4"/><circle cx="12" cy="19" r="2.4"/><circle cx="19" cy="19" r="2.4"/></svg></div>
-    <div>
-      <h1>Companion Dock installer</h1>
-      <p class="sub">Puts the firmware on a Waveshare ESP32-P4-WIFI6-POE-ETH board, straight from this page.</p>
-    </div>
-  </header>
+<a class="skip" href="#main">Skip to content</a>
 
-  <div class="panel callout bad" id="unsupported" hidden>
-    <b>This browser can't talk to the board.</b> Open this page in Chrome or Edge on a computer (Windows, macOS or
-    Linux). Safari, Firefox and phones don't support USB serial devices.
+<header class="nav">
+  <div class="brand-row">
+    <a class="brand" href="https://dock.semkivlabs.tech/" aria-label="Companion Dock, the project's site">Companion Dock</a>
+    <span class="brand-by">by <a href="https://semkivlabs.tech/" rel="noopener">Semkiv/Labs</a></span>
   </div>
+  <div class="nav-cta">
+    <a class="btn btn-ghost nav-gh" href="https://github.com/romansemkiv/companion-dock" rel="noopener" aria-label="GitHub">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8.5 7 3.5 12l5 5M15.5 7l5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <span>GitHub</span>
+    </a>
+    <a class="btn btn-solid" href="https://github.com/romansemkiv/companion-dock/blob/main/docs/manual.md" rel="noopener">Manual</a>
+  </div>
+</header>
 
-  <section class="panel" aria-labelledby="h-install">
-    <h2 id="h-install">Install</h2>
-    <div class="fw"><b id="ver">…</b><span id="fwinfo">Looking for the latest firmware</span></div>
-    <ol>
-      <li>Connect the board's <b>USB-C</b> port to this computer with a data cable. The USB-A port is for the Stream Decks.</li>
-      <li>Press <b>Connect and install</b> and pick the board in the list. It usually shows up as "USB Single Serial", "CH343" or "usbmodem".</li>
-      <li>Wait until it says it's done, about 3 minutes. Leave the cable in meanwhile.</li>
+<main id="main">
+
+<section class="intro">
+  <div class="wrap two">
+    <div>
+      <h1>Install or update over USB.</h1>
+      <p class="lede">This page puts the Companion Dock firmware on a Waveshare ESP32-P4-WIFI6-POE-ETH board. A box that already runs it can be updated here and keeps its settings.</p>
+    </div>
+    <div>
+      <dl class="release">
+        <dt>Latest firmware</dt>
+        <dd id="ver">…</dd>
+      </dl>
+      <p class="fine" id="fwinfo">Looking for the latest firmware</p>
+      <details class="own">
+        <summary>Use a firmware file from this computer</summary>
+        <input type="file" id="file" accept=".bin" aria-label="A full firmware image">
+        <p>Pick a full image, the one whose name ends in <code>-full.bin</code>. An update takes its parts from the same file.</p>
+      </details>
+    </div>
+  </div>
+  <div class="wrap" id="unsupported" hidden>
+    <p class="alert"><b>This browser can't talk to the board.</b> Open this page in Chrome or Edge on a computer (Windows, macOS or Linux). Safari, Firefox and phones don't support USB serial devices.</p>
+  </div>
+</section>
+
+<section class="band" aria-labelledby="h-install">
+  <div class="wrap">
+    <h2 id="h-install">Three steps.</h2>
+    <ol class="steps">
+      <li id="s-connect">
+        <h3>Connect the board</h3>
+        <p id="connect-help">Plug the board's <em>USB-C</em> port into this computer with a data cable (the USB-A port is for the Stream Decks). Press <em>Connect</em> and pick the board in the list: “USB Single Serial”, “CH343” or “usbmodem”.</p>
+        <p class="found" id="found" hidden></p>
+        <div class="btn-row">
+          <button class="btn btn-solid btn-lg" id="connect" type="button" disabled>Connect</button>
+          <button class="btn btn-ghost btn-lg" id="disconnect" type="button" hidden>Disconnect</button>
+        </div>
+      </li>
+      <li id="s-choose" class="wait">
+        <h3>Update or start fresh</h3>
+        <p id="choose-help">Once the board is connected, the page reads what is on it and offers what fits.</p>
+        <fieldset class="modes" id="modes" disabled>
+          <legend class="skip">What to install</legend>
+          <label><input type="radio" name="mode" value="update"><span class="mode"><b>Update</b> Keeps the Wi-Fi networks, the settings PIN, the Companion address and every other setting.</span></label>
+          <label><input type="radio" name="mode" value="fresh"><span class="mode"><b>Fresh install</b> Erases the settings. For a new board or a clean start.</span></label>
+        </fieldset>
+        <label class="pick" id="pick" hidden>Version to install <select id="version"></select></label>
+        <label class="erase" id="erase" hidden><input type="checkbox" id="agree"> <span><b>This erases the box's settings.</b> I understand they can't be brought back.</span></label>
+      </li>
+      <li id="s-write" class="wait">
+        <h3>Write it</h3>
+        <p>About 3 minutes. Leave the cable in until the page says it's done. What was written is checked against the file.</p>
+        <button class="btn btn-solid btn-lg" id="go" type="button" disabled>Install</button>
+      </li>
     </ol>
-    <div class="callout warn"><b>This is a fresh install.</b> It erases the box's settings: Wi-Fi networks, the settings
-      PIN and the Companion address. To update a box that already runs Companion Dock and keep its settings, open the
-      box's web page and upload the new <code>companion-dock-v….bin</code> on its Firmware page instead.</div>
-    <label class="chk"><input type="checkbox" id="agree"> <span>I understand the box's settings will be erased.</span></label>
-    <button class="primary" id="go" type="button" disabled>Connect and install</button>
-    <div class="bar" id="bar" hidden><div></div></div>
-    <p id="status" role="status" aria-live="polite"></p>
-    <details>
-      <summary>Use a firmware file from this computer</summary>
-      <input type="file" id="file" accept=".bin">
-      <p class="note">Pick a full image, the one whose name ends in <code>-full.bin</code>. It's written at address 0x0, like the latest one.</p>
-    </details>
-  </section>
+    <div class="run" id="run">
+      <div class="meter" id="meter" hidden><div></div></div>
+      <p id="status" role="status" aria-live="polite"></p>
+    </div>
+  </div>
+</section>
 
-  <section class="panel" aria-labelledby="h-after">
-    <h2 id="h-after">After installing</h2>
-    <p>The box restarts and the Stream Decks show the setup screen with two QR codes.</p>
-    <ol>
-      <li>Scan the first code with your phone to join the box's hotspot.</li>
-      <li>Scan the second to open the setup page, then join your network on its Wi-Fi page, or plug in an Ethernet cable.</li>
-      <li>Add the box in Companion. <a href="https://github.com/romansemkiv/companion-dock#3-add-it-in-companion">How to add it</a> covers both modes.</li>
-    </ol>
-  </section>
+<section class="band" aria-labelledby="h-after">
+  <div class="wrap two">
+    <div>
+      <h2 id="h-after">The box restarts by itself.</h2>
+    </div>
+    <div class="prose">
+      <h3>After an update</h3>
+      <p>The box starts in about 5 seconds, joins its network and reconnects to Companion. Its Firmware page and the deck's Box screen show the new version.</p>
+      <h3>After a fresh install</h3>
+      <p>The Stream Decks show the setup screen with two QR codes.</p>
+      <ol>
+        <li>Scan the first code with your phone to join the box's hotspot.</li>
+        <li>Scan the second to open the setup page, then join your network on its Wi-Fi page, or plug in an Ethernet cable.</li>
+        <li>Add the box in Companion. <a href="https://github.com/romansemkiv/companion-dock#3-add-it-in-companion" rel="noopener">How to add it</a> covers both modes.</li>
+      </ol>
+    </div>
+  </div>
+</section>
 
-  <section class="panel" aria-labelledby="h-trouble">
-    <h2 id="h-trouble">If it doesn't work</h2>
-    <ul>
-      <li><b>The board isn't in the list.</b> Try another cable (charge-only cables have no data wires) and plug straight into the computer, not through a hub. On Windows, if no COM port appears, install WCH's CH343 driver.</li>
-      <li><b>It can't connect.</b> Close anything else that has the port open, such as a serial monitor or the Arduino IDE. Then put the board in download mode by hand: hold <kbd>BOOT</kbd>, press and release <kbd>RESET</kbd>, release <kbd>BOOT</kbd>, and try again.</li>
-      <li><b>It stopped halfway.</b> Nothing is broken. Press <kbd>RESET</kbd> on the board and install again.</li>
-      <li>The log below shows exactly what happened. It helps if you open an issue.</li>
-    </ul>
-  </section>
+<section class="band" aria-labelledby="h-trouble">
+  <div class="wrap two">
+    <div>
+      <h2 id="h-trouble">If it doesn't work.</h2>
+    </div>
+    <div class="faq">
+      <details open>
+        <summary>The board isn't in the list</summary>
+        <p>Try another cable (charge-only cables have no data wires) and plug straight into the computer, not through a hub. On Windows, if no COM port appears, install WCH's CH343 driver.</p>
+      </details>
+      <details>
+        <summary>It can't connect</summary>
+        <p>Close anything else that has the port open, such as a serial monitor or the Arduino IDE. Then put the board in download mode by hand: hold <kbd>BOOT</kbd>, press and release <kbd>RESET</kbd>, release <kbd>BOOT</kbd>, and connect again.</p>
+      </details>
+      <details>
+        <summary>It stopped halfway</summary>
+        <p>Nothing is broken, and an update that stopped has not touched the settings. Press <kbd>RESET</kbd> on the board, connect and run it again.</p>
+      </details>
+      <details>
+        <summary>Update isn't offered</summary>
+        <p>The page offers an update only on a board that is laid out the way Companion Dock lays it out, so that the settings it keeps are this firmware's. A new board, or one that ran other firmware, gets a fresh install. A box on the network can also be updated from its own web page, on the Firmware page.</p>
+      </details>
+      <details>
+        <summary>Installing an older version</summary>
+        <p>Choose <em>Fresh install</em> and pick the version in the list under it. An update is always the latest version: it keeps the settings, and settings saved by a newer firmware aren't meant for an older one.</p>
+      </details>
+      <details>
+        <summary>The log</summary>
+        <p>What the page and the board said to each other. It helps if you open an issue.</p>
+        <pre id="log"></pre>
+      </details>
+    </div>
+  </div>
+</section>
 
-  <details class="panel">
-    <summary>Log</summary>
-    <pre id="log"></pre>
-  </details>
-
-  <footer>
-    Flashing is done by <a href="https://github.com/espressif/esptool-js">esptool-js</a> 0.7.1 (Apache-2.0), which
-    supports this board's chip revision. Nothing is sent anywhere: the firmware goes from this page to the board over USB.
-    <br>Companion Dock is under the <a href="https://github.com/romansemkiv/companion-dock/blob/main/LICENSE">PolyForm Shield 1.0.0</a>
-    licence; the firmware's <a href="../firmware/THIRD_PARTY_LICENSES.txt">third-party notices</a>. Not affiliated with or
-    endorsed by Elgato / Corsair or Bitfocus AS.
-  </footer>
 </main>
+
+<footer class="foot">
+  <div class="wrap">
+    <div class="foot-row">
+      <div>
+        <p class="foot-brand">Companion Dock</p>
+        <p>The firmware goes from this page to the board over USB. Nothing is sent anywhere.</p>
+      </div>
+      <nav aria-label="Project">
+        <a href="https://dock.semkivlabs.tech/" rel="noopener">The project's site</a>
+        <a href="https://github.com/romansemkiv/companion-dock" rel="noopener">GitHub</a>
+        <a href="https://github.com/romansemkiv/companion-dock/blob/main/docs/manual.md" rel="noopener">Manual</a>
+        <a href="https://github.com/romansemkiv/companion-dock/blob/main/docs/flashing.md" rel="noopener">Flashing from the command line</a>
+        <a href="../firmware/THIRD_PARTY_LICENSES.txt">Third-party notices</a>
+      </nav>
+    </div>
+    <p class="legal">Flashing is done by <a href="https://github.com/espressif/esptool-js" rel="noopener">esptool-js</a> 0.7.1 (Apache-2.0), which supports this board's chip revision. The page is set in Barlow and JetBrains Mono (<a href="fonts/OFL.txt">SIL Open Font License 1.1</a>). Companion Dock is under the <a href="https://github.com/romansemkiv/companion-dock/blob/main/LICENSE" rel="noopener">PolyForm Shield 1.0.0</a> licence. Not affiliated with or endorsed by Elgato / Corsair or Bitfocus AS.</p>
+  </div>
+</footer>
 
 <script type="module">
 import { ESPLoader, Transport } from "./esptool-js-0.7.1.mjs";
 import { md5 } from "./md5.mjs";
+import { checkFullImage, imageInfo, planFresh, planUpdate, readBoard } from "./plan.mjs";
 
 const $ = (s) => document.querySelector(s);
 const logEl = $("#log");
 const log = (t) => { logEl.textContent += t; logEl.scrollTop = logEl.scrollHeight; };
 const terminal = { clean() { logEl.textContent = ""; }, writeLine(t) { log(t + "\n"); }, write(t) { log(t); } };
 const canSerial = "serial" in navigator;
-let latest = null, localFile = null, busy = false;
-
-function setStatus(text, cls = "") { const s = $("#status"); s.textContent = text; s.className = cls; }
-function progress(f) { const b = $("#bar"); b.hidden = f === null; if (f !== null) b.firstElementChild.style.width = Math.round(f * 100) + "%"; }
-function refresh() {
-  const source = localFile || latest;
-  $("#go").disabled = busy || !canSerial || !source || !$("#agree").checked;
-  $("#go").textContent = localFile ? "Connect and install this file" : "Connect and install";
-}
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const hex = (bytes) => Array.from(bytes, (x) => x.toString(16).padStart(2, "0")).join("");
 const mb = (n) => (n / 1048576).toFixed(1) + " MB";
-async function sha256(bytes) {
-  const h = new Uint8Array(await crypto.subtle.digest("SHA-256", bytes));
-  return Array.from(h, (x) => x.toString(16).padStart(2, "0")).join("");
+
+/* latest: firmware/latest.json. versions: firmware/versions.json, every release, newest first (a fresh install can
+   pick one; without the file the list is the latest alone). localImage: a full image picked from this computer,
+   instead of the latest.
+   phase: "idle", "connecting", "ready" (a board is connected and read: session), "writing".
+   session: { transport, loader, image, version, board, plan }; plan is planUpdate()'s answer, or
+   { ok: false, why: "unreadable" } when the board's flash couldn't be read. */
+let latest = null, versions = [], localImage = null, phase = "idle", session = null;
+
+function setStatus(text, cls = "") { const s = $("#status"); s.textContent = text; s.className = cls; $("#run").classList.remove("done"); }
+function progress(f) { const m = $("#meter"); m.hidden = f === null; if (f !== null) m.firstElementChild.style.width = (f * 100).toFixed(1) + "%"; }
+const mode = () => document.querySelector("input[name=mode]:checked")?.value;
+/* The release a fresh install writes when the list is on offer; null: the image the session already has. */
+const canPick = () => !!session && mode() === "fresh" && !localImage && versions.length > 1;
+const picked = () => (canPick() && versions.find((v) => v.version === $("#version").value)) || null;
+
+/* What the board check found, said for step 1, and why step 2 offers what it offers. */
+function describe({ board, plan, version }) {
+  if (plan.ok && board.app)
+    return [board.app.version === version ? `This box already runs Companion Dock ${version}. Writing it again does no harm.`
+      : `This box runs Companion Dock ${board.app.version}.`,
+      `An update to ${version} keeps its settings.`];
+  if (plan.ok)
+    return ["This board is laid out for Companion Dock, but no working firmware was found on it. A flash that stopped halfway leaves it like this.",
+      "An update keeps whatever settings it has."];
+  if (plan.why === "blank")
+    return ["This board has no Companion Dock on it yet.", "There is nothing to keep on it, so this is a fresh install."];
+  if (plan.why === "unreadable")
+    return ["The page couldn't read what is on this board.",
+      "Without that check an update isn't safe, so only a fresh install is offered. To try the check again, disconnect and connect."];
+  return ["This board runs other firmware.", "Its settings area isn't Companion Dock's, so only a fresh install fits."];
 }
 
-// A full image starts with the bootloader at 0x2000 and the app at 0x20000; both begin with the ESP image magic.
-function checkImage(data) {
-  if (data.length < 0x20000 + 256 || data[0x2000] !== 0xe9 || data[0x20000] !== 0xe9)
-    throw new Error("this isn't a full image. Pick the file whose name ends in -full.bin.");
+function render() {
+  const ready = phase === "ready", writing = phase === "writing", busy = phase === "connecting" || writing;
+  $("#connect").disabled = busy || !canSerial || !(localImage || latest);
+  $("#connect").hidden = ready || writing;
+  $("#disconnect").hidden = !ready;
+  $("#file").disabled = phase !== "idle";
+  $("#s-choose").classList.toggle("wait", !ready && !writing);
+  $("#s-write").classList.toggle("wait", !ready && !writing);
+  $("#modes").disabled = !ready;
+  const version = session ? session.version : localImage ? localImage.version : latest ? latest.version : "";
+  if (session) {
+    const [found, choice] = describe(session);
+    $("#found").textContent = found;
+    $("#choose-help").textContent = choice;
+    document.querySelector("input[name=mode][value=update]").disabled = !session.plan.ok;
+  }
+  $("#connect-help").hidden = !!session;
+  $("#found").hidden = !session;
+  if (!session) {
+    $("#choose-help").textContent = "Once the board is connected, the page reads what is on it and offers what fits.";
+    for (const r of document.querySelectorAll("input[name=mode]")) r.checked = false;
+  }
+  const m = mode();
+  $("#erase").hidden = !(session && m === "fresh");
+  $("#pick").hidden = !canPick();
+  const fresh = picked() ? picked().version : version;
+  $("#go").textContent = m === "update" ? `Update to ${version}` : fresh ? `Install ${fresh}` : "Install";
+  $("#go").disabled = !ready || !m || (m === "fresh" && !$("#agree").checked);
 }
+
+async function sha256(bytes) { return hex(new Uint8Array(await crypto.subtle.digest("SHA-256", bytes))); }
 
 async function loadLatest() {
   try {
     const r = await fetch("../firmware/latest.json", { cache: "no-store" });
     if (!r.ok) throw new Error(String(r.status));
     latest = await r.json();
-    $("#ver").textContent = "v" + latest.version;
-    $("#fwinfo").textContent = [latest.date, latest.full_size ? mb(latest.full_size) : ""].filter(Boolean).join(" · ");
+    $("#ver").textContent = latest.version;
+    $("#fwinfo").textContent = [latest.date, latest.full_size ? mb(latest.full_size) : ""].filter(Boolean).join(", ");
   } catch {
-    $("#ver").textContent = "No firmware found";
-    $("#fwinfo").textContent = "Open this page from the project's site, or use a file from this computer below.";
+    $("#ver").textContent = "Not found";
+    $("#fwinfo").textContent = "Open this page from the project's site, or use a file from this computer.";
   }
-  refresh();
+  if (latest) {
+    try {
+      const r = await fetch("../firmware/versions.json", { cache: "no-store" });
+      const list = r.ok ? await r.json() : [];
+      versions = list.filter((v) => v && v.version && v.full);
+    } catch { /* no list: the latest alone */ }
+    if (!versions.some((v) => v.version === latest.version)) versions = [latest];
+    $("#version").replaceChildren(...versions.map((v) =>
+      new Option([v.version + (v.version === latest.version ? " (latest)" : ""), v.date].filter(Boolean).join(", "), v.version)));
+    $("#version").value = latest.version;
+  }
+  render();
 }
 
-async function getImage() {
-  if (localFile) return new Uint8Array(await localFile.arrayBuffer());
-  setStatus(`Downloading v${latest.version}…`);
-  const r = await fetch("../firmware/" + latest.full, { cache: "no-store" });
+/* One release's full image (an entry of latest.json's shape), downloaded and checked. */
+async function download(release) {
+  setStatus(`Downloading ${release.version}…`);
+  const r = await fetch("../firmware/" + release.full, { cache: "no-store" });
   if (!r.ok) throw new Error(`the download failed (${r.status}).`);
   const data = new Uint8Array(await r.arrayBuffer());
-  if (latest.full_sha256 && (await sha256(data)) !== latest.full_sha256)
+  if (release.full_sha256 && (await sha256(data)) !== release.full_sha256)
     throw new Error("the download is damaged (its checksum doesn't match). Try again.");
-  return data;
+  checkFullImage(data);
+  return { data, version: release.version };
 }
 
-async function install() {
-  busy = true; refresh(); progress(null); setStatus("");
+const getImage = () => localImage || download(latest);
+
+/* Our own reset, as esptool.py's hard reset does it: esptool-js 0.7.1's after("hard_reset") never asserts RTS (it
+   only waits and releases it) and re-sends a stale DTR "on", which holds BOOT (GPIO35) low through the auto-reset
+   circuit: the chip stayed in the flasher stub until a power cycle. DTR off (BOOT high), RTS on 100 ms (EN low),
+   RTS off: the box starts its firmware. A moment for it to start before the port closes. */
+async function restart(transport) {
+  terminal.writeLine("Restarting the box: EN pulsed through RTS, BOOT released.");
+  await transport.setDTR(false);
+  await transport.setRTS(true);
+  await sleep(100);
+  await transport.setRTS(false);
+  await sleep(300);
+}
+
+/* Let go of the board: out of the flasher and back into its firmware, then the port closed. */
+async function release(transport) {
+  try { await restart(transport); } catch { /* the port is already gone */ }
+  try { await transport.disconnect(); } catch { /* already closed */ }
+}
+
+function fail(e) {
+  progress(null);
+  if (e && e.name === "NotFoundError") setStatus("No board was picked. Press Connect again and choose it in the list.");
+  else setStatus("That didn't work: " + (e && e.message ? e.message : e) + " See “If it doesn't work” below.", "bad");
+  log("\n" + String(e && e.stack ? e.stack : e) + "\n");
+}
+
+async function connect() {
+  phase = "connecting"; render(); progress(null);
   let transport = null;
   try {
-    const data = await getImage();
-    checkImage(data);
+    /* the port first: the browser shows its list only right after a click, and a download may outlast that */
     setStatus("Pick the board in the list…");
     const port = await navigator.serial.requestPort();
+    const { data: image, version } = await getImage();
     transport = new Transport(port, false);
     /* 115200, the ROM's own rate: esptool-js changes the rate by closing and reopening the port (Web Serial can't change
        it in place), and the reopen's DTR/RTS toggle can reset this board through its auto-reset circuit, which drops the
        flasher stub ("Serial data stream stopped" at the write). Slower, but nothing reopens the port. */
     const loader = new ESPLoader({ transport, baudrate: 115200, terminal });
     setStatus("Connecting to the board…");
-    const chip = await loader.main();
+    await loader.main();
     if (!/ESP32-P4/.test(loader.chip.CHIP_NAME))
       throw new Error(`this board has an ${loader.chip.CHIP_NAME}. Companion Dock runs on the ESP32-P4.`);
     loader.DEFAULT_TIMEOUT = 30000; /* the stub may erase before it answers the write's start: give it time */
-    setStatus(`Connected to ${chip}. Writing ${mb(data.length)}, about 3 minutes…`);
+    setStatus("Reading what is on the board…");
+    /* After the data the stub sends its MD5 (16 bytes), which esptool-js leaves unread: take it, so it can't be
+       mistaken for the next command's answer, and check the read against it. */
+    const read = async (address, size) => {
+      const data = await loader.readFlash(address, size);
+      let sum = null;
+      try { sum = await transport.read(1000); } catch { /* no checksum came: the data stands as read */ }
+      if (sum && sum.length === 16 && hex(sum) !== md5(data)) throw new Error("the board's flash was misread.");
+      return data;
+    };
+    let board = null, plan = { ok: false, why: "unreadable" };
+    try {
+      board = await readBoard(image, read);
+      plan = planUpdate(image, board);
+      const app = board.app ? `${board.app.project} ${board.app.version} in slot ${board.slot}` : "no app found";
+      terminal.writeLine(`Board check: partition table ${board.table}, ${app}; update ${plan.ok ? "offered" : "not offered (" + plan.why + ")"}.`);
+    } catch (e) {
+      terminal.writeLine("Board check failed: " + (e && e.message ? e.message : e));
+    }
+    session = { transport, loader, image, version, board, plan };
+    document.querySelector(`input[name=mode][value=${plan.ok ? "update" : "fresh"}]`).checked = true;
+    $("#agree").checked = false;
+    if (latest) $("#version").value = latest.version;
+    phase = "ready";
+    setStatus("");
+  } catch (e) {
+    if (transport) await release(transport);
+    phase = "idle";
+    fail(e);
+  }
+  render();
+}
+
+async function disconnect() {
+  const { transport } = session;
+  session = null; phase = "idle"; render();
+  await release(transport);
+  setStatus("Disconnected. The box is starting its firmware again.");
+}
+
+async function install() {
+  const { transport, loader, plan } = session, update = mode() === "update", other = update ? null : picked();
+  let { image, version } = session;
+  phase = "writing"; render();
+  try {
+    /* an older release, or any but the one the session holds: a fresh install only, so the whole image */
+    if (other && other.version !== version) ({ data: image, version } = await download(other));
+    const parts = update ? plan.parts : planFresh(image);
+    const total = parts.reduce((n, p) => n + p.data.length, 0);
+    const before = parts.map((_, i) => parts.slice(0, i).reduce((n, p) => n + p.data.length, 0));
+    setStatus(`${update ? "Updating" : "Installing"}: writing ${mb(total)}, about 3 minutes…`);
     progress(0);
     await loader.writeFlash({
-      fileArray: [{ data, address: 0 }],
+      fileArray: parts.map((p) => ({ data: p.data.slice(), address: p.address })),
       flashMode: "keep", flashFreq: "keep", flashSize: "keep",
       eraseAll: false, compress: true,
-      reportProgress: (_i, written, total) => progress(written / total),
+      reportProgress: (i, written, of) => progress((before[i] + parts[i].data.length * (of ? written / of : 1)) / total),
       calculateMD5Hash: md5,
     });
     progress(1);
     setStatus("Restarting the box…");
-    /* Our own reset, as esptool.py's hard reset does it: esptool-js 0.7.1's after("hard_reset") never asserts RTS (it
-       only waits and releases it) and re-sends a stale DTR "on", which holds BOOT (GPIO35) low through the auto-reset
-       circuit: the chip stayed in the flasher stub until a power cycle. DTR off (BOOT high), RTS on 100 ms (EN low),
-       RTS off: the box starts its new firmware. A moment for it to start before the port closes. */
-    terminal.writeLine("Restarting the box: EN pulsed through RTS, BOOT released.");
-    await transport.setDTR(false);
-    await transport.setRTS(true);
-    await new Promise((r) => setTimeout(r, 100));
-    await transport.setRTS(false);
-    await new Promise((r) => setTimeout(r, 300));
-    setStatus("Done. The box is starting; the decks show the setup screen in a few seconds.", "ok");
-  } catch (e) {
+    await release(transport);
+    session = null; phase = "idle";
     progress(null);
-    if (e && e.name === "NotFoundError") setStatus("No board was picked. Press the button again and choose it in the list.");
-    else setStatus("That didn't work: " + (e && e.message ? e.message : e) + " See “If it doesn't work” below.", "bad");
-    log("\n" + String(e && e.stack ? e.stack : e) + "\n");
-  } finally {
-    if (transport) { try { await transport.disconnect(); } catch { /* already closed */ } }
-    busy = false; refresh();
+    setStatus(update ? `Updated to ${version}. The box is starting with its settings; it's back on the network in a few seconds.`
+      : `Installed ${version}. The box is starting; the decks show the setup screen in a few seconds.`);
+    $("#run").classList.add("done");
+  } catch (e) {
+    await release(transport);
+    session = null; phase = "idle";
+    fail(e);
   }
+  render();
+}
+
+async function pickFile(e) {
+  const file = e.target.files[0];
+  localImage = null;
+  setStatus("");
+  if (file) {
+    try {
+      const data = new Uint8Array(await file.arrayBuffer());
+      checkFullImage(data);
+      localImage = { data, version: imageInfo(data)?.version || file.name };
+      $("#ver").textContent = localImage.version;
+      $("#fwinfo").textContent = `${file.name}, ${mb(data.length)}, from this computer`;
+    } catch (err) {
+      e.target.value = "";
+      setStatus("That file can't be used: " + err.message, "bad");
+    }
+  }
+  if (!localImage && latest) {
+    $("#ver").textContent = latest.version;
+    $("#fwinfo").textContent = [latest.date, latest.full_size ? mb(latest.full_size) : ""].filter(Boolean).join(", ");
+  }
+  render();
 }
 
 if (!canSerial) $("#unsupported").hidden = false;
-$("#agree").addEventListener("change", refresh);
-$("#file").addEventListener("change", (e) => { localFile = e.target.files[0] || null; refresh(); });
+$("#file").addEventListener("change", pickFile);
+$("#connect").addEventListener("click", connect);
+$("#disconnect").addEventListener("click", disconnect);
 $("#go").addEventListener("click", install);
+$("#modes").addEventListener("change", render);
+$("#version").addEventListener("change", render);
+$("#agree").addEventListener("change", render);
 loadLatest();
 </script>
 </body>

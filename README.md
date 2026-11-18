@@ -3,7 +3,7 @@
 A small Power-over-Ethernet box that connects USB Elgato Stream Decks to
 [Bitfocus Companion](https://bitfocus.io/companion) over the network.
 
-**Install it from your browser: <https://romansemkiv.github.io/companion-dock/>** (Chrome or Edge, the board on USB-C).
+**Install or update it from your browser: <https://romansemkiv.github.io/companion-dock/>** (Chrome or Edge, the board on USB-C).
 
 <p align="center">
   <img src="docs/images/deck-module32-waiting.png" alt="A Stream Deck Module 32 showing the box's home screen: waiting for Companion, the box's IP and port, the hotspot name and password" width="49%">
@@ -137,8 +137,10 @@ The top bar shows each connection with its own address; the one carrying the rou
 ### 1. Flash the firmware
 
 The easiest way is the browser installer at <https://romansemkiv.github.io/companion-dock/>. Open it in
-Chrome or Edge, connect the board's USB-C port and press **Connect and install**. It fetches the latest firmware,
-checks it, writes it and verifies it. Nothing to install.
+Chrome or Edge, connect the board's USB-C port and press **Connect**. It fetches the latest firmware and checks it,
+reads what is on the board, writes the firmware and verifies it. Nothing to install. On a box that already runs
+Companion Dock it offers **Update**, which keeps the settings, next to **Fresh install**, which erases them and
+can also write an earlier release.
 
 From the command line, write the full image at `0x0` over the board's USB-C port:
 
@@ -159,7 +161,7 @@ way to flash from the browser with nothing to install.
 
 The full image erases the settings. For a box that already runs this firmware, upload
 `companion-dock-v0.2.8.bin` on the web page's **Firmware** page instead: the settings stay, and the box rolls back
-if the new image doesn't start properly.
+if the new image doesn't start properly. Over USB, the browser installer's **Update** keeps the settings too.
 
 ### 2. Set it up
 

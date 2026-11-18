@@ -15,3 +15,7 @@ python3 -B tools/test_pack_page.py
 mkdir -p build-host/www
 python3 tools/pack_page.py components/webui/www/index.html build-host/www/index.html.gz --html build-host/www/index.html
 node tools/check_pages.js build-host/www/index.html
+# the browser installer: what an update writes and what it leaves alone (installer/flasher/plan.mjs)
+node --test tools/test_installer.mjs
+# ... and its list of earlier releases, taken out of the history (tools/installer_versions.py)
+python3 -B tools/test_installer_versions.py

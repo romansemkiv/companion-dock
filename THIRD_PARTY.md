@@ -43,6 +43,7 @@ none of it is in the firmware.
 | What | Where | Licence |
 |---|---|---|
 | [esptool-js](https://github.com/espressif/esptool-js) 0.7.1, © Espressif Systems; bundles [pako](https://github.com/nodeca/pako) 2.1.0, © 2014-2017 Vitaly Puzrin and Andrei Tuputcyn | `installer/flasher/esptool-js-0.7.1.mjs` | Apache-2.0 ([`esptool-js-LICENSE.txt`](installer/flasher/esptool-js-LICENSE.txt)); pako MIT ([`pako-LICENSE.txt`](installer/flasher/pako-LICENSE.txt)) |
+| [Barlow](https://github.com/jpt/barlow) Regular, Medium and SemiBold and Barlow Semi Condensed SemiBold, © 2017 The Barlow Project Authors; [JetBrains Mono](https://github.com/JetBrains/JetBrainsMono) Medium, © 2020 The JetBrains Mono Project Authors | `installer/flasher/fonts/*.woff2`: the installer page's fonts | SIL Open Font License 1.1 ([`OFL.txt`](installer/flasher/fonts/OFL.txt)) |
 
 ## Protocols
 

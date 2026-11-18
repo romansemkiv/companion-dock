@@ -1,11 +1,12 @@
 # The browser installer on GitHub Pages: installer/ (the page and esptool-js) with firmware/ (the release files it
-# flashes, latest.json first) as one site. Runs on every push to main that touches either, or by hand.
+# flashes, latest.json first) as one site, plus every earlier release's full image, taken out of the history
+# (tools/installer_versions.py), for the page's version list. Runs on every push to main that touches these, or by hand.
 name: Installer site
 
 on:
   push:
     branches: [main]
-    paths: ["installer/**", "firmware/**", ".github/workflows/pages.yml"]
+    paths: ["installer/**", "firmware/**", "tools/installer_versions.py", ".github/workflows/pages.yml"]
   workflow_dispatch:
 
 permissions:
@@ -25,11 +26,14 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # the earlier releases' images are in the history
       - name: Assemble the site
         run: |
           mkdir -p _site
           cp -R installer/. _site/
           cp -R firmware _site/firmware
+          python3 tools/installer_versions.py _site/firmware
           touch _site/.nojekyll
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
