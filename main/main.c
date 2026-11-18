@@ -184,6 +184,9 @@ void app_main(void)
     }
     stage(dock ? "surfaces (Network Dock mode)" : "surfaces");
 
+    supervisor_cfg_lock();
+    svcbtn_apply(&s_cfg); /* keyEnabled, keyPin, keyShort */
+    supervisor_cfg_unlock();
     check("service button", svcbtn_start());
     stage("button");
 

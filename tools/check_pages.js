@@ -56,7 +56,8 @@ for (const file of files.filter((f) => path.basename(f) === 'index.html')) {
   need(/\['satellite','Satellite',"[^"]*",'satellite'\]/.test(html), "the mode chooser's Satellite choice has no i-satellite");
   need(/\['dock','Network Dock',`[^`]*`,'dock'\]/.test(html), "the mode chooser's Dock choice has no i-dock");
   need(/opts\.map\(\(\[v,t,d,n\]\)/.test(html) && has("n&&[ic(n),' ']"), 'choice() does not draw its icons');
-  for (const gone of ['i-link', 'i-cpu', "'link'", "'cpu'"]) need(!has(gone), `${gone} is still on the page`);
+  // the icons taken off the page: their symbols, and drawing them (ic(name), or a panel's icon, its last argument)
+  for (const gone of ['i-link', 'i-cpu', "ic('link'", "ic('cpu'", ",'link')", ",'cpu')"]) need(!has(gone), `${gone} is still on the page`);
   for (const m of html.matchAll(/href="#i-([\w-]+)"/g)) need(symbol(m[1]), `<use href="#i-${m[1]}"> has no symbol`);
 }
 
@@ -165,13 +166,13 @@ for (const file of files.filter((f) => path.basename(f) === 'index.html')) {
   for (const m of html.matchAll(/\bon(?:change|input)\s*[:=]\s*["'`]?([^,}"'`]*)/gi))   // handlers set as attributes too
     need(!/rpc\(|call\(|switchMode\(|setWifiOn\(|restartFlow\(/.test(m[1]), `an onchange / oninput acts by itself: ${m[1].slice(0, 60)}`);
   need(/if\(!i\)\{toast\(m,true\);return false\}/.test(html), 'bad() fails silently on a missing field');
-  // a11y: placeholders at 4.5:1 (--dim), named radio groups, the decks table's roles, a scan row says secured
+  // a11y: placeholders at 4.5:1 (--dim), named radio groups, the decks table's roles, a scan row says secured and names its buttons
   need(/::placeholder\{color:var\(--dim\)\}/.test(html), 'placeholders keep the browser grey');
   need(/role:'radiogroup','aria-label':label/.test(html) && (html.match(/\],'(Connection mode|How to find Companion)'\)/g) || []).length === 2 && html.includes(",'Companions found'))"),
     'a radio group has no name');
   need(/h\('table',\{class:'dtab',role:'table'/.test(html) && /role:'rowgroup'/.test(html) && /h\('tr',\{role:'row'\}/.test(html) && /h\('td',\{class:c,role:'cell'\}/.test(html),
     'the stacked deck rows lose their table semantics');
-  need(/'aria-label':`\$\{n\.ssid\}, \$\{n\.auth==='open'\?'open':'secured'\}/.test(html), 'a scan row does not say secured');
+  need(/n\.auth!=='open'&&h\('span',\{'aria-label':'secured'/.test(html) && /'aria-label':`Make \$\{n\.ssid\} the /.test(html), 'a scan row does not say secured, or its buttons do not name the network');
   need(/\.panel>\.ph h2\{/.test(html) && /h\('div',\{class:'ph'\},h\('h2'/.test(html), 'panel titles are not h2 (a heading level skipped)');
   need(/const b=btn\('Show',\(\)=>\{const s=i\.type==='password';i\.type=s\?'text':'password';b\.textContent=s\?'Hide':'Show'\}/.test(html), 'pfld has no Show / Hide');
 }
@@ -278,7 +279,7 @@ async function smoke(file) {
     'Companion.GetConfig': { companionAuto: st.companion.auto, companionHost: '10.0.0.5', companionPort: 16622, companionPinId: '', mode: st.mode },
     'Companion.List': [{ id: 'a', host: '10.0.0.5', port: 16622, version: '5.1.1', pinned: true }, { id: 'b', host: '10.0.0.9', port: 16623, version: '5.2.0', pinned: false }],
     'Eth.GetConfig': { ethDhcp: false, ethIp: '10.0.0.57', ethMask: '255.255.255.0', ethGw: '10.0.0.1', ethDns: '' },
-    // Wi-Fi off (the hotspot stays) in dock mode, on elsewhere
+    // Wi-Fi off (the hotspot stays on if it is enabled) in dock mode, on elsewhere
     'Wifi.GetConfig': { wifiSsid: 'Studio', wifiHasPass: true, wifiBackupSsid: st.net.route === 'none' ? '' : 'Phone', wifiBackupHasPass: st.net.route !== 'none',
       wifiEnabled: st.mode !== 'dock' }, 'Ap.GetConfig': apCfg(st),
     'Ota.GetStatus': { state: 'idle', running: 'ota_0', next: 'ota_1', pending_verify: true },
@@ -286,11 +287,16 @@ async function smoke(file) {
       st.mode === 'dock' ? { gestureEnabled: false, gestureKeys: ['topLeft', 'bottomLeft'], gestureTaps: 2, gestureHoldSeconds: 5 } : {}), // absent: the default
     // the Speaker & LED page: defaults in Satellite mode, everything off in dock mode, a pin the list doesn't have without network
     'Feedback.GetConfig': Object.assign({ speakerEnabled: true, speakerVolume: 50, soundReady: true, soundConnected: true, soundProblem: true,
-      soundDeckPlug: true, soundKeyClick: true, ledEnabled: true, ledFlash: true, ledPin: 23, ledBrightness: 30, ledPins: [0, 1, 2, 3, 4, 5, 20, 21, 22, 23, 26, 27, 33, 46, 47, 48] },
+      soundDeckPlug: true, soundKeyClick: true, ledEnabled: true, ledFlash: true, ledPin: 23, ledBrightness: 30,
+      keyEnabled: true, keyPin: 32, keyShort: 'menu', keyLong: 'find', ledPins: [0, 1, 2, 3, 4, 5, 20, 21, 22, 23, 26, 27, 32, 33, 46, 47, 48] },
       st.mode === 'dock' ? { speakerEnabled: false, speakerVolume: 0, soundReady: false, soundConnected: false, soundProblem: false, soundDeckPlug: false,
-        soundKeyClick: false, ledEnabled: false, ledFlash: false, ledBrightness: 1 } : {},
+        soundKeyClick: false, ledEnabled: false, ledFlash: false, ledBrightness: 1, keyEnabled: false, keyPin: 27, keyShort: 'none', keyLong: 'restart' } : {},
       st.net.route === 'none' ? { ledPin: 7, ledBrightness: 100, speakerVolume: 100, ledPins: [] } : {}),
     'Log.Get': { seq: 10, text: 'I (1) boot\n' },
+    'Sys.GetPerf': { windowMs: 2000, cpuMhz: 400, tempC: st.mode === 'dock' ? null : 41.5, cores: st.mode === 'dock' ? [null, null] : [12.5, 3],
+      heap: { internal: { total: 524288, free: 200000, minFree: 150000, largest: 90000 }, psram: { total: 33554432, free: 30000000, minFree: 29000000, largest: 20000000 } },
+      tasks: [{ name: 'IDLE0', core: 0, prio: 0, state: 'ready', cpu: 87.5, stackFree: 900 }, { name: 'tiT', core: -1, prio: 18, state: 'blocked', cpu: st.mode === 'dock' ? null : 4.2, stackFree: 300 }],
+      eth: st.net.route === 'none' ? null : { unicast: 1000, multi: 20, unwanted: 50000, rate: 0, lostBuf: 0, lostFifo: 3 } },
   })[m];
   // the recovery slot: Ota.GetStatus.sync, one sync state per box state for the page renders (each state's view is checked below)
   const otaAns = (state, other = {}, top = {}) => Object.assign({ state: 'idle', running: 'ota_0', version: 'v1', next: 'ota_1', pending_verify: false,
@@ -1017,9 +1023,10 @@ async function smoke(file) {
   }
   // the Wi-Fi scan list: h() and ic() are swapped for recorders, so the tree the page builds can be read
   const scanView = vm.runInContext('typeof scanView === "function" ? scanView : null', ctx);
+  const assignNet = vm.runInContext('typeof assignNet === "function" ? assignNet : null', ctx);
   const pickNet = vm.runInContext('typeof pickNet === "function" ? pickNet : null', ctx);
   const scanOutcome = vm.runInContext('typeof scanOutcome === "function" ? scanOutcome : null', ctx);
-  if (!scanView || !pickNet || !scanOutcome) errs.push('scanView(state) / pickNet(...) / scanOutcome(answer) are missing');
+  if (!scanView || !assignNet || !pickNet || !scanOutcome) errs.push('scanView(state) / assignNet(...) / pickNet(...) / scanOutcome(answer) are missing');
   else {
     const hOrig = ctx.h, icOrig = ctx.ic;
     ctx.h = (tag, attrs, ...kids) => ({ tag, attrs: attrs || {}, kids: kids.flat(Infinity).filter((k) => k != null && k !== false) });
@@ -1027,26 +1034,41 @@ async function smoke(file) {
     const walk = (n, f) => { f(n); if (n && n.kids) for (const k of n.kids) walk(k, f); };
     const texts = (n) => { const t = []; walk(n, (x) => { if (typeof x === 'string') t.push(x); }); return t.join('|'); };
     const find = (n, pred) => { const r = []; walk(n, (x) => { if (x && typeof x === 'object' && pred(x)) r.push(x); }); return r; };
+    const rowsOf = (n) => find(n, (x) => x.tag === 'li' && /\bnetr\b/.test(x.attrs.class || ''));
+    const buttons = (n) => find(n, (x) => x.tag === 'button');
     try {
       const evil = '<img src=x onerror=alert(1)>';
       const nets = [{ ssid: 'Studio', rssi: -48, auth: 'wpa2_psk', channel: 6 }, { ssid: 'Cafe', rssi: -71, auth: 'open', channel: 11 },
         { ssid: evil, rssi: -90, auth: 'wpa3_psk', channel: 1 }];
+      vm.runInContext('PG={cfg:{}}', ctx);
       const list = scanView({ results: nets });
-      const rows = find(list, (x) => x.tag === 'button');
+      const rows = rowsOf(list);
       if (rows.length !== 3) errs.push(`scan list: ${rows.length} rows for 3 networks`);
       const t = texts(list);
       for (const n of nets) if (!t.includes(n.ssid)) errs.push(`scan list: ${n.ssid} is not shown`);
       for (const d of ['-48 dBm', '-71 dBm', '-90 dBm']) if (!t.includes(d)) errs.push(`scan list: ${d} is not shown`);
       const locks = find(list, (x) => x.icon === 'lock').length;
       if (locks !== 2) errs.push(`scan list: ${locks} lock icons, the 2 protected networks need one each`);
-      if (find(rows[1], (x) => x.icon === 'lock').length) errs.push('scan list: the open network shows a lock');
+      if (rows[1] && find(rows[1], (x) => x.icon === 'lock').length) errs.push('scan list: the open network shows a lock');
       const bars = rows.map((r) => find(r, (x) => /\bbars\b/.test((x.attrs || {}).class || ''))[0].attrs.class);
       if (!(bars[0].endsWith('b4') && bars[1].endsWith('b2') && bars[2].endsWith('b1'))) errs.push(`scan list: signal bars ${bars}`);
       if (find(list, (x) => /^(img|script)$/.test(x.tag)).length) errs.push('scan list: a network name became markup');
-      if (!rows.every((r) => typeof r.attrs.onclick === 'function')) errs.push('scan list: a row does not react to a click');
+      // with no networks saved, every row offers both slots
+      for (const r of rows) {
+        const b = buttons(r);
+        if (b.map(texts).join() !== 'Primary,Backup' || !b.every((x) => typeof x.attrs.onclick === 'function'))
+          errs.push(`scan list: a row offers ${b.map(texts)}, not Primary and Backup`);
+      }
+      // a network already in a slot says so instead; an enterprise network cannot be used
+      vm.runInContext('PG={cfg:{wifiSsid:"Studio",wifiBackupSsid:"Cafe"}}', ctx);
+      const taken = rowsOf(scanView({ results: nets.concat([{ ssid: 'Corp', rssi: -60, auth: 'wpa2_enterprise', channel: 36 }]) }));
+      if (buttons(taken[0]).length || !/\|Primary$/.test(texts(taken[0]))) errs.push(`scan list: the primary network's row: ${texts(taken[0])}`);
+      if (buttons(taken[1]).length || !/\|Backup$/.test(texts(taken[1]))) errs.push(`scan list: the backup network's row: ${texts(taken[1])}`);
+      if (buttons(taken[2]).length !== 2) errs.push('scan list: a network in no slot lost its buttons');
+      if (buttons(taken[3]).length || !/Enterprise: not supported/.test(texts(taken[3]))) errs.push(`scan list: the enterprise row: ${texts(taken[3])}`);
       const none = scanView({ results: [] });
       if (!/No networks found/.test(texts(none))) errs.push(`scan list, empty: ${texts(none)}`);
-      if (find(none, (x) => x.tag === 'button').length) errs.push('scan list, empty: has rows');
+      if (rowsOf(none).length) errs.push('scan list, empty: has rows');
       const bad = scanView({ error: 'no Wi-Fi: the C6 does not answer' });
       if (!/Scan failed: no Wi-Fi: the C6 does not answer/.test(texts(bad))) errs.push(`scan list, error: ${texts(bad)}`);
       const busy = scanView({ busy: true });
@@ -1060,24 +1082,27 @@ async function smoke(file) {
       if (o3.error || !Array.isArray(o3.results) || o3.results.length) errs.push('scanOutcome(empty) should be an empty list');
       const o4 = scanOutcome({ scanning: false, results: [], ageMs: -1, error: 'the scan did not finish' });
       if (o4.error !== 'the scan did not finish') errs.push('scanOutcome(error) should carry the box\'s reason');
-      // scanWifi: start, poll the answer every 500 ms for up to 10 s (a fake timer, scripted answers)
+      // scanWifi: start, poll the answer every 500 ms for up to 10 s (a fake timer, scripted answers); the list is kept
       const scanWifi = vm.runInContext('scanWifi', ctx);
       const saved = { rpc: ctx.rpc, fill: ctx.fill, setTimeout: ctx.setTimeout };
       const drive = async (answers) => {
         const calls = [], shown = [];
         let i = 0, waited = 0;
+        vm.runInContext('SCAN=null;page="wifi";PG={cfg:{}}', ctx);
         ctx.setTimeout = (f, ms) => { waited += ms; f(); return 0; };
         ctx.fill = (e, ...k) => { shown.push(k.flat(Infinity)[0]); return e; };
         ctx.rpc = async (m, p) => { calls.push(m + (p ? JSON.stringify(p) : '')); const a = answers[Math.min(i++, answers.length - 1)];
-          if (a instanceof Error) throw a; if (a === 'leave') { vm.runInContext('PG={}', ctx); return { scanning: true }; } return a; };
+          if (a instanceof Error) throw a; if (a === 'leave') { vm.runInContext('PG={};page="home"', ctx); return { scanning: true }; } return a; };
         await scanWifi();
         return { calls, shown, waited };
       };
       let d = await drive([{ scanning: true }, { scanning: true, results: [] }, { scanning: true, results: [] }, { scanning: false, results: nets, ageMs: 5 }]);
       if (d.calls.join() !== 'Wifi.Scan,Wifi.Scan{"results":true},Wifi.Scan{"results":true},Wifi.Scan{"results":true}') errs.push(`scanWifi calls: ${d.calls}`);
       if (d.waited !== 1500) errs.push(`scanWifi waited ${d.waited} ms for 3 polls`);
-      if (d.shown.length !== 2 || !find(d.shown[0], (x) => /\bspin\b/.test((x.attrs || {}).class || '')).length || find(d.shown[1], (x) => x.tag === 'button').length !== 3)
+      if (d.shown.length !== 2 || !find(d.shown[0], (x) => /\bspin\b/.test((x.attrs || {}).class || '')).length || rowsOf(d.shown[1]).length !== 3)
         errs.push('scanWifi should show the spinner, then the three networks');
+      if (!vm.runInContext('scanFresh()&&SCAN.results.length===3&&scanLabel()==="Scan again"', ctx)) errs.push('scanWifi: the list is not kept for the next drawing');
+      if (vm.runInContext('SCAN.at-=5*60e3+1;scanFresh()', ctx)) errs.push('scanWifi: a list older than 5 minutes is still shown');
       d = await drive([{ scanning: true, results: [] }]); // never finishes
       if (d.calls.length !== 21 || d.waited !== 10000) errs.push(`scanWifi gave up after ${d.calls.length} calls / ${d.waited} ms, not 1 + 20 polls / 10 s`);
       if (!/did not finish/.test(texts(d.shown[d.shown.length - 1]))) errs.push('scanWifi should say the box did not finish');
@@ -1087,21 +1112,173 @@ async function smoke(file) {
       if (!/Scan failed: no answer/i.test(texts(d.shown[d.shown.length - 1]))) errs.push('scanWifi should show the error of a failed poll');
       d = await drive([{ scanning: true }, 'leave']); // the page changed meanwhile: nothing is drawn over the new one
       if (d.shown.length !== 1) errs.push(`scanWifi drew ${d.shown.length - 1} times after the page changed`);
+      if (!vm.runInContext('scanFresh()', ctx)) errs.push('scanWifi: a scan finished after leaving the page is not kept for the way back');
       Object.assign(ctx, saved);
-      // picking a network: the name goes into the field and the password gets the focus
-      const el = (v) => ({ value: v, focused: false, focus() { this.focused = true; } });
-      let ssid = el(''), pass = el('old secret');
-      let hint = pickNet(nets[0], ssid, pass, true);
-      if (ssid.value !== 'Studio' || !pass.focused || pass.value !== 'old secret' || hint) errs.push('pickNet(protected) should set the name and focus the password');
-      ssid = el(''); pass = el('old secret');
-      hint = pickNet(nets[1], ssid, pass, true);
-      if (ssid.value !== 'Cafe' || !pass.focused || pass.value !== '') errs.push('pickNet(open) should set the name, empty the password and focus it');
-      if (!/Forget password/.test(hint)) errs.push('pickNet(open) with a saved password should point at "Forget password"');
-      if (pickNet(nets[1], el(''), el(''), false)) errs.push('pickNet(open) without a saved password needs no hint');
+      // a slot assigned: the name and its password in one Wifi.SetConfig; an open network drops a saved password
+      const sent = [], asked = [], marked = [];
+      const sv = { call: ctx.call, confirmAction: ctx.confirmAction, bad: ctx.bad, refreshStatus: ctx.refreshStatus };
+      let answer = true;
+      ctx.call = async (m, p) => { sent.push(m + JSON.stringify(p)); };
+      ctx.confirmAction = async (o) => { asked.push(o.title); return answer; };
+      ctx.bad = (id, m) => { marked.push(id + ': ' + m); return false; };
+      ctx.refreshStatus = async () => {};
+      const over = (route) => vm.runInContext(`S={sys:{net:{ip:'192.168.8.225',route:'${route}'}},at:0,key:''};PG={cfg:{wifiSsid:'Old'}}`, ctx);
+      over('eth');
+      await assignNet(nets[1], 'main', '');
+      await assignNet(nets[0], 'backup', 'longenough');
+      await assignNet(nets[0], 'main', 'short');
+      await assignNet(nets[2], 'main', 'x'.repeat(64));
+      await pickNet({}, nets[1], 'backup'); // open: saved at once, no password asked
+      if (sent.join() !== 'Wifi.SetConfig{"wifiSsid":"Cafe","wifiPass":""},Wifi.SetConfig{"wifiBackupSsid":"Studio","wifiBackupPass":"longenough"},Wifi.SetConfig{"wifiBackupSsid":"Cafe","wifiBackupPass":""}')
+        errs.push(`assignNet sent ${sent}`);
+      if (marked.length !== 2 || !marked.every((m) => /^scanpass: 8-63/.test(m))) errs.push(`assignNet: a bad password is not marked on its field: ${marked}`);
+      if (asked.length) errs.push('assignNet asked for confirmation over Ethernet');
+      sent.length = 0; over('wifi'); answer = false;
+      await assignNet(nets[1], 'main', '');
+      if (sent.length || asked.join() !== 'Change the Wi-Fi network?') errs.push(`assignNet over Wi-Fi, declined: asked ${asked}, sent ${sent}`);
+      answer = true; asked.length = 0;
+      await assignNet(nets[0], 'backup', 'longenough');
+      if (sent.length !== 1 || asked.join() !== 'Change the backup network?') errs.push(`assignNet over Wi-Fi, confirmed: asked ${asked}, sent ${sent}`);
+      Object.assign(ctx, sv);
     } catch (e) { errs.push(`scan list: ${e && e.stack || e}`); }
-    finally { ctx.h = hOrig; ctx.ic = icOrig; }
+    finally { ctx.h = hOrig; ctx.ic = icOrig; vm.runInContext('SCAN=null;page="home";PG={}', ctx); }
   }
-  // the backup Wi-Fi network: its own name and password fields, its own Scan, a line for the network in use
+  // the service key (Speaker & LED page): its own card; neither pin list offers the other's pin; a move and turning it
+  // off ask first; the live state from Sys.GetStatus.key
+  {
+    const hOrig = ctx.h, icOrig = ctx.ic, fillOrig = ctx.fill, rpcOrig = ctx.rpc;
+    const sv = { call: ctx.call, confirmAction: ctx.confirmAction };
+    try {
+      const noop = () => {};
+      ctx.h = (tag, attrs, ...kids) => ({ tag, attrs: attrs || {}, kids: kids.flat(Infinity).filter((k) => k != null && k !== false), addEventListener: noop });
+      ctx.ic = (name) => ({ icon: name });
+      const walk = (n, f) => { f(n); if (n && n.kids) for (const k of n.kids) walk(k, f); };
+      const texts = (n) => { const t = []; walk(n, (x) => { if (typeof x === 'string') t.push(x); }); return t.join('|'); };
+      const find = (n, pred) => { const r = []; walk(n, (x) => { if (x && typeof x === 'object' && pred(x)) r.push(x); }); return r; };
+      const cfg = { speakerEnabled: true, speakerVolume: 50, soundReady: true, soundConnected: true, soundProblem: true, soundDeckPlug: true,
+        soundKeyClick: true, ledEnabled: true, ledFlash: true, ledPin: 32, ledBrightness: 30, keyEnabled: true, keyPin: 27, keyShort: 'find',
+        ledPins: [0, 23, 27, 32, 33] };
+      const shown = [];
+      ctx.rpc = async () => cfg;
+      ctx.fill = (e, ...k) => { shown.push(...k.flat(Infinity)); return e; };
+      vm.runInContext('PG={};page="feedback"', ctx);
+      await vm.runInContext('PAGES.feedback(PG)', ctx);
+      const page = { kids: shown };
+      const card = find(page, (x) => x.tag === 'section' && texts(find(x, (y) => y.tag === 'h2')[0] || {}) === 'Service key')[0];
+      if (!card) errs.push('Speaker & LED: no Service key card');
+      else {
+        const opts = (id) => find(find(page, (x) => x.tag === 'select' && x.attrs.id === id)[0] || {}, (x) => x.tag === 'option').map((o) => o.attrs.value);
+        if (opts('ledpin').join() !== '0,23,32,33') errs.push(`the light's pins offer the key's: ${opts('ledpin')}`);
+        if (opts('keypin').join() !== '0,23,27,33') errs.push(`the key's pins offer the light's: ${opts('keypin')}`);
+        if (opts('keyshort').join() !== 'menu,find,sound,light,none') errs.push(`short press choices: ${opts('keyshort')}`);
+        if (opts('keylong').join() !== 'menu,find,sound,light,none,restart') errs.push(`long press choices: ${opts('keylong')}`);
+        if (!/A to the pin, C to GND/.test(texts(card)) || !/VDD to 3V3/.test(texts(card))) errs.push('the Service key card does not say how to wire a NeoKey');
+        if (!find(card, (x) => x.attrs && x.attrs.id === 'keyst').length || !find(card, (x) => /\bsv\b/.test((x.attrs || {}).class || '')).length) errs.push('the Service key card lacks its live line or Save');
+      }
+      // saveKey: what it sends, and when it asks
+      const sent = [], asked = [];
+      let answer = true;
+      ctx.call = async (m, p) => { sent.push(m + JSON.stringify(p)); };
+      ctx.confirmAction = async (o) => { asked.push(o.title); return answer; };
+      const docOrig = ctx.document;
+      const form = (on, pin, sh) => { const f = { keyon: { type: 'checkbox', checked: on }, keypin: { value: String(pin) }, keyshort: { value: sh }, keylong: { value: 'restart' } };
+        ctx.document = { querySelector: (q) => f[q.slice(1)] };
+        vm.runInContext("PG={cfg:{keyEnabled:true,keyPin:27,keyShort:'find'}}", ctx); };
+      form(true, 27, 'none');
+      await vm.runInContext('saveKey()', ctx);
+      form(true, 33, 'none');
+      await vm.runInContext('saveKey()', ctx);
+      answer = false;
+      form(false, 27, 'find');
+      await vm.runInContext('saveKey()', ctx);
+      ctx.document = docOrig;
+      if (sent.join() !== 'Feedback.SetConfig{"keyEnabled":true,"keyPin":27,"keyShort":"none","keyLong":"restart"},Feedback.SetConfig{"keyEnabled":true,"keyPin":33,"keyShort":"none","keyLong":"restart"}')
+        errs.push(`saveKey sent ${sent}`);
+      if (asked.join() !== 'Move the service key to GPIO33?,Turn the service key off?') errs.push(`saveKey asked ${asked}`);
+      // the live line
+      const live = (key) => { const out = []; ctx.fill = (e, ...k) => { out.push(...k.flat(Infinity)); return e; };
+        ctx.__k = key; vm.runInContext('S={sys:{key:__k},at:0,key:""};LIVE.feedback()', ctx); return texts({ kids: out }); };
+      if (live({ down: true, presses: 4 }) !== 'Now|Pressed|Presses|4 since the start') errs.push(`key live, pressed: ${live({ down: true, presses: 4 })}`);
+      if (live(undefined) !== 'Now|Not pressed|Presses|0 since the start') errs.push(`key live, none yet: ${live(undefined)}`);
+    } catch (e) { errs.push(`service key: ${e && e.stack || e}`); }
+    finally { ctx.h = hOrig; ctx.ic = icOrig; ctx.fill = fillOrig; ctx.rpc = rpcOrig; Object.assign(ctx, sv); vm.runInContext('S={sys:null,at:0,key:""};PG={};page="home"', ctx); }
+  }
+  // the Performance page: tasks busiest first, rates per second from two readings, the EMAC's losses marked, "..." until a
+  // second reading gives CPU shares
+  {
+    const perfDraw = vm.runInContext('typeof perfDraw === "function" ? perfDraw : null', ctx);
+    const hOrig = ctx.h, icOrig = ctx.ic, fillOrig = ctx.fill;
+    if (!perfDraw) errs.push('perfDraw(answer, last, ms) is missing');
+    else try {
+      ctx.h = (tag, attrs, ...kids) => ({ tag, attrs: attrs || {}, kids: kids.flat(Infinity).filter((k) => k != null && k !== false) });
+      ctx.ic = (name) => ({ icon: name });
+      const walk = (n, f) => { f(n); if (n && n.kids) for (const k of n.kids) walk(k, f); };
+      const texts = (n) => { const t = []; walk(n, (x) => { if (typeof x === 'string') t.push(x); }); return t.join('|'); };
+      const find = (n, pred) => { const r = []; walk(n, (x) => { if (x && typeof x === 'object' && pred(x)) r.push(x); }); return r; };
+      const draw = (r, last, ms) => { const out = []; ctx.fill = (e, ...k) => { out.push({ tag: 'x', attrs: {}, kids: k.flat(Infinity).filter((x) => x != null && x !== false) }); return e; };
+        perfDraw(r, last, ms); return { cpu: out[0], mem: out[1], eth: out[2], tasks: out[3] }; };
+      const heap = { internal: { total: 524288, free: 204800, minFree: 153600, largest: 92160 }, psram: { total: 33554432, free: 31457280, minFree: 30408704, largest: 20971520 } };
+      const evil = '<img src=x onerror=alert(1)>';
+      const first = { windowMs: 0, cpuMhz: 400, tempC: null, cores: [null, null], heap, eth: { unicast: 100, multi: 10, unwanted: 1000, rate: 0, lostBuf: 0, lostFifo: 0 },
+        tasks: [{ name: 'satclient', core: -1, prio: 5, state: 'blocked', cpu: null, stackFree: 2000 }, { name: evil, core: 1, prio: 3, state: 'ready', cpu: null, stackFree: 400 }] };
+      let d = draw(first, null, 0);
+      if (!/Core 0\|\.\.\.\|Core 1\|\.\.\./.test(texts(d.cpu)) || !/Temperature\|-/.test(texts(d.cpu)) || !/the next reading/.test(texts(d.cpu))) errs.push(`perf, first reading: ${texts(d.cpu)}`);
+      if (texts(d.mem) !== 'Internal free|200 KB of 512 KB|Lowest free|150 KB|Largest block|90 KB|PSRAM free|30.0 MB of 32.0 MB|Lowest free|29.0 MB|Largest block|20.0 MB') errs.push(`perf memory: ${texts(d.mem)}`);
+      if (/\/s/.test(texts(d.eth))) errs.push('perf: a rate from a single reading');
+      if (!/Broadcast storms\|0$/.test(texts(d.eth)) || /Blocked/.test(texts(d.eth))) errs.push(`perf: no storm: ${texts(d.eth)}`);
+      if (find(d.tasks, (x) => /^(img|script)$/.test(x.tag)).length || !texts(d.tasks).includes(evil)) errs.push('perf: a task name became markup');
+      const low = find(d.tasks, (x) => x.tag === 'td' && x.attrs.class === 'low');
+      if (low.length !== 1 || texts(low[0]) !== '400 B') errs.push('perf: a stack under 512 bytes is not marked');
+      const second = Object.assign({}, first, { windowMs: 2000, tempC: 41.46, cores: [62.5, 3],
+        eth: { unicast: 300, multi: 12, unwanted: 9000, rate: 0, lostBuf: 0, lostFifo: 7, storm: true, storms: 3 },
+        tasks: [{ name: 'satclient', core: -1, prio: 5, state: 'blocked', cpu: 1.5, stackFree: 2000 }, { name: 'tiT', core: -1, prio: 18, state: 'running', cpu: 55, stackFree: 1500 },
+          { name: 'IDLE1', core: 1, prio: 0, state: 'ready', cpu: 97, stackFree: 700 }] });
+      d = draw(second, first, 2000);
+      if (!/Core 0\|62\.5 %\|Core 1\|3\.0 %/.test(texts(d.cpu)) || !/41\.5 °C/.test(texts(d.cpu)) || !/Over\|2\.0 s/.test(texts(d.cpu))) errs.push(`perf CPU: ${texts(d.cpu)}`);
+      const w = find(d.cpu, (x) => x.tag === 'i').map((x) => x.attrs.style);
+      if (w.join() !== 'width:62.5%,width:3%') errs.push(`perf CPU bars: ${w}`);
+      const et = texts(d.eth);
+      if (!/Broadcast storms\|Blocked now\| \|3$/.test(et)) errs.push(`perf: a storm under way is not said: ${et}`);
+      if (!/To the box\|300 \(100\/s\)/.test(et) || !/Dropped: no use\|9,000 \(4,000\/s\)/.test(et)) errs.push(`perf Ethernet rates: ${et}`);
+      const bad = find(d.eth, (x) => /\bpill bad\b/.test(x.attrs.class || ''));
+      if (bad.length !== 1 || texts(bad[0]) !== '7 (4/s)') errs.push(`perf: the EMAC's losses are not marked (${bad.map(texts)})`);
+      const names = find(d.tasks, (x) => x.tag === 'tr').map((r) => texts(r.kids[0]));
+      if (names.join() !== 'IDLE1,tiT,satclient') errs.push(`perf tasks order: ${names}`);
+      if (!/tiT\|any\|18\|running\|55\.0 %\|1,500 B/.test(texts(d.tasks))) errs.push(`perf task row: ${texts(d.tasks)}`);
+      d = draw(Object.assign({}, second, { eth: null }), second, 2000);
+      if (!/Ethernet is not running/.test(texts(d.eth))) errs.push('perf: no Ethernet is not said');
+      // sorting by a column: a header click sorts by it (numbers biggest first, names A to Z), a second one reverses
+      // it, the task's name breaks ties, a share not known yet comes last; the choice is kept in this browser
+      const stored = {};
+      const lsOrig = ctx.localStorage;
+      ctx.localStorage = { getItem: (k) => stored[k] ?? null, setItem: (k, v) => { stored[k] = v; }, removeItem() {} };
+      const click = (k) => { const out = []; ctx.fill = (e, ...kk) => { out.push(...kk.flat(Infinity)); return e; };
+        ctx.__s = second; vm.runInContext(`PG={last:__s};perfSortBy('${k}')`, ctx); return out.filter((x) => x && x.tag === 'tr').map((r) => texts(r.kids[0])).join(); };
+      vm.runInContext("PSORT={k:'cpu',d:-1}", ctx);
+      let o = click('prio');
+      if (o !== 'tiT,satclient,IDLE1') errs.push(`perf sort by priority: ${o}`);
+      o = click('prio');
+      if (o !== 'IDLE1,satclient,tiT') errs.push(`perf sort by priority, reversed: ${o}`);
+      o = click('name');
+      if (o !== 'IDLE1,satclient,tiT') errs.push(`perf sort by name: ${o}`);
+      o = click('name');
+      if (o !== 'tiT,satclient,IDLE1') errs.push(`perf sort by name, reversed: ${o}`);
+      if (JSON.parse(stored.psort || 'null')?.k !== 'name' || JSON.parse(stored.psort).d !== -1) errs.push(`perf sort not kept: ${stored.psort}`);
+      o = click('cpu');
+      if (o !== 'IDLE1,tiT,satclient') errs.push(`perf sort by CPU: ${o}`);
+      // a share not known yet (the first reading) comes last, whichever way
+      ctx.__f = Object.assign({}, first, { tasks: first.tasks.concat([{ name: 'tiT', core: -1, prio: 18, state: 'ready', cpu: 2, stackFree: 900 }]) });
+      const nul = (() => { const out = []; ctx.fill = (e, ...k) => { out.push(...k.flat(Infinity)); return e; };
+        vm.runInContext('perfTasks(__f.tasks)', ctx); return out.filter((x) => x && x.tag === 'tr').map((r) => texts(r.kids[0])).join(); })();
+      if (!/^tiT,/.test(nul)) errs.push(`perf sort: a task whose share is not known yet is not last: ${nul}`);
+      ctx.localStorage = lsOrig;
+      vm.runInContext("PSORT={k:'cpu',d:-1}", ctx);
+      if (!/h\('th',k==='state'\?\{class:'pst'\}:null,\s*h\('button',\{type:'button',class:'srt',onclick:\(\)=>perfSortBy\(k\)\}/.test(fs.readFileSync(file, 'utf8')))
+        errs.push('perf: the task headers are not buttons that sort');
+    } catch (e) { errs.push(`perf: ${e && e.stack || e}`); }
+    finally { ctx.h = hOrig; ctx.ic = icOrig; ctx.fill = fillOrig; }
+  }
+  // the Wi-Fi page: one list of networks in range, the backup network with its own name and password fields, a line for the network in use
   {
     const hOrig = ctx.h, icOrig = ctx.ic, fillOrig = ctx.fill, rpcOrig = ctx.rpc;
     ctx.h = (tag, attrs, ...kids) => ({ tag, attrs: attrs || {}, kids: kids.flat(Infinity).filter((k) => k != null && k !== false) });
@@ -1120,28 +1297,42 @@ async function smoke(file) {
       };
       const withBackup = await wifiPage({ wifiSsid: 'Studio', wifiHasPass: true, wifiBackupSsid: 'Phone', wifiBackupHasPass: true });
       const ids = new Set(); walk(withBackup, (x) => { if (x && x.attrs && x.attrs.id) ids.add(x.attrs.id); });
-      for (const id of ['ssid', 'wpass', 'wfscan', 'bssid', 'bpass', 'wfscan2', 'wbst', 'wbpill', 'wfst', 'wfpill', 'wmst', 'wmpill']) if (!ids.has(id)) errs.push(`Wi-Fi page: no #${id}`);
-      // three cards in order, each with its own fields and Save; Wi-Fi off dims both settings cards
+      for (const id of ['ssid', 'wpass', 'wfscan', 'wfscanb', 'bssid', 'bpass', 'wbst', 'wbpill', 'wfst', 'wfpill', 'wmst', 'wmpill']) if (!ids.has(id)) errs.push(`Wi-Fi page: no #${id}`);
+      if (ids.has('wfscan2')) errs.push('Wi-Fi page: a second scan list');
+      // four cards in order: the state, the networks in range, then each network with its own fields and Save;
+      // Wi-Fi off dims all but the first
       const cards = (pg) => pg.kids.filter((x) => x && x.tag === 'section');
       const title = (card) => texts(find(card, (x) => x.tag === 'h2')[0]);
       const idsIn = (card) => { const r = new Set(); walk(card, (x) => { if (x && x.attrs && x.attrs.id) r.add(x.attrs.id); }); return r; };
       const saves = (card) => find(card, (x) => x.tag === 'div' && /\bsv\b/.test(x.attrs.class || '')).length;
       const cs = cards(withBackup);
-      if (cs.map(title).join() !== 'Wi-Fi,Primary network,Backup network') errs.push(`the Wi-Fi cards are ${cs.map(title)}`);
+      if (cs.map(title).join() !== 'Wi-Fi,Networks in range,Primary network,Backup network') errs.push(`the Wi-Fi cards are ${cs.map(title)}`);
       else {
-        const want = [['wfst', 'wfpill'], ['ssid', 'wpass', 'wfscan', 'wmst', 'wmpill'], ['bssid', 'bpass', 'wfscan2', 'wbst', 'wbpill']];
+        const want = [['wfst', 'wfpill'], ['wfscan', 'wfscanb'], ['ssid', 'wpass', 'wmst', 'wmpill'], ['bssid', 'bpass', 'wbst', 'wbpill']];
         cs.forEach((card, i) => { const got = idsIn(card); for (const id of want[i]) if (!got.has(id)) errs.push(`#${id} is not in the ${title(card)} card`); });
         if (find(cs[0], (x) => x.tag === 'input').length || saves(cs[0])) errs.push('the Wi-Fi card has fields or a Save');
         if (!/Turn Wi-Fi off/.test(texts(cs[0])) || !/For places without a network cable/.test(texts(cs[0]))) errs.push('the Wi-Fi card lacks its note or the Turn Wi-Fi button');
-        if (saves(cs[1]) !== 1 || saves(cs[2]) !== 1) errs.push('a settings card without its own Save row');
-        if (find(cs[1], (x) => x.tag === 'button' && /Scan for networks/.test(texts(x))).length !== 1) errs.push('the Primary card has no Scan');
+        if (saves(cs[2]) !== 1 || saves(cs[3]) !== 1) errs.push('a settings card without its own Save row');
+        if (saves(cs[1]) || find(cs[1], (x) => x.tag === 'input').length) errs.push('the Networks in range card has fields or a Save before a network is picked');
+        if (find(cs[1], (x) => x.tag === 'button' && /Scan for networks/.test(texts(x))).length !== 1) errs.push('the Networks in range card has no Scan');
       }
       const offPage = cards(await wifiPage({ wifiSsid: 'Studio', wifiHasPass: true, wifiBackupSsid: 'Phone', wifiBackupHasPass: true, wifiEnabled: false }));
-      const dim = (card) => find(card, (x) => x.tag === 'div' && x.attrs.class === 'off' && find(x, (y) => y.tag === 'input').length).length;
-      if (offPage.length !== 3 || dim(offPage[0]) || !dim(offPage[1]) || !dim(offPage[2]) || !/Turn Wi-Fi on/.test(texts(offPage[0])))
-        errs.push('Wi-Fi off does not dim exactly the two settings cards');
+      // dimmed and disabled: a disabled fieldset around every button of the card (Turn Wi-Fi on outside them)
+      const off = (x) => x.tag === 'fieldset' && x.attrs.class === 'off' && x.attrs.disabled === true;
+      const dim = (card) => { const b = find(card, (x) => x.tag === 'button'), inside = find(card, off).flatMap((f) => find(f, (y) => y.tag === 'button'));
+        return b.length > 0 && b.length === inside.length; };
+      if (offPage.length !== 4 || find(offPage[0], off).length || !dim(offPage[1]) || !dim(offPage[2]) || !dim(offPage[3]) || !/Turn Wi-Fi on/.test(texts(offPage[0])))
+        errs.push('Wi-Fi off does not disable every button of the list and the two settings cards (and only those)');
+      const onPage = cards(withBackup);
+      if (onPage.some((card) => find(card, (x) => x.tag === 'fieldset' && x.attrs.disabled).length)) errs.push('Wi-Fi on: a card is disabled');
       const scans = find(withBackup, (x) => x.tag === 'button' && /Scan for networks/.test(texts(x)));
-      if (scans.length !== 2) errs.push(`Wi-Fi page: ${scans.length} Scan buttons, one for each network`);
+      if (scans.length !== 1) errs.push(`Wi-Fi page: ${scans.length} Scan buttons, not one for both networks`);
+      // a scan made earlier (before a save drew the page again, or on an earlier visit) is drawn with the page
+      vm.runInContext("SCAN={results:[{ssid:'Cafe',rssi:-60,auth:'open',channel:1}],at:Date.now()}", ctx);
+      const again = await wifiPage({ wifiSsid: 'Studio', wifiHasPass: true, wifiBackupSsid: '', wifiBackupHasPass: false });
+      const lst = find(again, (x) => x.attrs && x.attrs.id === 'wfscan')[0];
+      if (!lst || !/Cafe/.test(texts(lst)) || !find(again, (x) => x.tag === 'button' && /Scan again/.test(texts(x))).length) errs.push('Wi-Fi page: the last scan is not drawn with the page');
+      vm.runInContext('SCAN=null', ctx);
       const bpass = find(withBackup, (x) => x.attrs && x.attrs.id === 'bpass')[0];
       if (!bpass || bpass.attrs.type !== 'password' || bpass.attrs.maxlength !== 63 || !/keep the saved one/.test(bpass.attrs.placeholder || ''))
         errs.push('Wi-Fi page: the backup password field (password, 63 characters, saved one kept)');
@@ -1188,9 +1379,6 @@ async function smoke(file) {
       await vm.runInContext("forgetWifiPass('main')", ctx);
       Object.assign(ctx, saved);
       if (calls.join() !== 'Wifi.SetConfig{"wifiBackupPass":""},Wifi.SetConfig{"wifiPass":""}') errs.push(`forgetWifiPass: ${calls}`);
-      // the scan list of the backup pair picks into the backup fields
-      const wf = vm.runInContext('WF', ctx);
-      if (wf.backup.ssid !== 'bssid' || wf.backup.pass !== 'bpass' || wf.backup.out !== 'wfscan2' || wf.backup.has !== 'wifiBackupHasPass') errs.push(`WF.backup: ${JSON.stringify(wf.backup)}`);
     } catch (e) { errs.push(`backup Wi-Fi: ${e && e.stack || e}`); }
     finally { ctx.h = hOrig; ctx.ic = icOrig; ctx.fill = fillOrig; ctx.rpc = rpcOrig; }
   }

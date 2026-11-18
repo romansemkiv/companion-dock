@@ -20,6 +20,7 @@
  * the C6: at most 3 times per power-on (a count in RTC no-init memory), then once per 30 min. */
 #include "boxconfig/config.h"
 #include "supervisor.h"
+#include "svcbtn.h"
 
 #include <stdatomic.h>
 #include <stdio.h>
@@ -176,6 +177,7 @@ static void apply_config(void)
     discovery_apply(&s_snap);
     surfaces_dock_apply(s_snap.box_name, s_snap.mdns_enabled); /* dock mode: the docks' mDNS names */
     feedback_apply(&s_snap);                                   /* the speaker and the status light */
+    svcbtn_apply(&s_snap);                                     /* the service key: on / off, its pin, short press */
     s_ap_shown = -1; /* the hotspot password, or whether it has one, may have changed */
 }
 

@@ -40,6 +40,13 @@ CONFIG_USB_HOST_HW_BUFFER_BIAS_PERIODIC_OUT=y
 CONFIG_ESP_TASK_WDT_PANIC=y
 # Task watchdog: the supervisor, satclient, imgwork, usb_daemon and usb_client tasks feed it.
 CONFIG_ESP_TASK_WDT_TIMEOUT_S=10
+# Run-time stats for the web page's Performance page (components/webui/perf.c): each task's CPU time, counted
+# in us from esp_timer in 64 bits (never wraps)
+CONFIG_FREERTOS_USE_TRACE_FACILITY=y
+CONFIG_FREERTOS_GENERATE_RUN_TIME_STATS=y
+CONFIG_FREERTOS_RUN_TIME_COUNTER_TYPE_U64=y
+# ... and each task's core in the same snapshot (TaskStatus_t.xCoreID): never read through a handle that may be gone
+CONFIG_FREERTOS_VTASKLIST_INCLUDE_COREID=y
 # Stacks: app_main runs the staged boot, including the ESP-Hosted bring-up
 # (and a C6 update when one is due); the default event loop task runs every network handler.
 CONFIG_ESP_MAIN_TASK_STACK_SIZE=6144
@@ -53,6 +60,17 @@ CONFIG_HTTPD_WS_PRE_HANDSHAKE_CB_SUPPORT=y
 # web server's 8 + 2, the captive DNS and the Satellite client.
 CONFIG_LWIP_MAX_SOCKETS=40
 CONFIG_LWIP_MAX_ACTIVE_TCP=32
+# Ethernet receive (components/netmgr/eth.c, rxfilter.h): 64 DMA buffers (the patched esp_eth allows 128) instead of 20 ride out a
+# burst while the receive task drops the broadcast the box has no use for; the receive path in IRAM
+# keeps that per-frame work off the flash cache.
+CONFIG_ETH_DMA_RX_BUFFER_NUM=64
+CONFIG_ETH_IRAM_OPTIMIZATION=y
+# Core 0 takes the Ethernet receive task, busy through a broadcast flood: mDNS answers (discovery) from core 1, as the
+# web server, the speaker and (unpinned, they move there) the decks and Companion
+CONFIG_MDNS_TASK_AFFINITY_CPU1=y
+# mDNS answers keep and restore the connection (Companion finds the box, the docks): the connection band, above the web
+# server on core 1 (docs/manual.md, Task priorities)
+CONFIG_MDNS_TASK_PRIORITY=4
 
 # ESP-Hosted over SDIO to the on-board ESP32-C6 (names verified against esp_hosted 3.0.9)
 CONFIG_ESP_HOSTED_CP_TARGET_ESP32C6=y

@@ -241,7 +241,8 @@ esp_err_t speaker_start(void)
     fb_retry_init(&s_retry);
     s_q = xQueueCreate(QUEUE_LEN, sizeof(req_t));
     if (!s_q) return ESP_ERR_NO_MEM;
-    if (xTaskCreateWithCaps(spk_task, "speaker", STACK, NULL, PRIO, NULL, MALLOC_CAP_SPIRAM) != pdPASS)
+    /* core 1: core 0 takes the Ethernet receive task, busy through a broadcast flood (netmgr eth.c) */
+    if (xTaskCreatePinnedToCoreWithCaps(spk_task, "speaker", STACK, NULL, PRIO, NULL, 1, MALLOC_CAP_SPIRAM) != pdPASS)
         return ESP_ERR_NO_MEM;
     return ESP_OK;
 }

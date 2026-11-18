@@ -98,7 +98,7 @@ static void retry_cb(void *arg)
 {
     (void)arg;
     if (atomic_exchange(&s_retry_running, true)) return; /* one is under way: it re-arms on failure */
-    if (xTaskCreate(retry_task, "sta_retry", STA_RETRY_STACK, NULL, 3, NULL) != pdPASS) {
+    if (xTaskCreate(retry_task, "sta_retry", STA_RETRY_STACK, NULL, 4 /* the connection band (docs/manual.md, Task priorities) */, NULL) != pdPASS) {
         atomic_store(&s_retry_running, false);
         ESP_LOGW(TAG, "sta: no memory for the reconnect task, retrying in 1 s");
         esp_timer_start_once(s_retry, STA_RETRY_AGAIN_US);

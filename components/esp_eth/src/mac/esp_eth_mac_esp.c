@@ -86,6 +86,9 @@ typedef struct {
 #ifdef SOC_EMAC_IEEE1588V2_SUPPORTED
     ts_target_exceed_cb_from_isr_t ts_target_exceed_cb_from_isr;
 #endif
+    // Companion Dock patch: the receive filter (esp_eth_mac_esp_set_rx_filter)
+    esp_eth_mac_esp_rx_filter_t rx_filter;
+    void *rx_filter_ctx;
 } emac_esp32_t;
 
 static esp_err_t emac_esp_alloc_driver_obj(const eth_mac_config_t *config, emac_esp32_t **emac_out_hdl);
@@ -441,6 +444,73 @@ err:
     return ret;
 }
 
+void esp_eth_mac_esp_set_rx_filter(esp_eth_mac_t *mac, esp_eth_mac_esp_rx_filter_t filter, void *ctx)
+{
+    emac_esp32_t *emac = __containerof(mac, emac_esp32_t, parent);
+    emac->rx_filter_ctx = ctx;
+    emac->rx_filter = filter;
+}
+
+/* Companion Dock patch: one received frame copied out and handed to the stack, as ESP-IDF's loop does it. */
+static void emac_esp32_rx_one(emac_esp32_t *emac)
+{
+    uint32_t frame_len = ETH_MAX_PACKET_SIZE;
+    uint8_t *buffer = emac_esp_dma_alloc_recv_buf(emac->emac_dma_hndl, &frame_len);
+    if (buffer != NULL) {
+#ifdef SOC_EMAC_IEEE1588V2_SUPPORTED
+        eth_mac_time_t ts;
+        eth_mac_time_t *p_ts = &ts;
+#else
+        eth_mac_time_t *p_ts = NULL;
+#endif
+        uint32_t recv_len = emac_esp_dma_receive_frame(emac->emac_dma_hndl, buffer, EMAC_DMA_BUF_SIZE_AUTO, p_ts);
+        if (recv_len == 0) {
+            ESP_LOGE(TAG, "frame copy error");
+            free(buffer);
+            emac_esp_dma_flush_recv_frame(emac->emac_dma_hndl);
+        } else if (frame_len > recv_len) {
+            ESP_LOGE(TAG, "received frame was truncated");
+            free(buffer);
+        } else {
+            emac->eth->stack_input_info(emac->eth, buffer, recv_len, (void *)p_ts);
+        }
+    } else if (frame_len) {
+        ESP_LOGE(TAG, "no mem for receive buffer");
+        emac_esp_dma_flush_recv_frame(emac->emac_dma_hndl);
+    }
+}
+
+/* Companion Dock patch: the receive loop with a filter set. Refused frames are given back in place, with no cache
+ * sync, allocation or copy (emac_esp_dma_rx_filter), and each frame costs the same however many wait: no walk of
+ * every waiting descriptor after each one. ESP-IDF's loop does that walk, with a cache sync per descriptor: about
+ * 100 us a frame with the ring full, so a broadcast flood beyond some 4000 frames a second filled the ring and the
+ * EMAC dropped what came next, frames to the box among them. The receive interrupt is off while the ring drains (the
+ * ISR turns it off and wakes this task; this turns it on again when the ring is empty: a frame that came meanwhile
+ * raises it at once), so a flood costs no interrupt per frame. A ring that never empties (a flood beyond what this
+ * keeps up with) gets a tick's pause every RX_BURST frames, so the tasks below this one on its core still run. */
+#define RX_BURST 4096
+static void emac_esp32_rx_drain(emac_esp32_t *emac)
+{
+    uint32_t done = 0;
+    for (;;) {
+        const bool kept = emac_esp_dma_rx_filter(emac->emac_dma_hndl, emac->rx_filter, emac->rx_filter_ctx, &done,
+                                                 RX_BURST);
+        if (kept) {
+            emac_esp32_rx_one(emac);
+            done++;
+        }
+        if (done >= RX_BURST) {
+            done = 0;
+            vTaskDelay(1); /* the ring never emptied in RX_BURST frames: the tasks below this one get a turn */
+            continue;
+        }
+        if (!kept) {
+            break; /* the ring is empty */
+        }
+    }
+    emac_ll_enable_corresponding_intr(emac->hal.dma_regs, EMAC_LL_INTR_RECEIVE_ENABLE);
+}
+
 static void emac_esp32_rx_task(void *arg)
 {
     emac_esp32_t *emac = (emac_esp32_t *)arg;
@@ -448,6 +518,10 @@ static void emac_esp32_rx_task(void *arg)
     while (1) {
         // block indefinitely until got notification from underlay event
         ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+        if (emac->rx_filter) { /* Companion Dock patch */
+            emac_esp32_rx_drain(emac);
+            continue;
+        }
         do {
             /* set max expected frame len */
             uint32_t frame_len = ETH_MAX_PACKET_SIZE;
@@ -647,6 +721,9 @@ IRAM_ATTR void emac_isr_default_handler(void *args)
 #if EMAC_LL_CONFIG_ENABLE_INTR_MASK & EMAC_LL_INTR_RECEIVE_ENABLE
     if (intr_stat & EMAC_LL_DMA_RECEIVE_FINISH_INTR) {
         BaseType_t rx_high_task_woken = pdFALSE;
+        if (emac->rx_filter) { /* Companion Dock patch: off until the receive task has drained the ring */
+            emac_ll_disable_corresponding_intr(hal->dma_regs, EMAC_LL_INTR_RECEIVE_ENABLE);
+        }
         /* notify receive task */
         vTaskNotifyGiveFromISR(emac->rx_task_hdl, &rx_high_task_woken);
         high_task_woken |= (bool)rx_high_task_woken;

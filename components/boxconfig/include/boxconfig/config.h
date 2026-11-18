@@ -42,7 +42,7 @@ typedef struct {
     bool mdns_enabled;
     box_surface_mode_t surface_mode; /* JSON key "surfaceMode" */
     /* The board's speaker and the status light (components/feedback). JSON keys in quotes. Defaults:
-     * the speaker on at volume 50 with every sound on, the light on GPIO23 at
+     * the speaker on at volume 50 with every sound on, the light off (optional hardware) on GPIO23 at
      * brightness 30. */
     bool speaker_enabled;   /* "speakerEnabled" */
     uint8_t speaker_volume; /* "speakerVolume": 0-100 */
@@ -55,6 +55,17 @@ typedef struct {
     bool led_flash;         /* "ledFlash": and flashes on each event (key clicks too), needs ledEnabled */
     int8_t led_pin;         /* "ledPin": its data GPIO, one boxcfg_led_pin_problem accepts */
     uint8_t led_brightness; /* "ledBrightness": 1-100 */
+    /* The service key (main/svcbtn.c): a push button from its pin to GND, read with the internal pull-up (a NeoKey,
+     * Adafruit 5756: its A pad to the pin, C to GND). "keyEnabled" (false: optional hardware; true for a stored config
+     * of before, without the key: boxcfg_stored_legacy): off, the key does nothing at all, not even
+     * the factory reset; "keyPin" (32): one boxcfg_key_pin_problem accepts, never ledPin; "keyShort" ("menu"): what a
+     * short press does, "keyLong" ("find"): a long one (held 3 s, released before 5 s), each a BOXCFG_KEY_ACT_*
+     * (restart: the long press only). Held 5 s / 10 s: the setup hotspot / the factory reset, always. Applied at
+     * once. */
+    bool key_enabled;
+    int8_t key_pin;
+    uint8_t key_short;
+    uint8_t key_long;
     /* "deckBrightness": 10-100 in steps of 10 (default 70): the decks' brightness while the box drives
      * them (its maintenance screens); Companion's own wins while it drives a deck. */
     uint8_t deck_brightness;
@@ -112,6 +123,12 @@ bool boxcfg_from_cjson(box_config_t *c, const struct cJSON *root, char *err, siz
  * use boxcfg_from_json (all or nothing). */
 int boxcfg_from_json_lenient(box_config_t *c, const char *json, char *skipped, size_t n);
 
+/* After boxcfg_from_json_lenient on the stored config: what a config stored by an earlier firmware meant without
+ * saying it. One without "keyEnabled" is from before the service key could be turned off (0.2.8): the key was always
+ * on then, on GPIO32, and stays on (its 10 s hold is the way back from a forgotten PIN); only a new or factory-reset
+ * box starts with it off. True when it changed *c. json not a JSON object: nothing. */
+bool boxcfg_stored_legacy(box_config_t *c, const char *json);
+
 /* How loading the stored config went. */
 typedef enum {
     BOXCFG_LOAD_ABSENT,  /* nothing stored */
@@ -143,13 +160,28 @@ bool boxcfg_apply_satellite_config(box_config_t *c, const char *json, char *err,
 bool boxcfg_same_target(const box_config_t *a, const box_config_t *b);
 char *boxcfg_satellite_config_json(const box_config_t *c);
 
-/* The status light's data pin (led_pins.c): a free header pin of the Waveshare
- * ESP32-P4-WIFI6-POE-ETH that this firmware doesn't use itself (not GPIO7/8,
- * the speaker codec's I2C bus, nor GPIO32, the service button). NULL when gpio
- * may carry it, else why not. */
+/* The status light's data pin and the service key's pin (led_pins.c): a free header pin of the Waveshare
+ * ESP32-P4-WIFI6-POE-ETH that this firmware doesn't use itself (not GPIO7/8, the speaker codec's I2C
+ * bus). NULL when gpio may carry it, else why not. The two must differ (boxcfg_from_json checks). */
 const char *boxcfg_led_pin_problem(int gpio);
+#define boxcfg_key_pin_problem boxcfg_led_pin_problem
 /* Those pins, ascending: writes at most max of them, returns how many. */
 int boxcfg_led_pins(int *out, int max);
+
+/* keyShort, keyLong: what the service key's short and long presses do */
+enum {
+    BOXCFG_KEY_ACT_MENU = 0,    /* "menu": the box menu opened on the decks, or closed */
+    BOXCFG_KEY_ACT_FIND = 1,    /* "find": Find my box */
+    BOXCFG_KEY_ACT_NONE = 2,    /* "none" */
+    BOXCFG_KEY_ACT_SOUND = 3,   /* "sound": the speaker on / off (speakerEnabled, saved) */
+    BOXCFG_KEY_ACT_LIGHT = 4,   /* "light": the status light on / off (ledEnabled, saved) */
+    BOXCFG_KEY_ACT_RESTART = 5, /* "restart": the box restarts (keyLong only: a brush of the key never restarts it) */
+};
+#define BOXCFG_KEY_PIN 32 /* keyPin's default: the service button's pin before it could be chosen */
+/* The action's name above; NULL for another value. */
+const char *boxcfg_key_act_name(int v);
+/* The action with that name; false for none. */
+bool boxcfg_key_act_parse(const char *name, uint8_t *out);
 
 #ifdef ESP_PLATFORM
 #include "esp_err.h"

@@ -49,10 +49,14 @@ void boxcfg_defaults(box_config_t *c, const uint8_t mac[6], uint32_t (*rand32)(v
     c->speaker_enabled = true;
     c->speaker_volume = DEFAULT_VOLUME;
     c->sound_ready = c->sound_connected = c->sound_problem = c->sound_deck_plug = c->sound_key_click = true;
-    c->led_enabled = true;
+    c->led_enabled = false; /* optional hardware: off until it is fitted and switched on (Speaker & LED page) */
     c->led_flash = true;
     c->led_pin = DEFAULT_LED_PIN;
     c->led_brightness = DEFAULT_LED_BRIGHTNESS;
+    c->key_enabled = false; /* optional hardware: an unwired pin with its pull-up reads released, but off is safest */
+    c->key_pin = BOXCFG_KEY_PIN;
+    c->key_short = BOXCFG_KEY_ACT_MENU;
+    c->key_long = BOXCFG_KEY_ACT_FIND;
     c->deck_brightness = DEFAULT_DECK_BRIGHTNESS;
     c->deck_limit = BOXCFG_DECK_LIMIT;
     c->gesture_enabled = true; /* the default gesture */
@@ -146,10 +150,10 @@ static bool get_int(const cJSON *root, const char *key, int lo, int hi, int *dst
     return true;
 }
 
-/* The speaker and the status light (components/feedback). */
+/* The speaker, the status light (components/feedback) and the service key (main/svcbtn.c). */
 static bool get_feedback(const cJSON *root, box_config_t *t, char *err, size_t errlen)
 {
-    int vol = t->speaker_volume, pin = t->led_pin, bright = t->led_brightness;
+    int vol = t->speaker_volume, pin = t->led_pin, bright = t->led_brightness, kpin = t->key_pin;
     bool ok = get_bool(root, "speakerEnabled", &t->speaker_enabled, err, errlen) &&
               get_int(root, "speakerVolume", 0, 100, &vol, err, errlen) &&
               get_bool(root, "soundReady", &t->sound_ready, err, errlen) &&
@@ -160,15 +164,51 @@ static bool get_feedback(const cJSON *root, box_config_t *t, char *err, size_t e
               get_bool(root, "ledEnabled", &t->led_enabled, err, errlen) &&
               get_bool(root, "ledFlash", &t->led_flash, err, errlen) &&
               get_int(root, "ledPin", 0, 54, &pin, err, errlen) &&
-              get_int(root, "ledBrightness", 1, 100, &bright, err, errlen);
+              get_int(root, "ledBrightness", 1, 100, &bright, err, errlen) &&
+              get_bool(root, "keyEnabled", &t->key_enabled, err, errlen) &&
+              get_int(root, "keyPin", 0, 54, &kpin, err, errlen);
     const char *why = ok ? boxcfg_led_pin_problem(pin) : NULL;
     if (why) {
         set_err(err, errlen, "ledPin", why);
         ok = false;
     }
+    why = ok ? boxcfg_key_pin_problem(kpin) : NULL;
+    if (why) {
+        set_err(err, errlen, "keyPin", why);
+        ok = false;
+    }
+    const cJSON *ks = cJSON_GetObjectItemCaseSensitive(root, "keyShort");
+    uint8_t act;
+    if (ok && ks) {
+        if (!(cJSON_IsString(ks) && boxcfg_key_act_parse(ks->valuestring, &act)) || act == BOXCFG_KEY_ACT_RESTART) {
+            set_err(err, errlen, "keyShort", "must be menu, find, sound, light or none (restart: the long press only)");
+            ok = false;
+        } else {
+            t->key_short = act;
+        }
+    }
+    const cJSON *kl = cJSON_GetObjectItemCaseSensitive(root, "keyLong");
+    if (ok && kl) {
+        if (cJSON_IsString(kl) && boxcfg_key_act_parse(kl->valuestring, &act)) {
+            t->key_long = act;
+        } else {
+            set_err(err, errlen, "keyLong", "must be menu, find, sound, light, restart or none");
+            ok = false;
+        }
+    }
+    /* checked on the result: the light and the key on one pin would fight over it. The key named in the
+     * request is the one refused (the light when both or neither are). */
+    if (ok && pin == kpin) {
+        const bool key = cJSON_GetObjectItemCaseSensitive(root, "keyPin") && !cJSON_GetObjectItemCaseSensitive(root, "ledPin");
+        char msg[48];
+        snprintf(msg, sizeof msg, key ? "GPIO%d is the status light's pin" : "GPIO%d is the service key's pin", pin);
+        set_err(err, errlen, key ? "keyPin" : "ledPin", msg);
+        ok = false;
+    }
     t->speaker_volume = (uint8_t)vol;
     t->led_pin = (int8_t)pin;
     t->led_brightness = (uint8_t)bright;
+    t->key_pin = (int8_t)kpin;
     return ok;
 }
 
@@ -276,7 +316,7 @@ static const char *const KEYS[] = {"boxName", "companionAuto", "companionHost", 
                                    "apEnabled", "apSecured", "apPass", "adminPass", "mdnsEnabled", "surfaceMode",
                                    "speakerEnabled", "speakerVolume", "soundReady", "soundConnected", "soundProblem",
                                    "soundDeckPlug", "soundKeyClick", "ledEnabled", "ledFlash", "ledPin", "ledBrightness",
-                                   "deckBrightness", "deckLimit", "gestureEnabled", "gestureKeys", "gestureTaps",
+                                   "keyEnabled", "keyPin", "keyShort", "keyLong", "deckBrightness", "deckLimit", "gestureEnabled", "gestureKeys", "gestureTaps",
                                    "gestureHoldSeconds"};
 
 static bool known_key(const char *k)
@@ -417,6 +457,11 @@ char *boxcfg_to_json(const box_config_t *c, bool include_secrets)
     cJSON_AddBoolToObject(o, "ledFlash", c->led_flash);
     cJSON_AddNumberToObject(o, "ledPin", c->led_pin);
     cJSON_AddNumberToObject(o, "ledBrightness", c->led_brightness);
+    cJSON_AddBoolToObject(o, "keyEnabled", c->key_enabled);
+    cJSON_AddNumberToObject(o, "keyPin", c->key_pin);
+    const char *ks = boxcfg_key_act_name(c->key_short), *kl = boxcfg_key_act_name(c->key_long);
+    cJSON_AddStringToObject(o, "keyShort", ks ? ks : "menu");
+    cJSON_AddStringToObject(o, "keyLong", kl ? kl : "find");
     cJSON_AddNumberToObject(o, "deckBrightness", c->deck_brightness);
     cJSON_AddNumberToObject(o, "deckLimit", c->deck_limit);
     cJSON_AddBoolToObject(o, "gestureEnabled", c->gesture_enabled);
@@ -549,6 +594,18 @@ int boxcfg_from_json_lenient(box_config_t *c, const char *json, char *skipped, s
     }
     cJSON_Delete(root);
     return bad;
+}
+
+bool boxcfg_stored_legacy(box_config_t *c, const char *json)
+{
+    cJSON *root = cJSON_Parse(json ? json : "");
+    bool changed = false;
+    if (cJSON_IsObject(root) && !cJSON_GetObjectItemCaseSensitive(root, "keyEnabled") && !c->key_enabled) {
+        c->key_enabled = true;
+        changed = true;
+    }
+    cJSON_Delete(root);
+    return changed;
 }
 
 bool boxcfg_should_store(boxcfg_load_t how, bool same)

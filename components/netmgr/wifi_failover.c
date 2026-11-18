@@ -172,7 +172,8 @@ static void work_task(void *arg);
 static void kick_work(void)
 {
     if (atomic_exchange(&s_work_running, true)) return;
-    if (xTaskCreate(work_task, "sta_work", WORK_STACK, NULL, 3, NULL) != pdPASS) atomic_store(&s_work_running, false);
+    if (xTaskCreate(work_task, "sta_work", WORK_STACK, NULL, 4 /* the connection band (docs/manual.md, Task priorities) */, NULL) != pdPASS)
+        atomic_store(&s_work_running, false);
 }
 
 static void work_task(void *arg)

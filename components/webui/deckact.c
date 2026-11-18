@@ -27,7 +27,7 @@
 static const char *TAG = "deckact";
 
 #define DA_STACK 8192 /* internal: config saves write flash; the hotspot blocks while Wi-Fi restarts (as svcbtn's) */
-#define DA_PRIO 4
+#define DA_PRIO 3 /* convenience: below every task a show needs (docs/manual.md, Task priorities) */
 #define DA_DEPTH 4
 
 #define DA_PIN (-1) /* the PIN check: its digits wait in s_pin, never in the queue */
@@ -190,6 +190,13 @@ static void run(const da_item_t *it)
         const bool on = !webui_cfg()->speaker_enabled;
         webui_cfg_unlock();
         call("Feedback.SetConfig", obj1("speakerEnabled", cJSON_CreateBool(on)), on ? "Sound on" : "Sound off", false);
+        break;
+    }
+    case DUI_A_LIGHT: { /* the status light on / off: the service key's (svcbtn) */
+        webui_cfg_lock();
+        const bool on = !webui_cfg()->led_enabled;
+        webui_cfg_unlock();
+        call("Feedback.SetConfig", obj1("ledEnabled", cJSON_CreateBool(on)), on ? "Light on" : "Light off", false);
         break;
     }
     case DUI_A_FLASH: { /* the status light's flashes */

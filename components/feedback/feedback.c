@@ -41,6 +41,7 @@ static int s_flash_req = -1; /* fb_event_t; -1 none */
 static TaskHandle_t s_task;
 static fb_track_t s_track;       /* feedback task only */
 static atomic_bool s_fw_update; /* feedback_firmware_update */
+static atomic_int s_led_pin = -1; /* feedback_led_pin */
 
 static settings_t settings(void)
 {
@@ -95,8 +96,10 @@ static void feedback_task(void *arg)
 
         if (set.pin != open_pin && set.pin != failed_pin) {
             led_close();
+            atomic_store(&s_led_pin, -1); /* the old pin is let go of, and reset */
             open_pin = led_open(set.pin) ? set.pin : -1;
             failed_pin = open_pin < 0 ? set.pin : -1;
+            atomic_store(&s_led_pin, open_pin);
             if (open_pin < 0) ESP_LOGE(TAG, "the status light on GPIO%d didn't start (no RMT channel)", set.pin);
         }
         const fb_led_t s = fb_track_led(&s_track, now);
@@ -125,6 +128,8 @@ void feedback_apply(const box_config_t *cfg)
     taskEXIT_CRITICAL(&s_mux);
     if (s_task) xTaskNotifyGive(s_task);
 }
+
+int feedback_led_pin(void) { return atomic_load(&s_led_pin); }
 
 void feedback_amp_off(void)
 {

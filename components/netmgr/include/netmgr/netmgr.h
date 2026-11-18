@@ -123,6 +123,21 @@ esp_err_t netmgr_wifi_use(int sta_net);
  * address (no cable, DHCP still asking) or isn't running. Any task. */
 bool netmgr_eth_lease(char ip[16], char mask[16], char gw[16], char dns[16]);
 
+/* Ethernet's receive counts since the start (eth.c's filter, rxfilter.h). lost_*: frames the EMAC itself lost
+ * (no free receive buffer; its FIFO overflowed), added up every 100 ms.
+ * started: Ethernet runs (else all 0). Any task. */
+typedef struct {
+    bool started;
+    uint32_t unicast;  /* to the box, passed to lwIP */
+    uint32_t multi;    /* broadcast and multicast passed (ARP, DHCP, mDNS, IGMP, IPv6) */
+    uint32_t unwanted; /* broadcast and multicast dropped: no use to the box */
+    uint32_t rate;     /* dropped: over their kind's budget */
+    uint32_t lost_buf, lost_fifo;
+    bool storm;      /* broadcast is blocked now: a broadcast storm (storm.h) */
+    uint32_t storms; /* broadcast storms since the start */
+} netmgr_eth_rx_t;
+void netmgr_eth_rx_stats(netmgr_eth_rx_t *out);
+
 /* The C6 answers over SDIO and runs a firmware Wi-Fi can use. False from a failed start-up, or from
  * the moment it stops answering, until the next start (ESP-Hosted never retries it; the supervisor
  * restarts the box when that leaves it without a network). */

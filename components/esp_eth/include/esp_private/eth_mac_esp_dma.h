@@ -124,6 +124,18 @@ uint32_t emac_esp_dma_receive_frame(emac_esp_dma_handle_t emac_esp_dma, uint8_t 
  */
 void emac_esp_dma_flush_recv_frame(emac_esp_dma_handle_t emac_esp_dma);
 
+/* Companion Dock patch (components/esp_eth/COMPANION_DOCK.md): the received frames at the ring's head, filtered in
+ * place. Each complete frame's first bytes go to keep(): 16 of a unicast one, 44 of a broadcast or multicast one,
+ * EMAC_ESP_DMA_HDR_LEN with IPv4 options (all of a shorter frame). A refused frame
+ * (and an erroneous one) is given back to the DMA there. Descriptors and headers are read, and given back, through
+ * the memory's non-cacheable alias: no cache sync, no allocation, no copy. Returns true when a kept frame waits at
+ * the ring's head (take it with emac_esp_dma_alloc_recv_buf + emac_esp_dma_receive_frame, as before), false when
+ * no complete frame waits, or when *count (raised by one for each frame given back) reached budget. */
+#define EMAC_ESP_DMA_HDR_LEN 64
+bool emac_esp_dma_rx_filter(emac_esp_dma_handle_t emac_esp_dma,
+                            bool (*keep)(const uint8_t *hdr, uint32_t hdr_len, uint32_t len, void *ctx), void *ctx,
+                            uint32_t *count, uint32_t budget);
+
 /**
  * @brief Get number of frames remaining in Rx DMA
  *

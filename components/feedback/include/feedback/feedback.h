@@ -67,6 +67,10 @@ void feedback_firmware_update(bool on);
 /* The settings changed (cfg copied): volume, sounds, the light on or off, its pin and brightness
  * apply at once. */
 void feedback_apply(const box_config_t *cfg);
+/* The GPIO the light holds now, -1 for none. After feedback_apply moved it, the light's task lets go of the old pin
+ * on its own time, and resets that pin as it does: whoever takes the pin over (the service key) waits for this to
+ * say another pin first. Any task. */
+int feedback_led_pin(void);
 /* The supervisor's report. Never blocks. */
 void feedback_status(const fb_status_t *st);
 /* ev's sound, when the speaker and that sound are on (deck in / out: soundDeckPlug). Never blocks:

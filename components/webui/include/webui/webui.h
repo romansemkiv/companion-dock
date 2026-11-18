@@ -24,6 +24,10 @@ extern "C" {
 /* The lock that guards *cfg (supervisor_cfg_lock / supervisor_cfg_unlock). Call before webui_start. */
 void webui_set_cfg_lock(void (*lock)(void), void (*unlock)(void));
 
+/* The service key's state for Sys.GetStatus.key (main/svcbtn.c, at each change): down = held now; presses = short
+ * and long presses since the start. Any task, never blocks. */
+void webui_key_report(bool down, uint32_t presses);
+
 /* Starts capturing log output for Log.Get (a 16 KB ring). Call early in the boot so the ring holds
  * the start-up lines; webui_start calls it too. Idempotent. */
 void webui_log_capture_start(void);

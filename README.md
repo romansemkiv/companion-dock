@@ -35,9 +35,13 @@ web page.
 - **A box menu on the decks.** While Companion isn't driving a deck, the deck shows the box's own screens: the
   state, the box's address, Network, Companion, Hotspot and Box settings, with holds for anything that restarts
   or cuts people off. A key gesture or the web page opens the menu over Companion too.
-- **A web page** for status, settings, firmware updates and the log, laid out for a phone as well as a desktop.
+- **A web page** for status, settings, firmware updates, the log and a live performance view (CPU, memory, tasks,
+  network counters), laid out for a phone as well as a desktop.
 - **Ethernet and Wi-Fi**, with a backup Wi-Fi network for when the main one is out of reach, and a setup
-  hotspot. The decks show QR codes to join the hotspot and open the setup page.
+  hotspot. The decks show QR codes to join the hotspot and open the setup page. One Wi-Fi scan on the web page
+  sets either network.
+- **Stays up through a broadcast storm** on Ethernet: the box drops the junk broadcast of a full 100 Mbit link
+  while Companion stays connected and the box stays discoverable.
 - **Firmware updates from the web page**, into two slots. A new image checks itself and the box rolls back if it
   fails. The other slot keeps a working copy as a recovery slot.
 - **A settings PIN** (4 to 8 digits) that locks the web page and the decks' risky keys. On a deck, a PIN pad
@@ -57,7 +61,8 @@ web page.
 Prices from the vendors' sites, November 2026; shipping not included. That is about **$33** for the box itself.
 
 The NeoPixel takes 5 V and GND from the board's header and its data input on GPIO 23, header pin 8 (another pin can be set on
-the web page). Pin tables, power notes and the optional service button are in the
+the web page). Pin tables, power notes and the optional service key (a push button or a NeoKey: short press, long
+press, 5 s and 10 s holds) are in the
 [manual](docs/manual.md#hardware).
 
 ### How many Stream Decks
@@ -83,7 +88,7 @@ high-speed hub, so it only works plugged into the box directly, on its own.
 
 ### Case
 
-A 3D-printable case in three lid variants: **Button** (a Choc key, wired as the service button, and a NeoPixel),
+A 3D-printable case in three lid variants: **Button** (a Choc key, wired as the service key, and a NeoPixel),
 **LED** (a NeoPixel behind a diffuser) and **Slim** (a plain lid). One `.3mf` file per variant holds all its printed
 parts, and an optional bracket mounts it under a desk or on a wall; the bill of materials, print settings, mounting,
 assembly and wiring are in [case/](case/README.md).
@@ -194,8 +199,9 @@ registry once; without it a build stops (`-DCBX_NO_C6_IMAGE=ON` builds one witho
 ## Project layout
 
 ```
-main/                 boot, the supervisor (settings, OTA self-check, watchdog), RESET x3, the service button
-components/netmgr/    Ethernet, Wi-Fi station and hotspot through the C6, backup Wi-Fi, captive DNS
+main/                 boot, the supervisor (settings, OTA self-check, watchdog), RESET x3, the service key
+components/netmgr/    Ethernet (receive filter, broadcast storm control), Wi-Fi station and hotspot through the C6, backup Wi-Fi, captive DNS
+components/esp_eth/   ESP-IDF's Ethernet driver with the box's receive patch (COMPANION_DOCK.md)
 components/c6fw/      keeps the C6 on the ESP-Hosted firmware the image carries
 components/discovery/ mDNS: announce the box, find Companion
 components/satproto/  Satellite API codec and session (pure C, host-tested)

@@ -8,6 +8,7 @@
 #include "sdkconfig.h"
 #include "soc/soc_caps.h"
 #include "esp_cache.h"
+#include "hal/cache_ll.h" /* Companion Dock patch: the non-cacheable alias */
 #include "hal/emac_hal.h"
 #include "esp_heap_caps.h"
 #include "esp_private/eth_mac_esp_dma.h"
@@ -40,6 +41,8 @@
 #endif
 
 static const char *TAG = "esp.emac.dma";
+
+_Static_assert(EMAC_ESP_DMA_HDR_LEN <= CONFIG_ETH_DMA_BUFFER_SIZE, "a frame's header is read from its first DMA buffer");
 
 struct emac_esp_dma_t {
     emac_hal_context_t hal;
@@ -343,6 +346,108 @@ static esp_err_t emac_esp_dma_get_valid_recv_len(emac_esp_dma_handle_t emac_esp_
     }
 
     return ESP_OK;
+}
+
+/* Companion Dock patch: see eth_mac_esp_dma.h. The descriptors and the RX buffers are internal RAM (L2MEM): their
+ * non-cacheable alias reads what the DMA wrote and writes where the DMA reads, so the drop path needs no cache sync
+ * (four a frame before, most of the cost). ESP-IDF's cached path, which takes the kept frames, invalidates before it
+ * reads and writes back what it writes, so the two views never hold a stale line over each other. */
+#define NC_DESC(d) ((volatile eth_dma_rx_descriptor_t *)CACHE_LL_L2MEM_NON_CACHE_ADDR(d))
+#define RDES0_OWN_DMA (1u << 31)
+#define RDES0_ERR_SUMMARY (1u << 15)
+#define RDES0_LAST (1u << 8)
+#define RDES0_LEN(w) (((w) >> 16) & 0x3fff)
+
+/* The ring never moves (emac_esp_dma_reset chains descriptor i to i + 1 and the last to the first, with buffer i):
+ * the next descriptor and a descriptor's buffer come from its index, not from uncached reads of its pointers. */
+static inline eth_dma_rx_descriptor_t *rx_next(emac_esp_dma_handle_t emac_esp_dma, eth_dma_rx_descriptor_t *d)
+{
+    eth_dma_rx_descriptor_t *base = (eth_dma_rx_descriptor_t *)emac_esp_dma->descriptors;
+    return d + 1 == base + CONFIG_ETH_DMA_RX_BUFFER_NUM ? base : d + 1;
+}
+
+static inline const uint8_t *rx_buf_of(emac_esp_dma_handle_t emac_esp_dma, const eth_dma_rx_descriptor_t *d)
+{
+    return emac_esp_dma->rx_buf[d - (const eth_dma_rx_descriptor_t *)emac_esp_dma->descriptors];
+}
+
+/* the descriptors from d on (a frame's n) back to the DMA; the head moves past them */
+static void rx_give_back(emac_esp_dma_handle_t emac_esp_dma, eth_dma_rx_descriptor_t *d, uint32_t n)
+{
+    for (uint32_t i = 0; i < n; i++) {
+        NC_DESC(d)->RDES0.Value = RDES0_OWN_DMA;
+        d = rx_next(emac_esp_dma, d);
+    }
+    emac_esp_dma->rx_desc = d;
+}
+
+/* How much of a frame the filter looks at, in words read uncached (each a bus round trip, most of a frame's cost):
+ * a unicast frame's first 16 bytes (its destination says it is unicast); a broadcast or multicast one's first 44
+ * (Ethernet, IPv4 and UDP headers, or an ARP packet), 64 with IPv4 options. */
+static uint32_t rx_read_hdr(const volatile uint32_t *src, uint32_t len, uint32_t *hdr)
+{
+    uint32_t got = 4;
+    for (uint32_t i = 0; i < got; i++) {
+        hdr[i] = src[i];
+    }
+    const uint8_t *b = (const uint8_t *)hdr;
+    uint32_t want = 16;
+    if (b[0] & 1) {
+        want = (b[12] == 0x08 && b[13] == 0x00 && (b[14] & 0x0f) > 5) ? EMAC_ESP_DMA_HDR_LEN : 44;
+    }
+    if (want > len) {
+        want = len;
+    }
+    for (uint32_t i = got; i < (want + 3) / 4; i++) {
+        hdr[i] = src[i];
+    }
+    return want;
+}
+
+bool emac_esp_dma_rx_filter(emac_esp_dma_handle_t emac_esp_dma,
+                            bool (*keep)(const uint8_t *hdr, uint32_t hdr_len, uint32_t len, void *ctx), void *ctx,
+                            uint32_t *count, uint32_t budget)
+{
+    bool waiting = false;
+    uint32_t n_dropped = 0;
+    while (*count + n_dropped < budget) {
+        eth_dma_rx_descriptor_t *first = emac_esp_dma->rx_desc, *d = first;
+        uint32_t w = NC_DESC(d)->RDES0.Value, n = 1;
+        if (w & RDES0_OWN_DMA) {
+            break; /* nothing received */
+        }
+        while (!(w & RDES0_LAST) && n < CONFIG_ETH_DMA_RX_BUFFER_NUM) { /* the frame's other descriptors */
+            d = rx_next(emac_esp_dma, d);
+            w = NC_DESC(d)->RDES0.Value;
+            if (w & RDES0_OWN_DMA) {
+                goto out; /* still arriving */
+            }
+            n++;
+        }
+        __asm__ __volatile__("fence r, r" ::: "memory"); /* the status before the data it covers */
+        const uint32_t len = RDES0_LEN(w) > ETH_CRC_LENGTH ? RDES0_LEN(w) - ETH_CRC_LENGTH : 0;
+        if ((w & RDES0_ERR_SUMMARY) || !(w & RDES0_LAST) || len == 0) {
+            rx_give_back(emac_esp_dma, first, n);
+            n_dropped++;
+            continue;
+        }
+        uint32_t hdr[EMAC_ESP_DMA_HDR_LEN / 4];
+        const volatile uint32_t *src = (const volatile uint32_t *)CACHE_LL_L2MEM_NON_CACHE_ADDR(rx_buf_of(emac_esp_dma, first));
+        const uint32_t hl = rx_read_hdr(src, len, hdr);
+        if (keep((const uint8_t *)hdr, hl, len, ctx)) {
+            waiting = true;
+            break;
+        }
+        rx_give_back(emac_esp_dma, first, n);
+        n_dropped++;
+    }
+out:
+    if (n_dropped) {
+        __asm__ __volatile__("fence w, o" ::: "memory"); /* the descriptors given back before the DMA looks */
+        emac_hal_receive_poll_demand(&emac_esp_dma->hal); /* a DMA stopped on a full ring goes on */
+    }
+    *count += n_dropped;
+    return waiting;
 }
 
 void emac_esp_dma_get_remain_frames(emac_esp_dma_handle_t emac_esp_dma, uint32_t *remain_frames, uint32_t *free_descs)

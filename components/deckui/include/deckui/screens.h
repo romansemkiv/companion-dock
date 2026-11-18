@@ -62,6 +62,7 @@ enum {
     DUI_A_COMP_AUTO,  // Auto find (a manual Companion): companionAuto on again
     DUI_A_WIFI_OFF,   // hold: the Wi-Fi station off (wifiEnabled false; the setup hotspot stays)
     DUI_A_WIFI_ON,    // the Wi-Fi station on again: from the main network
+    DUI_A_LIGHT,      // the status light on / off (ledEnabled): the service key's (no deck button)
     DUI_A_COUNT
 };
 

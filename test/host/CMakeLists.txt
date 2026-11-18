@@ -120,6 +120,8 @@ add_host_test(netpolicy SOURCES test_netpolicy.c ../../components/netmgr/policy.
   ../../components/netmgr/scan_logic.c)
 add_host_test(wifiscan SOURCES test_wifiscan.c ../../components/netmgr/scan_logic.c)
 add_host_test(wififo SOURCES test_wififo.c ../../components/netmgr/wififo_logic.c)
+add_host_test(rxfilter SOURCES test_rxfilter.c ../../components/netmgr/rxfilter.c)
+add_host_test(storm SOURCES test_storm.c ../../components/netmgr/storm_logic.c)
 
 add_host_test(select SOURCES test_select.c ../../components/discovery/select.c)
 
@@ -146,6 +148,8 @@ target_compile_options(test_auth_logic PRIVATE -O2) # as on the box (webui/CMake
 add_host_test(web_logic SOURCES test_web_logic.c ../../components/webui/web_logic.c
   ../../components/boxconfig/config_json.c ../../components/boxconfig/led_pins.c WITH_CJSON)
 target_include_directories(test_web_logic PRIVATE ${REPO_ROOT}/components/webui)
+add_host_test(perf_logic SOURCES test_perf_logic.c ../../components/webui/perf_logic.c)
+target_include_directories(test_perf_logic PRIVATE ${REPO_ROOT}/components/webui)
 
 add_host_test(usbdeck_policy SOURCES test_usbdeck_policy.c ../../components/usbdeck/usbdeck_policy.c)
 target_include_directories(test_usbdeck_policy PRIVATE ${REPO_ROOT}/components/usbdeck)

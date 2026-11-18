@@ -155,7 +155,7 @@ esp_err_t discovery_start(const box_config_t *cfg, box_surface_mode_t mode)
     }
     if (cfg->mdns_enabled) announce_on(s_name);
 
-    if (xTaskCreate(browse_task, "mdns_browse", 4096, NULL, 3, &s_task) != pdPASS) {
+    if (xTaskCreate(browse_task, "mdns_browse", 4096, NULL, 4 /* finds Companion: the connection band (docs/manual.md, Task priorities) */, &s_task) != pdPASS) {
         ESP_LOGE(TAG, "browse task create failed");
         return ESP_ERR_NO_MEM;
     }

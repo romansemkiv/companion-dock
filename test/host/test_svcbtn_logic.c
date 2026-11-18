@@ -9,8 +9,8 @@ void tearDown(void) {}
 #define STEP_US 10000LL /* svcbtn.c polls every 10 ms */
 
 typedef struct {
-    int setup_stage, reset_stage, other;
-    int64_t setup_at, reset_at; /* time held when each stage fired */
+    int long_stage, setup_stage, reset_stage, other;
+    int64_t long_at, setup_at, reset_at; /* time held when each stage fired */
 } held_t;
 
 /* Holds the (armed, already pressed at t0) button down until t0 + hold_us, polling every STEP_US. */
@@ -20,7 +20,10 @@ static held_t hold(svcbtn_t *b, int64_t *t, int64_t t0, int64_t hold_us)
     while (*t + STEP_US <= t0 + hold_us) {
         *t += STEP_US;
         svc_event_t e = svcbtn_step(b, true, *t);
-        if (e == SVC_SETUP_STAGE) {
+        if (e == SVC_LONG_STAGE) {
+            h.long_stage++;
+            h.long_at = *t - t0;
+        } else if (e == SVC_SETUP_STAGE) {
             h.setup_stage++;
             h.setup_at = *t - t0;
         } else if (e == SVC_RESET_STAGE) {
@@ -78,7 +81,7 @@ static svc_event_t press_for(int64_t held_us)
     return svcbtn_step(&b, false, t + held_us);
 }
 
-/* A short press: released after 50 ms up to (not including) 2 s: SVC_SHORT; shorter is a bounce. */
+/* A short press: released after 50 ms up to (not including) 3 s: SVC_SHORT; shorter is a bounce; 3 s on, long. */
 static void test_svcbtn_short_press(void)
 {
     TEST_ASSERT_EQUAL_INT(SVC_NONE, press_for(0));
@@ -87,7 +90,10 @@ static void test_svcbtn_short_press(void)
     TEST_ASSERT_EQUAL_INT(SVC_SHORT, press_for(1000000));
     TEST_ASSERT_EQUAL_INT(SVC_SHORT, press_for(1999000));
     TEST_ASSERT_EQUAL_INT(SVC_SHORT, press_for(SVC_SHORT_MAX_US - 1));
-    TEST_ASSERT_EQUAL_INT(SVC_NONE, press_for(SVC_SHORT_MAX_US));
+    TEST_ASSERT_EQUAL_INT(SVC_SHORT, press_for(2500000));
+    TEST_ASSERT_EQUAL_INT(SVC_LONG, press_for(SVC_SHORT_MAX_US)); /* 3 s on: long */
+    TEST_ASSERT_EQUAL_INT(SVC_NONE, press_for(SVC_SETUP_US)); /* no poll saw the 5 s stage: no hotspot, nothing */
+    TEST_ASSERT_EQUAL_INT(SVC_NONE, press_for(SVC_RESET_US + 1000000)); /* ... nor a reset */
     /* polled every 10 ms: released at the poll 1910 ms in */
     svcbtn_t b;
     svcbtn_init(&b);
@@ -100,18 +106,23 @@ static void test_svcbtn_short_press(void)
     TEST_ASSERT_EQUAL_INT(SVC_NONE, svcbtn_step(&b, false, t += STEP_US));
 }
 
-/* Held 2 s up to the 5 s stage: nothing on release (neither short nor the hotspot). */
-static void test_svcbtn_between_short_and_setup_does_nothing(void)
+/* Held 3 s: the long stage exactly at 3 s, once; released before 5 s: a long press. */
+static void test_svcbtn_long_press(void)
 {
-    TEST_ASSERT_EQUAL_INT(SVC_NONE, press_for(2000000));
-    TEST_ASSERT_EQUAL_INT(SVC_NONE, press_for(3000000));
+    TEST_ASSERT_EQUAL_INT64(3000000LL, SVC_LONG_US);
+    TEST_ASSERT_EQUAL_INT(SVC_LONG, press_for(3000000));
+    TEST_ASSERT_EQUAL_INT(SVC_LONG, press_for(4990000));
     svcbtn_t b;
     svcbtn_init(&b);
     int64_t t = STEP_US;
     svcbtn_step(&b, false, t);
     TEST_ASSERT_EQUAL_INT(SVC_PRESSED, svcbtn_step(&b, true, t += STEP_US));
-    held_t h = hold(&b, &t, t, 4950000LL);
+    const int64_t t0 = t;
+    held_t h = hold(&b, &t, t0, 4950000LL);
+    TEST_ASSERT_EQUAL_INT(1, h.long_stage);
+    TEST_ASSERT_EQUAL_INT64(SVC_LONG_US, h.long_at);
     TEST_ASSERT_EQUAL_INT(0, h.setup_stage + h.reset_stage + h.other);
+    TEST_ASSERT_EQUAL_INT(SVC_LONG, svcbtn_step(&b, false, t += STEP_US));
     TEST_ASSERT_EQUAL_INT(SVC_NONE, svcbtn_step(&b, false, t += STEP_US));
 }
 
@@ -125,6 +136,7 @@ static void test_svcbtn_hold_5s_setup(void)
     TEST_ASSERT_EQUAL_INT(SVC_PRESSED, svcbtn_step(&b, true, t += STEP_US));
     const int64_t t0 = t;
     held_t h = hold(&b, &t, t0, 9950000LL);
+    TEST_ASSERT_EQUAL_INT(1, h.long_stage); /* on the way */
     TEST_ASSERT_EQUAL_INT(1, h.setup_stage);
     TEST_ASSERT_EQUAL_INT(0, h.reset_stage);
     TEST_ASSERT_EQUAL_INT(0, h.other);
@@ -143,6 +155,7 @@ static void test_svcbtn_hold_10s_reset(void)
     TEST_ASSERT_EQUAL_INT(SVC_PRESSED, svcbtn_step(&b, true, t += STEP_US));
     const int64_t t0 = t;
     held_t h = hold(&b, &t, t0, 30000000LL); /* held on well past 10 s: still one reset */
+    TEST_ASSERT_EQUAL_INT(1, h.long_stage);
     TEST_ASSERT_EQUAL_INT(1, h.setup_stage);
     TEST_ASSERT_EQUAL_INT(1, h.reset_stage);
     TEST_ASSERT_EQUAL_INT(0, h.other);
@@ -163,7 +176,7 @@ static void test_svcbtn_next_press_starts_over(void)
     TEST_ASSERT_EQUAL_INT(SVC_SETUP, svcbtn_step(&b, false, t += STEP_US));
     TEST_ASSERT_EQUAL_INT(SVC_PRESSED, svcbtn_step(&b, true, t += STEP_US));
     held_t h = hold(&b, &t, t, 1000000LL);
-    TEST_ASSERT_EQUAL_INT(0, h.setup_stage + h.reset_stage + h.other);
+    TEST_ASSERT_EQUAL_INT(0, h.long_stage + h.setup_stage + h.reset_stage + h.other);
     TEST_ASSERT_EQUAL_INT(SVC_SHORT, svcbtn_step(&b, false, t += STEP_US));
     /* and after the reset stage too: a short press is short again */
     TEST_ASSERT_EQUAL_INT(SVC_PRESSED, svcbtn_step(&b, true, t += STEP_US));
@@ -179,7 +192,7 @@ int main(void)
     RUN_TEST(test_svcbtn_down_from_start_never_counts);
     RUN_TEST(test_svcbtn_released_at_start_arms);
     RUN_TEST(test_svcbtn_short_press);
-    RUN_TEST(test_svcbtn_between_short_and_setup_does_nothing);
+    RUN_TEST(test_svcbtn_long_press);
     RUN_TEST(test_svcbtn_down_from_start_short_never_counts);
     RUN_TEST(test_svcbtn_hold_5s_setup);
     RUN_TEST(test_svcbtn_hold_10s_reset);

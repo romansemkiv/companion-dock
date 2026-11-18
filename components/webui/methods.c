@@ -681,8 +681,17 @@ static uint32_t slots_rev(void)
     return h;
 }
 
+static atomic_uint s_key; /* the service key: bit 31 held now, the rest its short presses (webui_key_report) */
+
+void webui_key_report(bool down, uint32_t presses)
+{
+    atomic_store(&s_key, (presses & 0x7fffffffu) | (down ? 0x80000000u : 0));
+    notify_soon(); /* an open page sees the press now: the once-a-second check misses a press shorter than that */
+}
+
 /* Sys.GetStatus -> {name, uptime_s, mode, net, companion, dock, decks, deckLimit, decksIgnored, problems, message,
- * maintenance, firmware, c6, heap, lastReset, rev}. rev: what an open page reads again when it changes: cfg, the
+ * maintenance, firmware, c6, heap, lastReset, key, rev}. key: the service key, {down: held now, presses: its short
+ * and long presses since the start}. rev: what an open page reads again when it changes: cfg, the
  * settings saves since the start (any *.SetConfig, Companion.Choose, the settings PIN; 0 after a restart), found and
  * slots, fingerprints of Companion.List and of Ota.GetStatus's slots. deckLimit: this run's; decksIgnored: the decks attached over it
  * (each one also in decks with ignored true, until it is unplugged). maintenance: the decks' maintenance screen is on demand. mode: this run's surface mode; dock: the Network Docks (docks_json); lastReset:
@@ -736,11 +745,23 @@ static cJSON *m_sys_status(const cJSON *p, rpc_err_t *err)
     cJSON_AddNumberToObject(heap, "internal_free", (double)heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
     cJSON_AddNumberToObject(heap, "psram_free", (double)heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
     cJSON_AddStringToObject(r, "lastReset", breadcrumb_summary());
+    const unsigned k = atomic_load(&s_key);
+    cJSON *key = cJSON_AddObjectToObject(r, "key");
+    cJSON_AddBoolToObject(key, "down", k >> 31);
+    cJSON_AddNumberToObject(key, "presses", k & 0x7fffffffu);
     cJSON *rev = cJSON_AddObjectToObject(r, "rev");
     cJSON_AddNumberToObject(rev, "cfg", (double)atomic_load(&s_cfg_rev));
     cJSON_AddNumberToObject(rev, "found", (double)found_rev());
     cJSON_AddNumberToObject(rev, "slots", (double)slots_rev());
     return r;
+}
+
+/* Sys.GetPerf: CPU, tasks, memory, temperature, Ethernet receive counts (perf.c) */
+static cJSON *m_sys_perf(const cJSON *p, rpc_err_t *err)
+{
+    (void)p;
+    cJSON *r = webui_perf_json();
+    return r ? r : rpc_fail(err, RPC_E_UNAVAILABLE, "no memory for the task list: try again");
 }
 
 /* ---- Device.* ---- */
@@ -1299,12 +1320,14 @@ static cJSON *m_deck_maint(const cJSON *p, rpc_err_t *err)
 
 static const char *const FEEDBACK_KEYS[] = {"speakerEnabled", "speakerVolume", "soundReady",    "soundConnected",
                                             "soundProblem",   "soundDeckPlug", "soundKeyClick", "ledEnabled",
-                                            "ledFlash",       "ledPin",        "ledBrightness", NULL};
+                                            "ledFlash",       "ledPin",        "ledBrightness", "keyEnabled",
+                                            "keyPin",         "keyShort",      "keyLong",       NULL};
 static const char *const FEEDBACK_RO[] = {"ledPins", NULL};
 
 /* Feedback.GetConfig -> {speakerEnabled, speakerVolume, soundReady, soundConnected, soundProblem,
- * soundDeckPlug, soundKeyClick, ledEnabled, ledFlash, ledPin, ledBrightness, ledPins}: ledPins (read-only) are
- * the GPIOs ledPin may name. */
+ * soundDeckPlug, soundKeyClick, ledEnabled, ledFlash, ledPin, ledBrightness, keyEnabled, keyPin, keyShort, keyLong, ledPins}:
+ * the service key's settings too (boxconfig/config.h); ledPins (read-only) are the GPIOs ledPin and keyPin may name
+ * (not the same one). */
 static cJSON *m_feedback_get_config(const cJSON *p, rpc_err_t *err)
 {
     (void)p;
@@ -1322,6 +1345,11 @@ static cJSON *m_feedback_get_config(const cJSON *p, rpc_err_t *err)
     cJSON_AddBoolToObject(r, "ledFlash", s_cfg->led_flash);
     cJSON_AddNumberToObject(r, "ledPin", s_cfg->led_pin);
     cJSON_AddNumberToObject(r, "ledBrightness", s_cfg->led_brightness);
+    cJSON_AddBoolToObject(r, "keyEnabled", s_cfg->key_enabled);
+    cJSON_AddNumberToObject(r, "keyPin", s_cfg->key_pin);
+    const char *ks = boxcfg_key_act_name(s_cfg->key_short), *kl = boxcfg_key_act_name(s_cfg->key_long);
+    cJSON_AddStringToObject(r, "keyShort", ks ? ks : "menu");
+    cJSON_AddStringToObject(r, "keyLong", kl ? kl : "find");
     webui_cfg_unlock();
     int pins[24];
     cJSON_AddItemToObject(r, "ledPins", cJSON_CreateIntArray(pins, boxcfg_led_pins(pins, 24)));
@@ -1432,6 +1460,7 @@ esp_err_t webui_methods_init(box_config_t *cfg, void (*changed)(void), box_surfa
     s_deck_limit = cfg->deck_limit; /* read before the server starts, as main read it for surfaces */
     s_changed = changed;
     rpc_register("Sys.GetStatus", m_sys_status, 0);
+    rpc_register("Sys.GetPerf", m_sys_perf, 0);
     rpc_register("Device.GetInfo", m_device_info, 0);
     rpc_register("Device.Restart", m_restart, 0);
     rpc_register("Device.FactoryReset", m_factory_reset, 0);

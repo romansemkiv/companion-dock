@@ -1,18 +1,20 @@
-/* The status light's data pin (boxconfig/config.h). Pure: also built by the host tests.
+/* The status light's data pin and the service key's pin (boxconfig/config.h). Pure: also built by the
+ * host tests.
  *
  * The Waveshare ESP32-P4-WIFI6-POE-ETH's free header pins are
  * 0-5, 7, 8, 20-23, 26, 27, 32, 33, 46-48. Of those this firmware uses GPIO7/8 (the I2C
- * bus to the speaker's ES8311 codec) and GPIO32 (the service button, svcbtn.h); every other GPIO is
- * wired to something on the board. */
+ * bus to the speaker's ES8311 codec); every other GPIO is wired to something on the board. The light
+ * and the key share the rest (not the same pin: boxcfg_from_json). */
 #include <stddef.h>
+#include <string.h>
 
 #include "boxconfig/config.h"
 
 #define GPIO_MAX 54
 
-static const int FREE[] = {0, 1, 2, 3, 4, 5, 20, 21, 22, 23, 26, 27, 33, 46, 47, 48};
+static const int FREE[] = {0, 1, 2, 3, 4, 5, 20, 21, 22, 23, 26, 27, 32, 33, 46, 47, 48};
 
-/* why each other GPIO can't carry the light */
+/* why each other GPIO can't carry the light or the key */
 static const char *const TAKEN[GPIO_MAX + 1] = {
     [6] = "GPIO6 is linked to the Wi-Fi chip on the board",
     [7] = "GPIO7 is the I2C bus to the speaker's codec",
@@ -34,7 +36,6 @@ static const char *const TAKEN[GPIO_MAX + 1] = {
     [29] = "GPIO29 is Ethernet (RMII)",
     [30] = "GPIO30 is Ethernet (RMII)",
     [31] = "GPIO31 is Ethernet (RMII)",
-    [32] = "GPIO32 is the service button",
     [34] = "GPIO34 is Ethernet (RMII)",
     [35] = "GPIO35 is Ethernet (RMII) and the BOOT button",
     [36] = "GPIO36 is a strapping pin",
@@ -60,7 +61,7 @@ const char *boxcfg_led_pin_problem(int gpio)
     for (size_t i = 0; i < sizeof FREE / sizeof *FREE; i++)
         if (FREE[i] == gpio) return NULL;
     if (gpio >= 0 && gpio <= GPIO_MAX && TAKEN[gpio]) return TAKEN[gpio];
-    return "not a free pin: use GPIO 0-5, 20-23, 26, 27, 33 or 46-48";
+    return "not a free pin: use GPIO 0-5, 20-23, 26, 27, 32, 33 or 46-48";
 }
 
 int boxcfg_led_pins(int *out, int max)
@@ -68,4 +69,23 @@ int boxcfg_led_pins(int *out, int max)
     int n = 0;
     for (size_t i = 0; i < sizeof FREE / sizeof *FREE && n < max; i++) out[n++] = FREE[i];
     return n;
+}
+
+static const char *const KEY_ACT[] = {[BOXCFG_KEY_ACT_MENU] = "menu",   [BOXCFG_KEY_ACT_FIND] = "find",
+                                      [BOXCFG_KEY_ACT_NONE] = "none",   [BOXCFG_KEY_ACT_SOUND] = "sound",
+                                      [BOXCFG_KEY_ACT_LIGHT] = "light", [BOXCFG_KEY_ACT_RESTART] = "restart"};
+
+const char *boxcfg_key_act_name(int v)
+{
+    return v >= 0 && v < (int)(sizeof KEY_ACT / sizeof *KEY_ACT) ? KEY_ACT[v] : NULL;
+}
+
+bool boxcfg_key_act_parse(const char *name, uint8_t *out)
+{
+    for (size_t i = 0; name && i < sizeof KEY_ACT / sizeof *KEY_ACT; i++)
+        if (!strcmp(KEY_ACT[i], name)) {
+            *out = (uint8_t)i;
+            return true;
+        }
+    return false;
 }

@@ -10,6 +10,11 @@
 
 #define WEBUI_AP_IP "192.168.4.1"
 
+/* ---- perf.c ---- */
+
+/* Sys.GetPerf's answer (perf.c has its fields), or NULL without memory. The HTTP server's task. */
+cJSON *webui_perf_json(void);
+
 /* ---- methods.c: the config, status and the RPC methods other than Auth.* ---- */
 
 /* The box config and the lock given to webui_set_cfg_lock. Hold the lock only to copy, change and

@@ -314,6 +314,27 @@ typedef bool (*ts_target_exceed_cb_from_isr_t)(esp_eth_mediator_t *eth, void *us
 *      - NULL: create MAC instance failed because some error occurred
 */
 esp_eth_mac_t *esp_eth_mac_new_esp32(const eth_esp32_emac_config_t *esp32_config, const eth_mac_config_t *config);
+
+/**
+* @brief Companion Dock patch (components/esp_eth/COMPANION_DOCK.md): a filter on the EMAC receive task, run on each
+*        received frame in its DMA buffer before it is copied out.
+*
+* @param hdr the frame's first hdr_len bytes: 16 of a unicast frame, 44 of a broadcast or multicast one (its Ethernet,
+*            IPv4 and UDP headers, or its ARP packet), 64 with IPv4 options; all of a shorter frame
+* @param len the frame's length, without the FCS
+* @return true: the frame goes on as before (copied out, to the stack input); false: dropped in place, with no
+*         allocation and no copy
+*
+* While a filter is set the receive task drains the DMA ring frame after frame at a constant cost per frame (it
+* no longer walks every waiting descriptor after each one), and the receive interrupt stays off while it does.
+*/
+typedef bool (*esp_eth_mac_esp_rx_filter_t)(const uint8_t *hdr, uint32_t hdr_len, uint32_t len, void *ctx);
+
+/**
+* @brief Companion Dock patch: sets the receive filter (NULL: none, the driver as ESP-IDF has it). Set it before
+*        esp_eth_start.
+*/
+void esp_eth_mac_esp_set_rx_filter(esp_eth_mac_t *mac, esp_eth_mac_esp_rx_filter_t filter, void *ctx);
 #endif // CONFIG_ETH_USE_ESP32_EMAC
 
 #ifdef __cplusplus

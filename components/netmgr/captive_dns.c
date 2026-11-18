@@ -125,7 +125,7 @@ esp_err_t captive_dns_start(uint32_t ip)
 {
     if (s_task) return ESP_OK;
     s_ip.addr = ip;
-    if (xTaskCreate(dns_task, "captive_dns", 3072, NULL, 5, &s_task) != pdPASS) {
+    if (xTaskCreate(dns_task, "captive_dns", 3072, NULL, 3 /* convenience (docs/manual.md, Task priorities) */, &s_task) != pdPASS) {
         s_task = NULL;
         return ESP_ERR_NO_MEM;
     }

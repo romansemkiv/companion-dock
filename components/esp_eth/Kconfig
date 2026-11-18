@@ -91,7 +91,7 @@ menu "Ethernet"
 
         config ETH_DMA_RX_BUFFER_NUM
             int "Amount of Ethernet DMA Rx buffers"
-            range 3 30
+            range 3 128 # Companion Dock patch: 30 before; a deeper ring rides out a longer pause of the receive task
             default 10 if IDF_TARGET_ESP32
             default 20 if IDF_TARGET_ESP32P4 #ESP32P4 has smaller internal Rx FIFO
             help

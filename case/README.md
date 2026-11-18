@@ -96,9 +96,10 @@ To the board's 40-pin header (check the pinout of your board):
 | What | Wire to | In the firmware |
 |---|---|---|
 | NeoPixel (Button and LED variants) | 5 V or 3V3, GND, data on **GPIO23** (header pin 8) | the status light's default pin (from 0.2.1; a box set up on an older firmware may keep GPIO26: choose GPIO23 under **Speaker & LED → Data pin**) |
-| The key (Button variant) | **GPIO32** (header pin 25) and GND (pin 26) | the box's service button: a short press opens the box menu (or closes any open one), held 5 s it turns the setup hotspot on for 15 minutes, held 10 s it resets the box to factory settings ([Recovery](../docs/manual.md#recovery)). Internal pull-up, active low |
+| The key (Button variant) | **GPIO32** (header pin 25) and GND (pin 26) | the box's service key (switch it on under **Speaker & LED → Service key**): a short press opens the box menu (or closes any open one) and a long one (3 s) is Find my box, unless set otherwise; held 5 s it turns the setup hotspot on for 15 minutes, held 10 s it resets the box to factory settings ([Recovery](../docs/manual.md#recovery)). Internal pull-up, active low |
 
-The firmware's service button is GPIO32 and can't be moved, so wire the key there rather than to another pin.
+The firmware's service key is on GPIO32 unless another pin is set (**Speaker & LED → Service key**), and it is **off
+until switched on there** on a new box: wire the key, then turn it on.
 
 ## Licence
 

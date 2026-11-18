@@ -1,0 +1,302 @@
+diff -ru a/Kconfig b/Kconfig
+--- a/Kconfig	2026-10-16 04:14:28
++++ b/Kconfig	2026-11-17 15:36:41
+@@ -91,7 +91,7 @@
+ 
+         config ETH_DMA_RX_BUFFER_NUM
+             int "Amount of Ethernet DMA Rx buffers"
+-            range 3 30
++            range 3 128 # Companion Dock patch: 30 before; a deeper ring rides out a longer pause of the receive task
+             default 10 if IDF_TARGET_ESP32
+             default 20 if IDF_TARGET_ESP32P4 #ESP32P4 has smaller internal Rx FIFO
+             help
+diff -ru a/include/esp_eth_mac_esp.h b/include/esp_eth_mac_esp.h
+--- a/include/esp_eth_mac_esp.h	2026-10-16 04:14:28
++++ b/include/esp_eth_mac_esp.h	2026-11-17 16:30:38
+@@ -314,6 +314,27 @@
+ *      - NULL: create MAC instance failed because some error occurred
+ */
+ esp_eth_mac_t *esp_eth_mac_new_esp32(const eth_esp32_emac_config_t *esp32_config, const eth_mac_config_t *config);
++
++/**
++* @brief Companion Dock patch (components/esp_eth/COMPANION_DOCK.md): a filter on the EMAC receive task, run on each
++*        received frame in its DMA buffer before it is copied out.
++*
++* @param hdr the frame's first hdr_len bytes: 16 of a unicast frame, 44 of a broadcast or multicast one (its Ethernet,
++*            IPv4 and UDP headers, or its ARP packet), 64 with IPv4 options; all of a shorter frame
++* @param len the frame's length, without the FCS
++* @return true: the frame goes on as before (copied out, to the stack input); false: dropped in place, with no
++*         allocation and no copy
++*
++* While a filter is set the receive task drains the DMA ring frame after frame at a constant cost per frame (it
++* no longer walks every waiting descriptor after each one), and the receive interrupt stays off while it does.
++*/
++typedef bool (*esp_eth_mac_esp_rx_filter_t)(const uint8_t *hdr, uint32_t hdr_len, uint32_t len, void *ctx);
++
++/**
++* @brief Companion Dock patch: sets the receive filter (NULL: none, the driver as ESP-IDF has it). Set it before
++*        esp_eth_start.
++*/
++void esp_eth_mac_esp_set_rx_filter(esp_eth_mac_t *mac, esp_eth_mac_esp_rx_filter_t filter, void *ctx);
+ #endif // CONFIG_ETH_USE_ESP32_EMAC
+ 
+ #ifdef __cplusplus
+diff -ru a/include/esp_private/eth_mac_esp_dma.h b/include/esp_private/eth_mac_esp_dma.h
+--- a/include/esp_private/eth_mac_esp_dma.h	2026-10-16 04:14:28
++++ b/include/esp_private/eth_mac_esp_dma.h	2026-11-17 16:30:10
+@@ -124,6 +124,18 @@
+  */
+ void emac_esp_dma_flush_recv_frame(emac_esp_dma_handle_t emac_esp_dma);
+ 
++/* Companion Dock patch (components/esp_eth/COMPANION_DOCK.md): the received frames at the ring's head, filtered in
++ * place. Each complete frame's first bytes go to keep(): 16 of a unicast one, 44 of a broadcast or multicast one,
++ * EMAC_ESP_DMA_HDR_LEN with IPv4 options (all of a shorter frame). A refused frame
++ * (and an erroneous one) is given back to the DMA there. Descriptors and headers are read, and given back, through
++ * the memory's non-cacheable alias: no cache sync, no allocation, no copy. Returns true when a kept frame waits at
++ * the ring's head (take it with emac_esp_dma_alloc_recv_buf + emac_esp_dma_receive_frame, as before), false when
++ * no complete frame waits, or when *count (raised by one for each frame given back) reached budget. */
++#define EMAC_ESP_DMA_HDR_LEN 64
++bool emac_esp_dma_rx_filter(emac_esp_dma_handle_t emac_esp_dma,
++                            bool (*keep)(const uint8_t *hdr, uint32_t hdr_len, uint32_t len, void *ctx), void *ctx,
++                            uint32_t *count, uint32_t budget);
++
+ /**
+  * @brief Get number of frames remaining in Rx DMA
+  *
+diff -ru a/src/mac/esp_eth_mac_esp.c b/src/mac/esp_eth_mac_esp.c
+--- a/src/mac/esp_eth_mac_esp.c	2026-10-16 04:14:28
++++ b/src/mac/esp_eth_mac_esp.c	2026-11-17 15:36:41
+@@ -86,6 +86,9 @@
+ #ifdef SOC_EMAC_IEEE1588V2_SUPPORTED
+     ts_target_exceed_cb_from_isr_t ts_target_exceed_cb_from_isr;
+ #endif
++    // Companion Dock patch: the receive filter (esp_eth_mac_esp_set_rx_filter)
++    esp_eth_mac_esp_rx_filter_t rx_filter;
++    void *rx_filter_ctx;
+ } emac_esp32_t;
+ 
+ static esp_err_t emac_esp_alloc_driver_obj(const eth_mac_config_t *config, emac_esp32_t **emac_out_hdl);
+@@ -441,6 +444,73 @@
+     return ret;
+ }
+ 
++void esp_eth_mac_esp_set_rx_filter(esp_eth_mac_t *mac, esp_eth_mac_esp_rx_filter_t filter, void *ctx)
++{
++    emac_esp32_t *emac = __containerof(mac, emac_esp32_t, parent);
++    emac->rx_filter_ctx = ctx;
++    emac->rx_filter = filter;
++}
++
++/* Companion Dock patch: one received frame copied out and handed to the stack, as ESP-IDF's loop does it. */
++static void emac_esp32_rx_one(emac_esp32_t *emac)
++{
++    uint32_t frame_len = ETH_MAX_PACKET_SIZE;
++    uint8_t *buffer = emac_esp_dma_alloc_recv_buf(emac->emac_dma_hndl, &frame_len);
++    if (buffer != NULL) {
++#ifdef SOC_EMAC_IEEE1588V2_SUPPORTED
++        eth_mac_time_t ts;
++        eth_mac_time_t *p_ts = &ts;
++#else
++        eth_mac_time_t *p_ts = NULL;
++#endif
++        uint32_t recv_len = emac_esp_dma_receive_frame(emac->emac_dma_hndl, buffer, EMAC_DMA_BUF_SIZE_AUTO, p_ts);
++        if (recv_len == 0) {
++            ESP_LOGE(TAG, "frame copy error");
++            free(buffer);
++            emac_esp_dma_flush_recv_frame(emac->emac_dma_hndl);
++        } else if (frame_len > recv_len) {
++            ESP_LOGE(TAG, "received frame was truncated");
++            free(buffer);
++        } else {
++            emac->eth->stack_input_info(emac->eth, buffer, recv_len, (void *)p_ts);
++        }
++    } else if (frame_len) {
++        ESP_LOGE(TAG, "no mem for receive buffer");
++        emac_esp_dma_flush_recv_frame(emac->emac_dma_hndl);
++    }
++}
++
++/* Companion Dock patch: the receive loop with a filter set. Refused frames are given back in place, with no cache
++ * sync, allocation or copy (emac_esp_dma_rx_filter), and each frame costs the same however many wait: no walk of
++ * every waiting descriptor after each one. ESP-IDF's loop does that walk, with a cache sync per descriptor: about
++ * 100 us a frame with the ring full, so a broadcast flood beyond some 4000 frames a second filled the ring and the
++ * EMAC dropped what came next, frames to the box among them. The receive interrupt is off while the ring drains (the
++ * ISR turns it off and wakes this task; this turns it on again when the ring is empty: a frame that came meanwhile
++ * raises it at once), so a flood costs no interrupt per frame. A ring that never empties (a flood beyond what this
++ * keeps up with) gets a tick's pause every RX_BURST frames, so the tasks below this one on its core still run. */
++#define RX_BURST 4096
++static void emac_esp32_rx_drain(emac_esp32_t *emac)
++{
++    uint32_t done = 0;
++    for (;;) {
++        const bool kept = emac_esp_dma_rx_filter(emac->emac_dma_hndl, emac->rx_filter, emac->rx_filter_ctx, &done,
++                                                 RX_BURST);
++        if (kept) {
++            emac_esp32_rx_one(emac);
++            done++;
++        }
++        if (done >= RX_BURST) {
++            done = 0;
++            vTaskDelay(1); /* the ring never emptied in RX_BURST frames: the tasks below this one get a turn */
++            continue;
++        }
++        if (!kept) {
++            break; /* the ring is empty */
++        }
++    }
++    emac_ll_enable_corresponding_intr(emac->hal.dma_regs, EMAC_LL_INTR_RECEIVE_ENABLE);
++}
++
+ static void emac_esp32_rx_task(void *arg)
+ {
+     emac_esp32_t *emac = (emac_esp32_t *)arg;
+@@ -448,6 +518,10 @@
+     while (1) {
+         // block indefinitely until got notification from underlay event
+         ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
++        if (emac->rx_filter) { /* Companion Dock patch */
++            emac_esp32_rx_drain(emac);
++            continue;
++        }
+         do {
+             /* set max expected frame len */
+             uint32_t frame_len = ETH_MAX_PACKET_SIZE;
+@@ -647,6 +721,9 @@
+ #if EMAC_LL_CONFIG_ENABLE_INTR_MASK & EMAC_LL_INTR_RECEIVE_ENABLE
+     if (intr_stat & EMAC_LL_DMA_RECEIVE_FINISH_INTR) {
+         BaseType_t rx_high_task_woken = pdFALSE;
++        if (emac->rx_filter) { /* Companion Dock patch: off until the receive task has drained the ring */
++            emac_ll_disable_corresponding_intr(hal->dma_regs, EMAC_LL_INTR_RECEIVE_ENABLE);
++        }
+         /* notify receive task */
+         vTaskNotifyGiveFromISR(emac->rx_task_hdl, &rx_high_task_woken);
+         high_task_woken |= (bool)rx_high_task_woken;
+diff -ru a/src/mac/esp_eth_mac_esp_dma.c b/src/mac/esp_eth_mac_esp_dma.c
+--- a/src/mac/esp_eth_mac_esp_dma.c	2026-10-16 04:14:28
++++ b/src/mac/esp_eth_mac_esp_dma.c	2026-11-17 16:29:54
+@@ -8,6 +8,7 @@
+ #include "sdkconfig.h"
+ #include "soc/soc_caps.h"
+ #include "esp_cache.h"
++#include "hal/cache_ll.h" /* Companion Dock patch: the non-cacheable alias */
+ #include "hal/emac_hal.h"
+ #include "esp_heap_caps.h"
+ #include "esp_private/eth_mac_esp_dma.h"
+@@ -41,6 +42,8 @@
+ 
+ static const char *TAG = "esp.emac.dma";
+ 
++_Static_assert(EMAC_ESP_DMA_HDR_LEN <= CONFIG_ETH_DMA_BUFFER_SIZE, "a frame's header is read from its first DMA buffer");
++
+ struct emac_esp_dma_t {
+     emac_hal_context_t hal;
+     uint32_t tx_desc_flags;
+@@ -343,6 +346,108 @@
+     }
+ 
+     return ESP_OK;
++}
++
++/* Companion Dock patch: see eth_mac_esp_dma.h. The descriptors and the RX buffers are internal RAM (L2MEM): their
++ * non-cacheable alias reads what the DMA wrote and writes where the DMA reads, so the drop path needs no cache sync
++ * (four a frame before, most of the cost). ESP-IDF's cached path, which takes the kept frames, invalidates before it
++ * reads and writes back what it writes, so the two views never hold a stale line over each other. */
++#define NC_DESC(d) ((volatile eth_dma_rx_descriptor_t *)CACHE_LL_L2MEM_NON_CACHE_ADDR(d))
++#define RDES0_OWN_DMA (1u << 31)
++#define RDES0_ERR_SUMMARY (1u << 15)
++#define RDES0_LAST (1u << 8)
++#define RDES0_LEN(w) (((w) >> 16) & 0x3fff)
++
++/* The ring never moves (emac_esp_dma_reset chains descriptor i to i + 1 and the last to the first, with buffer i):
++ * the next descriptor and a descriptor's buffer come from its index, not from uncached reads of its pointers. */
++static inline eth_dma_rx_descriptor_t *rx_next(emac_esp_dma_handle_t emac_esp_dma, eth_dma_rx_descriptor_t *d)
++{
++    eth_dma_rx_descriptor_t *base = (eth_dma_rx_descriptor_t *)emac_esp_dma->descriptors;
++    return d + 1 == base + CONFIG_ETH_DMA_RX_BUFFER_NUM ? base : d + 1;
++}
++
++static inline const uint8_t *rx_buf_of(emac_esp_dma_handle_t emac_esp_dma, const eth_dma_rx_descriptor_t *d)
++{
++    return emac_esp_dma->rx_buf[d - (const eth_dma_rx_descriptor_t *)emac_esp_dma->descriptors];
++}
++
++/* the descriptors from d on (a frame's n) back to the DMA; the head moves past them */
++static void rx_give_back(emac_esp_dma_handle_t emac_esp_dma, eth_dma_rx_descriptor_t *d, uint32_t n)
++{
++    for (uint32_t i = 0; i < n; i++) {
++        NC_DESC(d)->RDES0.Value = RDES0_OWN_DMA;
++        d = rx_next(emac_esp_dma, d);
++    }
++    emac_esp_dma->rx_desc = d;
++}
++
++/* How much of a frame the filter looks at, in words read uncached (each a bus round trip, most of a frame's cost):
++ * a unicast frame's first 16 bytes (its destination says it is unicast); a broadcast or multicast one's first 44
++ * (Ethernet, IPv4 and UDP headers, or an ARP packet), 64 with IPv4 options. */
++static uint32_t rx_read_hdr(const volatile uint32_t *src, uint32_t len, uint32_t *hdr)
++{
++    uint32_t got = 4;
++    for (uint32_t i = 0; i < got; i++) {
++        hdr[i] = src[i];
++    }
++    const uint8_t *b = (const uint8_t *)hdr;
++    uint32_t want = 16;
++    if (b[0] & 1) {
++        want = (b[12] == 0x08 && b[13] == 0x00 && (b[14] & 0x0f) > 5) ? EMAC_ESP_DMA_HDR_LEN : 44;
++    }
++    if (want > len) {
++        want = len;
++    }
++    for (uint32_t i = got; i < (want + 3) / 4; i++) {
++        hdr[i] = src[i];
++    }
++    return want;
++}
++
++bool emac_esp_dma_rx_filter(emac_esp_dma_handle_t emac_esp_dma,
++                            bool (*keep)(const uint8_t *hdr, uint32_t hdr_len, uint32_t len, void *ctx), void *ctx,
++                            uint32_t *count, uint32_t budget)
++{
++    bool waiting = false;
++    uint32_t n_dropped = 0;
++    while (*count + n_dropped < budget) {
++        eth_dma_rx_descriptor_t *first = emac_esp_dma->rx_desc, *d = first;
++        uint32_t w = NC_DESC(d)->RDES0.Value, n = 1;
++        if (w & RDES0_OWN_DMA) {
++            break; /* nothing received */
++        }
++        while (!(w & RDES0_LAST) && n < CONFIG_ETH_DMA_RX_BUFFER_NUM) { /* the frame's other descriptors */
++            d = rx_next(emac_esp_dma, d);
++            w = NC_DESC(d)->RDES0.Value;
++            if (w & RDES0_OWN_DMA) {
++                goto out; /* still arriving */
++            }
++            n++;
++        }
++        __asm__ __volatile__("fence r, r" ::: "memory"); /* the status before the data it covers */
++        const uint32_t len = RDES0_LEN(w) > ETH_CRC_LENGTH ? RDES0_LEN(w) - ETH_CRC_LENGTH : 0;
++        if ((w & RDES0_ERR_SUMMARY) || !(w & RDES0_LAST) || len == 0) {
++            rx_give_back(emac_esp_dma, first, n);
++            n_dropped++;
++            continue;
++        }
++        uint32_t hdr[EMAC_ESP_DMA_HDR_LEN / 4];
++        const volatile uint32_t *src = (const volatile uint32_t *)CACHE_LL_L2MEM_NON_CACHE_ADDR(rx_buf_of(emac_esp_dma, first));
++        const uint32_t hl = rx_read_hdr(src, len, hdr);
++        if (keep((const uint8_t *)hdr, hl, len, ctx)) {
++            waiting = true;
++            break;
++        }
++        rx_give_back(emac_esp_dma, first, n);
++        n_dropped++;
++    }
++out:
++    if (n_dropped) {
++        __asm__ __volatile__("fence w, o" ::: "memory"); /* the descriptors given back before the DMA looks */
++        emac_hal_receive_poll_demand(&emac_esp_dma->hal); /* a DMA stopped on a full ring goes on */
++    }
++    *count += n_dropped;
++    return waiting;
+ }
+ 
+ void emac_esp_dma_get_remain_frames(emac_esp_dma_handle_t emac_esp_dma, uint32_t *remain_frames, uint32_t *free_descs)

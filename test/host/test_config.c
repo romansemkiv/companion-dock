@@ -425,7 +425,7 @@ static void test_feedback_defaults(void)
     TEST_ASSERT_TRUE(c.sound_problem);
     TEST_ASSERT_TRUE(c.sound_deck_plug);
     TEST_ASSERT_TRUE(c.sound_key_click);
-    TEST_ASSERT_TRUE(c.led_enabled);
+    TEST_ASSERT_FALSE(c.led_enabled); /* optional hardware: off until switched on */
     TEST_ASSERT_TRUE(c.led_flash);
     TEST_ASSERT_EQUAL_INT8(23, c.led_pin); /* the case's NeoPixel pin */
     TEST_ASSERT_EQUAL_UINT8(30, c.led_brightness);
@@ -436,7 +436,7 @@ static void test_feedback_defaults(void)
     static const char *const SOUNDS[] = {"soundReady", "soundConnected", "soundProblem", "soundDeckPlug", "soundKeyClick"};
     for (size_t i = 0; i < sizeof SOUNDS / sizeof *SOUNDS; i++)
         TEST_ASSERT_TRUE_MESSAGE(cJSON_IsTrue(cJSON_GetObjectItem(o, SOUNDS[i])), SOUNDS[i]);
-    TEST_ASSERT_TRUE(cJSON_IsTrue(cJSON_GetObjectItem(o, "ledEnabled")));
+    TEST_ASSERT_TRUE(cJSON_IsFalse(cJSON_GetObjectItem(o, "ledEnabled")));
     TEST_ASSERT_TRUE(cJSON_IsTrue(cJSON_GetObjectItem(o, "ledFlash")));
     TEST_ASSERT_EQUAL_INT(23, cJSON_GetObjectItem(o, "ledPin")->valueint);
     TEST_ASSERT_EQUAL_INT(30, cJSON_GetObjectItem(o, "ledBrightness")->valueint);
@@ -489,18 +489,125 @@ static void test_feedback_json(void)
         TEST_ASSERT_EQUAL_STRING_MESSAGE(BAD[i][1], key, BAD[i][0]);
         TEST_ASSERT_EQUAL_MEMORY(&before, &c, sizeof c);
     }
-    /* why a pin is refused */
+    /* why a pin is refused: GPIO32 is the service key's while the key is on it */
     TEST_ASSERT_FALSE(boxcfg_from_json(&c, "{\"ledPin\":32}", err, sizeof err));
-    TEST_ASSERT_NOT_NULL(strstr(err, "service button"));
+    TEST_ASSERT_NOT_NULL(strstr(err, "service key"));
     TEST_ASSERT_FALSE(boxcfg_from_json(&c, "{\"ledPin\":8}", err, sizeof err));
     TEST_ASSERT_NOT_NULL(strstr(err, "speaker"));
 }
 
-/* The LED's data pin: a free header pin of the board that this firmware
- * doesn't use itself (GPIO7/8 the codec's I2C bus, GPIO32 the service button). */
+/* The service key: off by default (optional hardware), but on for a config stored before it could be turned off
+ * (boxcfg_stored_legacy); on GPIO32 with a short press for the box menu; its pin one of the light's free pins, never
+ * the light's own; keyShort by name. */
+static void test_service_key(void)
+{
+    box_config_t c;
+    char err[96];
+    boxcfg_defaults(&c, (const uint8_t[6]){1, 2, 3, 4, 5, 6}, fake_rand);
+    TEST_ASSERT_FALSE(c.key_enabled);
+    TEST_ASSERT_EQUAL_INT8(32, c.key_pin);
+    TEST_ASSERT_EQUAL_UINT8(BOXCFG_KEY_ACT_MENU, c.key_short);
+    TEST_ASSERT_EQUAL_UINT8(BOXCFG_KEY_ACT_FIND, c.key_long);
+    box_config_t old;
+    boxcfg_defaults(&old, (const uint8_t[6]){1, 2, 3, 4, 5, 6}, fake_rand);
+    static const char BEFORE[] = "{\"ledEnabled\":true,\"ledPin\":23}"; /* stored by a firmware before the key's settings */
+    TEST_ASSERT_EQUAL_INT(0, boxcfg_from_json_lenient(&old, BEFORE, NULL, 0));
+    TEST_ASSERT_FALSE(old.key_enabled);
+    TEST_ASSERT_TRUE(old.led_enabled); /* a light switched on stays on */
+    /* ... where the key was always on: it stays on, on its pin (the way back from a forgotten PIN) */
+    TEST_ASSERT_TRUE(boxcfg_stored_legacy(&old, BEFORE));
+    TEST_ASSERT_TRUE(old.key_enabled);
+    TEST_ASSERT_EQUAL_INT8(32, old.key_pin);
+    TEST_ASSERT_FALSE(boxcfg_stored_legacy(&old, BEFORE)); /* nothing more to change */
+    /* a config that says it is left alone: off stays off, and what it stores back says so from then on */
+    box_config_t said;
+    boxcfg_defaults(&said, (const uint8_t[6]){1, 2, 3, 4, 5, 6}, fake_rand);
+    TEST_ASSERT_FALSE(boxcfg_stored_legacy(&said, "{\"keyEnabled\":false}"));
+    TEST_ASSERT_FALSE(said.key_enabled);
+    char *full = boxcfg_to_json(&said, true);
+    TEST_ASSERT_FALSE(boxcfg_stored_legacy(&said, full));
+    free(full);
+    /* unreadable: nothing */
+    TEST_ASSERT_FALSE(boxcfg_stored_legacy(&said, "not json"));
+    TEST_ASSERT_FALSE(boxcfg_stored_legacy(&said, "[1]"));
+    TEST_ASSERT_FALSE(boxcfg_stored_legacy(&said, NULL));
+    TEST_ASSERT_FALSE(said.key_enabled);
+    /* written and read back */
+    TEST_ASSERT_TRUE(boxcfg_from_json(&c, "{\"keyEnabled\":true,\"keyPin\":27,\"keyShort\":\"find\",\"keyLong\":\"restart\"}", err, sizeof err));
+    TEST_ASSERT_EQUAL_UINT8(BOXCFG_KEY_ACT_RESTART, c.key_long);
+    TEST_ASSERT_TRUE(c.key_enabled);
+    TEST_ASSERT_EQUAL_INT8(27, c.key_pin);
+    TEST_ASSERT_EQUAL_UINT8(BOXCFG_KEY_ACT_FIND, c.key_short);
+    char *j = boxcfg_to_json(&c, true);
+    cJSON *o = cJSON_Parse(j);
+    TEST_ASSERT_TRUE(cJSON_IsTrue(cJSON_GetObjectItem(o, "keyEnabled")));
+    TEST_ASSERT_EQUAL_INT(27, cJSON_GetObjectItem(o, "keyPin")->valueint);
+    TEST_ASSERT_EQUAL_STRING("find", cJSON_GetObjectItem(o, "keyShort")->valuestring);
+    TEST_ASSERT_EQUAL_STRING("restart", cJSON_GetObjectItem(o, "keyLong")->valuestring);
+    box_config_t back;
+    boxcfg_defaults(&back, (const uint8_t[6]){1, 2, 3, 4, 5, 6}, fake_rand);
+    TEST_ASSERT_TRUE(boxcfg_from_json(&back, j, err, sizeof err));
+    TEST_ASSERT_TRUE(back.key_enabled);
+    TEST_ASSERT_EQUAL_INT8(27, back.key_pin);
+    TEST_ASSERT_EQUAL_UINT8(BOXCFG_KEY_ACT_FIND, back.key_short);
+    TEST_ASSERT_EQUAL_UINT8(BOXCFG_KEY_ACT_RESTART, back.key_long);
+    /* every action by name, both presses (restart the long one only) */
+    static const char *const ACTS[] = {"menu", "find", "none", "sound", "light", "restart"};
+    for (int i = 0; i < 6; i++) {
+        char js[64];
+        snprintf(js, sizeof js, "{\"keyLong\":\"%s\"}", ACTS[i]);
+        TEST_ASSERT_TRUE_MESSAGE(boxcfg_from_json(&back, js, err, sizeof err), js);
+        TEST_ASSERT_EQUAL_STRING(ACTS[i], boxcfg_key_act_name(back.key_long));
+        snprintf(js, sizeof js, "{\"keyShort\":\"%s\"}", ACTS[i]);
+        TEST_ASSERT_EQUAL_MESSAGE(i != 5, boxcfg_from_json(&back, js, err, sizeof err), js);
+    }
+    cJSON_Delete(o);
+    free(j);
+    TEST_ASSERT_TRUE(boxcfg_from_json(&c, "{\"keyShort\":\"none\"}", err, sizeof err));
+    TEST_ASSERT_EQUAL_UINT8(BOXCFG_KEY_ACT_NONE, c.key_short);
+    /* the key moved off GPIO32: the light may take it */
+    TEST_ASSERT_TRUE(boxcfg_from_json(&c, "{\"ledPin\":32}", err, sizeof err));
+    TEST_ASSERT_EQUAL_INT8(32, c.led_pin);
+    /* refused, nothing changed; the key named in the request is the one blamed */
+    static const char *const BAD[][2] = {
+        {"{\"keyPin\":32}", "keyPin"},          /* the light's pin now */
+        {"{\"ledPin\":27}", "ledPin"},          /* the key's */
+        {"{\"ledPin\":5,\"keyPin\":5}", "ledPin"},
+        {"{\"keyPin\":7}", "keyPin"},           /* the codec's I2C bus */
+        {"{\"keyPin\":28}", "keyPin"},          /* Ethernet */
+        {"{\"keyPin\":-1}", "keyPin"},
+        {"{\"keyPin\":\"27\"}", "keyPin"},
+        {"{\"keyEnabled\":1}", "keyEnabled"},
+        {"{\"keyShort\":\"reset\"}", "keyShort"},
+        {"{\"keyShort\":2}", "keyShort"},
+        {"{\"keyShort\":\"restart\"}", "keyShort"}, /* the long press only */
+        {"{\"keyLong\":\"reset\"}", "keyLong"},
+        {"{\"keyLong\":null}", "keyLong"},
+    };
+    for (size_t i = 0; i < sizeof BAD / sizeof BAD[0]; i++) {
+        box_config_t before = c;
+        TEST_ASSERT_FALSE_MESSAGE(boxcfg_from_json(&c, BAD[i][0], err, sizeof err), BAD[i][0]);
+        char key[24];
+        boxcfg_err_key(err, key, sizeof key);
+        TEST_ASSERT_EQUAL_STRING_MESSAGE(BAD[i][1], key, BAD[i][0]);
+        TEST_ASSERT_EQUAL_MEMORY(&before, &c, sizeof c);
+    }
+    TEST_ASSERT_FALSE(boxcfg_from_json(&c, "{\"keyPin\":32}", err, sizeof err));
+    TEST_ASSERT_NOT_NULL(strstr(err, "status light"));
+    /* names */
+    TEST_ASSERT_EQUAL_STRING("menu", boxcfg_key_act_name(BOXCFG_KEY_ACT_MENU));
+    TEST_ASSERT_EQUAL_STRING("restart", boxcfg_key_act_name(BOXCFG_KEY_ACT_RESTART));
+    TEST_ASSERT_NULL(boxcfg_key_act_name(6));
+    uint8_t v = 9;
+    TEST_ASSERT_FALSE(boxcfg_key_act_parse("Menu", &v));
+    TEST_ASSERT_EQUAL_UINT8(9, v);
+}
+
+/* The LED's data pin and the service key's: a free header pin of the board that this firmware
+ * doesn't use itself (GPIO7/8 the codec's I2C bus). */
 static void test_led_pins(void)
 {
-    static const int WANT[] = {0, 1, 2, 3, 4, 5, 20, 21, 22, 23, 26, 27, 33, 46, 47, 48};
+    static const int WANT[] = {0, 1, 2, 3, 4, 5, 20, 21, 22, 23, 26, 27, 32, 33, 46, 47, 48};
     int pins[64];
     const int n = boxcfg_led_pins(pins, 64);
     TEST_ASSERT_EQUAL_INT(sizeof WANT / sizeof *WANT, n);
@@ -513,7 +620,6 @@ static void test_led_pins(void)
         if (listed) TEST_ASSERT_NULL_MESSAGE(why, "a free pin is refused");
         else TEST_ASSERT_NOT_NULL_MESSAGE(why, "a taken or missing pin is accepted");
     }
-    TEST_ASSERT_NOT_NULL(strstr(boxcfg_led_pin_problem(32), "service button"));
     TEST_ASSERT_NOT_NULL(strstr(boxcfg_led_pin_problem(7), "speaker"));
     TEST_ASSERT_NOT_NULL(strstr(boxcfg_led_pin_problem(53), "speaker"));
     TEST_ASSERT_NOT_NULL(strstr(boxcfg_led_pin_problem(28), "Ethernet"));
@@ -1124,6 +1230,7 @@ int main(void)
     RUN_TEST(test_feedback_defaults);
     RUN_TEST(test_feedback_json);
     RUN_TEST(test_led_pins);
+    RUN_TEST(test_service_key);
     RUN_TEST(test_ap_secured_json);
     RUN_TEST(test_ap_pass_validated_only_when_secured);
     RUN_TEST(test_ap_old_stored_config_secured);

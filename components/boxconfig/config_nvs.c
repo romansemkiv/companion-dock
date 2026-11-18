@@ -70,6 +70,8 @@ static esp_err_t load(box_config_t *c, char **stored, boxcfg_load_t *how)
     } else {
         *how = BOXCFG_LOAD_CLEAN;
     }
+    if (n >= 0 && boxcfg_stored_legacy(c, json))
+        ESP_LOGI(TAG, "stored settings from before 0.2.8: the service key stays on (GPIO%d)", c->key_pin);
     if (stored) *stored = json;
     else free(json);
     return ESP_OK;

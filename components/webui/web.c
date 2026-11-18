@@ -897,7 +897,7 @@ static esp_err_t ota_upload(httpd_req_t *req)
 }
 
 #define OTA_STACK 8192 /* internal: flash writes (esp_ota_*), NVS, the reply; as the server task's */
-#define OTA_PRIO 5     /* the server task's (HTTPD_DEFAULT_CONFIG) */
+#define OTA_PRIO 3     /* the server task's: convenience, below every task a show needs (docs/manual.md, Task priorities) */
 
 _Static_assert(sizeof(uintptr_t) <= sizeof(uint32_t), "the request goes to ota_task in a task notification");
 
@@ -1270,6 +1270,7 @@ esp_err_t web_start(void)
      * app_main), and the 270 ms PBKDF2 of a settings-password check runs on this task (sign-in
      * round trips varied 270-320 ms with the core it landed on). */
     c.core_id = 1;
+    c.task_priority = 3; /* convenience: below every task a show needs (docs/manual.md, Task priorities) */
     c.max_open_sockets = 8;
     c.lru_purge_enable = true;
     c.recv_wait_timeout = RECV_TIMEOUT_S;

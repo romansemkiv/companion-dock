@@ -73,8 +73,8 @@ is wired as the service button.
 | USB-A (stacked with USB-C) | the P4's USB 2.0 high-speed OTG port | the only native USB host port: decks and hubs go here |
 | Console | UART0 (TX 37 / RX 38) | the board's USB-C port (CH343P USB-UART): flashing, logs, core dumps |
 | Speaker | ES8311 codec: I2C SDA 7 / SCL 8 (address 0x18), I2S MCLK 13, BCLK 12, WS 10, DOUT 9; amplifier enable 53 | fixed on the board; a speaker goes on the board's speaker connector ([Speaker and status light](#speaker-and-status-light)) |
-| **Status light** (optional) | **23** (a setting; 26 before 0.2.1) | one WS2812B-type NeoPixel: 5 V, GND, data in on the pin |
-| **Service button** (optional) | **32** | a push button to GND: header pin 25, with GND beside it on pin 26 (check the pinout of your board). Internal pull-up |
+| **Status light** (optional, off by default) | **23** (a setting; 26 before 0.2.1) | one WS2812B-type NeoPixel: 5 V, GND, data in on the pin |
+| **Service key** (optional, off by default) | **32** (a setting) | a push button to GND: header pin 25, with GND beside it on pin 26 (check the pinout of your board). Internal pull-up. A NeoKey (Adafruit 5756) is key and status light in one ([Service key](#service-key)) |
 | BOOT button | 35 | not usable: the same pin is Ethernet TXD1 |
 | RESET button | EN | pressed 3 times in a row: setup hotspot on for 15 minutes ([Recovery](#recovery)) |
 
@@ -107,11 +107,58 @@ box and the play buttons on the page also beep while the speaker is turned off i
 that stops answering is closed with the amplifier off, logged once, and tried again with a sound after
 10 s, then after twice as long each time up to 10 minutes; the page's play buttons say why.
 
-**Status light.** Wire one WS2812B-type NeoPixel (GRB, such as a single-pixel breakout): **5 V** and
+**Status light.** It is **off by default** (optional hardware): once it is wired, switch on *Show the status on the
+light* on the *Speaker & LED* page. A box that had it on keeps it on. Wire one WS2812B-type NeoPixel (GRB, such as a
+single-pixel breakout): **5 V** and
 **GND** from the header, its **data input on GPIO23**, header pin 8 (a 330 Ω resistor in the data line helps on
-long wires). Another pin can be set on the page: any of GPIO 0–5, 20–23, 26, 27, 33 or 46–48 (GPIO7/8 are the
-speaker codec's I2C bus, GPIO32 the service button). Nothing breaks without a light on the pin. Before 0.2.1 the
+long wires). Another pin can be set on the page: any of GPIO 0–5, 20–23, 26, 27, 32, 33 or 46–48 but the service
+key's (GPIO7/8 are the speaker codec's I2C bus). Nothing breaks without a light on the pin. Before 0.2.1 the
 default was GPIO26, and a box that saved it keeps it until you change it or reset the box.
+
+### Service key
+
+An optional push button from a header pin to GND (GPIO32 by default, header pin 25; GND is pin 26), read with the
+chip's pull-up. The *Speaker & LED* page's **Service key** card sets it (`Feedback.SetConfig`: `keyEnabled`,
+`keyPin`, `keyShort`, `keyLong`), applied at once:
+
+- **Service key on** (`keyEnabled`, **off by default** on a new or factory-reset box: it is optional hardware. A box
+  updated from before 0.2.8, where the key was always on, keeps it on): off, the key does nothing at all, the 10 s
+  factory reset included (turning it off asks first).
+- **Pin** (`keyPin`, 32): any of the light's free pins but the light's own; a move asks first (rewire).
+- **Short press** (`keyShort`, released before 3 s) and **Long press** (`keyLong`, held 3 s and released before
+  5 s), each one of:
+
+  | Action | Does |
+  |---|---|
+  | `menu` | the box menu opened on the biggest deck with a screen, or every box menu closed (the short press's default) |
+  | `find` | Find my box: beeps, and the light blinks white for 30 s (the long press's default) |
+  | `sound` | the speaker on / off (saved, as the deck menu's Sound key; a notice on the decks) |
+  | `light` | the status light on / off (saved; a notice on the decks) |
+  | `restart` | the box restarts. **Long press only**, so a brush of the key never restarts the box |
+  | `none` | nothing |
+
+  The key acts as a deck unlocked with the settings PIN would: whoever stands at the box has it in hand, as the
+  10 s reset.
+- Held **5 s** then released: the setup hotspot for 15 minutes. Held **10 s** then released: **factory reset**.
+  These two don't change.
+
+Each press clicks and flashes the light like a deck key (by *Click on every key press* and *Flash with each
+event*); the 3 s, 5 s and 10 s marks each play the confirm sound with a flash, so you know what letting go will do.
+The card shows the key live (*Pressed* / *Not pressed*, the presses since the start) for checking the wiring
+(`Sys.GetStatus.key`: `down`, `presses`).
+
+**A NeoKey (Adafruit 5756)** is a CHOC key socket with a NeoPixel under the key. Fit any CHOC switch and wire:
+
+| NeoKey pad | to |
+|---|---|
+| **A** (switch anode) | the key's pin (GPIO32) |
+| **C** (switch cathode) | GND |
+| **I** (NeoPixel data in) | the light's pin (GPIO23) |
+| **+** (VDD) | **3V3** (powered at 3.3 V the NeoPixel reads the P4's 3.3 V data reliably) |
+| **−** | GND |
+
+Its NeoPixel then is the status light (the #1312 is not needed). The switch's series diode passes with the pull-up
+(A to the pin, C to GND; the other way round the key never reads pressed).
 
 | Sound | When |
 |---|---|
@@ -147,11 +194,15 @@ sound at the slider's volume and flash the light.
 
 ## Backup Wi-Fi network
 
-Settings: the web page's *Wi-Fi* page has three cards: **Wi-Fi**, the state (Connected, Connecting,
+Settings: the web page's *Wi-Fi* page has four cards: **Wi-Fi**, the state (Connected, Connecting,
 Not found, Off, Not set up or Radio down), the network joined (its name, *Primary* or *Backup*), the box's Wi-Fi
-address and signal, the Wi-Fi chip's firmware and *Turn Wi-Fi on / off*; **Primary network**, the main pair's name,
-*Scan for networks*, password and Save (*In use*, *Standby* or *Not set*); and **Backup network**, with its own
-name, password and *Scan for networks* button (picking a result fills the backup name and focuses its password), or
+address and signal, the Wi-Fi chip's firmware and *Turn Wi-Fi on / off*; **Networks in range**, one *Scan for
+networks* for both networks: each network found has a *Primary* and a *Backup* button (or the slot it already has).
+An open network is saved into that slot at once (a saved password is dropped); a secured one first asks for its
+password under its row (*Save as primary* / *Save as backup*, Enter saves, Esc cancels). WPA2-Enterprise networks are
+marked as not supported. The list stays for 5 minutes, across the page drawn again after a save and across visits to
+other pages, so one scan serves both slots; **Primary network**, the main pair's name, password and Save (*In use*,
+*Standby* or *Not set*), for typing a hidden network; and **Backup network**, with its own name and password, or
 `Wifi.SetConfig {"wifiBackupSsid", "wifiBackupPass"}`. The same rules as the main pair: a name of up to 32
 bytes, a password empty or 8-63 characters, a missing password keeps the saved one, passwords are never
 returned (`wifiBackupHasPass` says whether one is stored). The backup is only used while the main network has a name (with an empty main name the station is off). An empty backup name means no backup: the
@@ -180,12 +231,14 @@ Behaviour:
 
 The decision lives in `components/netmgr/wififo_logic.c` (pure, host-tested); `wifi.c` applies it.
 
-**Wi-Fi off**: the *Wi-Fi* page's *Use Wi-Fi (the setup hotspot stays)* switch, the deck's *Wi-Fi*
+**Wi-Fi off**: the *Wi-Fi* page's *Turn Wi-Fi off* button (the page then says the setup hotspot stays on if it is
+enabled), the deck's *Wi-Fi*
 toggle on the Network screen, or `Wifi.SetConfig {"wifiEnabled": false}` turns the station (the main and the
 backup network) off: it disconnects and stays down, with no reconnect, no failover and no signal sampling. The
-networks' names and passwords are kept (the page shows them dimmed, still editable), and *Scan for networks*
-still works (the station comes up just for the scan). **The setup hotspot is untouched**: it keeps its own
-settings, and RESET ×3 or the service button still force it on. Ethernet isn't affected; with Ethernet down
+networks' names and passwords are kept. The page shows its *Networks in range*, *Primary* and *Backup* cards dimmed
+and disabled (every field and button) until *Turn Wi-Fi on*; `Wifi.Scan` itself still works (the station comes up
+just for the scan). **The setup hotspot is untouched**: it stays on if it is
+enabled (its own setting on the *Access point* page), and RESET ×3 or the service button still force it on. Ethernet isn't affected; with Ethernet down
 too, the decks show "No network" with the hotspot to join. Turned on again, the station starts from the main
 network. `wifiEnabled` defaults to on (also for a config saved without it); `Wifi.GetStatus.enabled` and
 `Sys.GetStatus.net.wifi_enabled` report it.
@@ -382,7 +435,7 @@ satellite (Phosphor has none), drawn in Phosphor's stroke.
   co-processor isn't answering; a backup that isn't set up says *Not set*; both say *Off* (grey) while Wi-Fi is
   turned off. The **Wi-Fi** toggle (a power switch, outlined while on, in its fixed key):
   turning it off is a 1.5 s hold ("Wi-Fi off"), on a tap; both locked under the settings PIN; the setup
-  hotspot stays either way. The row not in use has **Use**
+  hotspot stays on either way if it is enabled. The row not in use has **Use**
   (hold 1.5 s, "Wi-Fi blips"; locked under the settings PIN, which the PIN pad unlocks): the box joins
   that network now and keeps it as the one in use, as `Wifi.Use` does. **Companion**: the mode (Satellite
   with the satellite icon, Dock; hold the other one 1.5 s to switch; the box restarts), the port (dock mode) or the target (captioned
@@ -563,7 +616,40 @@ limit; CMake stops otherwise). `Device.GetInfo.version` and the *Firmware* page 
 FreeRTOS at 1000 Hz, PSRAM for every allocation over 1 KB (task stacks may go there too),
 stack-smashing protection, ELF core dumps to flash, the task watchdog (10 s, it restarts the box),
 USB host hubs (multi-level) with a FIFO split (set in `usb_host_task.c`) that fits the decks'
-1024-byte interrupt-OUT and 512-byte interrupt-IN packets, WebSocket support, 40 lwIP sockets for the docks, and ESP-Hosted over SDIO to the C6.
+1024-byte interrupt-OUT and 512-byte interrupt-IN packets, WebSocket support, 40 lwIP sockets for the docks, 64 Ethernet
+receive buffers with the receive path in IRAM, and ESP-Hosted over SDIO to the C6.
+
+**Broadcast on Ethernet** (`components/netmgr/rxfilter.h`, `storm.h`, and a patched ESP-IDF Ethernet driver in
+`components/esp_eth`, see its `COMPANION_DOCK.md`). The box checks each received frame's header right in the
+network chip's receive buffer, before it is copied anywhere, and gives the broadcast and multicast it has no use for
+straight back. Of broadcast only ARP and DHCP replies pass; of multicast only mDNS, IGMP and IPv6, each within its
+own budget a second (all of them together under 1000). Unicast to the box always passes. That keeps up with a full
+100 Mbit link of the smallest broadcast frames (about 148 000 a second, measured: one core about 89 % busy), so
+through a broadcast flood Companion stays connected and the box stays reachable and discoverable (ARP and mDNS go
+on). Only a flood the box cannot keep up with, the network chip losing frames for 300 ms on end, makes it block
+broadcast in the chip (a *broadcast storm*): unicast and multicast go on, a device that has never talked to the box
+cannot find it until the storm ends. It looks again after 2 s, then after twice as long each time up to 30 s, and
+receives broadcast again once the storm is over. The log says so (`eth: broadcast storm …`, `… storm over after N
+s`), and every 10 s during a flood `eth: last 10 s: …` with the frames dropped and lost. The *Performance* page
+shows the counts live (*Ethernet in*). Over Wi-Fi the frames already came through the C6, and none of this applies.
+
+### Task priorities
+
+Every task a show depends on outranks every task that is only a convenience, so a busy web page, a firmware upload,
+a Wi-Fi scan or a broadcast flood never holds up a key press, an image or the connection. Higher runs first.
+
+| Band | Priority | Tasks | Core |
+|---|---|---|---|
+| System (ESP-IDF, ESP-Hosted) | 15-24 | `ipc0/1` 24, `esp_timer` 22 (the broadcast storm check), `sdio_*` 22 (the C6 link), `sys_evt` 20 (network events), `tiT` 18 (lwIP), `emac_rx` 15 (Ethernet receive) | `emac_rx`, `esp_timer`, `sys_evt` core 0 |
+| Live input | 6-8 | `usb_daemon` 8, `usb_client` 7 (the USB host), `deckN` 6 (one per deck: keys in, images out), `docktx` 6 (key reports to Companion), `usbdeck_svc` 6 (USB recovery) | either |
+| Companion and images | 4-5 | `dockrx` 5 (Network Dock: from Companion), `satclient` 5 (Satellite), `surfaces` 5 (the decks' coordinator), `imgwork` 4 (image conversion, just below input so it never delays a key) | `surfaces` core 1 |
+| The connection | 4 | `supervisor` (Companion target, network decisions, the watchdog), `elgdock` (dock connections), `mdns` (answers: Companion finds the box), `mdns_browse` (the box finds Companion), `sta_retry` and `sta_work` (Wi-Fi reconnect, failover) | `mdns` core 1 |
+| Convenience | 1-3 | `httpd` and `ota` 3 (the web page, uploads), `notify` 3, `deckact` 3 (box-menu actions), `captive_dns` 3, `svcbtn_act` 3, `speaker` 3, `ap_force`, `scan_fin`, `c6fw` 3, `feedback` 2, `svcbtn` 2, `qreset` 2, `eth_log` 2 (the flood and storm log lines, kept off the receiving core), `slotsync` 1 | `httpd`, `ota`, `speaker`, `eth_log` core 1 |
+
+Core 0 takes the Ethernet receive task, which a broadcast flood keeps busy; core 1 has the decks' coordinator, the web
+server, mDNS and the speaker. The other tasks are not pinned: they use both cores, and core 1 while core 0 is busy.
+The tasks that feed the watchdog (`supervisor`, `satclient`, `imgwork`, `usb_daemon`, `usb_client`) are all in the
+bands a show needs. The Performance page lists every task with its priority and core.
 
 **First flash of a board.** `./build.sh -p PORT` writes everything. To give the box its Wi-Fi network
 before it ever starts (no hotspot step), seed an NVS image and flash it after the firmware:
@@ -682,9 +768,9 @@ or that can cut you off (network changes, the settings password).
 | What | How | Does |
 |---|---|---|
 | **RESET ×3** | press RESET 3 times in a row, each press within 3 s of the last start | setup hotspot on for 15 minutes, even if it is turned off. Nothing is reset. A PoE cable replugged a few times does no more than this |
-| **Service button, short press** | press the GPIO32 button for 50 ms to 2 s | the box menu on the biggest deck with a screen, or, with any open, every box menu closed ([Maintenance screens](#maintenance-screens-on-the-decks)); released between 2 s and 5 s it does nothing |
-| **Service button 5 s** | hold the GPIO32 button 5 s, then release | setup hotspot on for 15 minutes |
-| **Service button 10 s** | hold it 10 s, then release | **factory reset**: settings, Wi-Fi and settings password erased, then a restart. The dock map (which deck has which Network Dock port) is kept, so Companion's Remote Surface entries keep working |
+| **Service key, short / long press** | press the [service key](#service-key) for 50 ms to 3 s / hold it 3 s and let go before 5 s | as set (*Short press*, *Long press*): by default the box menu on the biggest deck with a screen (or, with any open, every box menu closed) / Find my box ([Maintenance screens](#maintenance-screens-on-the-decks)) |
+| **Service key 5 s** | hold the service key 5 s, then release | setup hotspot on for 15 minutes |
+| **Service key 10 s** | hold it 10 s, then release | **factory reset**: settings, Wi-Fi and settings password erased, then a restart. The dock map (which deck has which Network Dock port) is kept, so Companion's Remote Surface entries keep working |
 | Factory reset from the page | *Device → Factory reset → Reset now*, or `Device.FactoryReset` | the same erase. It needs the settings password when one is set |
 | Bad firmware | usually nothing | a new image is checked 30 s after its first start and every 30 s after: RAM, USB host, web server and API running, and the network it was uploaded over back (that interface has an address, or the hotspot runs). It is confirmed at the first check that passes. One uploaded over a hotspot that the settings have off (forced on by RESET ×3 or the service button) gets the hotspot forced on again until then. One that crashes, or still fails 2 minutes after the start (checks at 0:30, 1:00, 1:30 and 2:00), is rolled back by the bootloader. A restart asked for before it is confirmed (Device.Restart, a factory reset from the page, the deck or the service button, a mode or deck-limit change) waits for the check, then goes ahead: restarting a firmware that isn't confirmed yet would roll it back. A factory reset erases the settings at once too, so the previous firmware starts without them if the check fails. The Firmware page counts down to the next check, and after a failed one says what it found and when the box would go back. A restart also waits for a firmware upload being written, and an upload is refused while a restart is on its way; a factory reset asked for while a restart waits joins it. The upload runs on its own task, so a slow one never holds up the page, the API or Companion's REST. An image that breaks the network in a way the check doesn't see (e.g. it answers on the address but Companion can't reach it) is confirmed: then reflash over USB |
 | Broken firmware slot | usually nothing | the bootloader validates the image it starts; when that fails it starts the other slot, which holds a copy. This holds for a bootloader built from this tree, and only for an image that fails validation, not for one that crashes ([recovery slot](#recovery-slot)) |
@@ -695,8 +781,8 @@ or that can cut you off (network changes, the settings password).
 
 > **Settings PIN warning.** If you set a settings PIN and forget it, the web page and the API stay locked,
 > and the page's factory reset needs that PIN too. The ways back are:
-> - the **service button** on GPIO32, held 10 s. **It is optional hardware, not on the board**: wire a
->   push button from GPIO32 to GND before you need it;
+> - the **service key** (GPIO32 unless moved), held 10 s, while it is on. **It is optional hardware, not on the
+>   board**: wire a push button (or a NeoKey) from its pin to GND before you need it;
 > - without the button, a **USB reflash**: erase the NVS partition over the USB-C port. That loses every
 >   setting (Wi-Fi, static IP, Companion choice, box name, dock map). The box then starts like a new one,
 >   with the hotspot on and a new random password (shown on the decks and over serial):
@@ -803,13 +889,14 @@ session token.
 | Decks | `Deck.List` (model, serial, firmware, USB speed, hub depth and port) `Deck.ShowMessage {text, seconds}` (1–160 printable characters and newlines; 0 s = until cleared, at most 3600 s) `Deck.ClearMessage` `Deck.ShowMaintenance {on, serial?}` (the box menu on that deck, Companion's too, or closed on it; without `serial`, true opens on the biggest deck with a screen, false closes them all; `{on, open: [serials], serial, model}` back, `on` any open, `serial` / `model` the deck just opened; a serial not attached or without a screen, or no deck with a screen, is an error) |
 | Speaker and light | `Feedback.GetConfig` / `SetConfig` (`speakerEnabled`, `speakerVolume` 0–100, `soundReady`, `soundConnected`, `soundProblem`, `soundDeckPlug`, `soundKeyClick`, `ledEnabled`, `ledFlash`, `ledPin`, `ledBrightness` 1–100; GetConfig also lists the pins `ledPin` may name in `ledPins`) `Feedback.Test {event, volume?}` (plays `ready`, `connected`, `problem`, `deckIn`, `deckOut`, `keyClick`, `confirm` (a hold done), `locked` (a locked button) or `identify` and flashes the light, also when that sound is off; `volume` previews another volume) |
 | Firmware | `Ota.GetStatus` (both slots, the running one, pending verify, the last upload's progress, and the [recovery slot](#recovery-slot) as `sync`: `{state, pct, other: {label, project, version, date, time, valid, foreign}}`, state `in_sync`, `syncing`, `differs`, `other_newer`, `empty`, `invalid` or `waiting`; `valid`: a valid image of this project, which `Ota.BootOther` may start; `foreign`: another project's image or one without an app descriptor, shown as `invalid`) `Ota.Sync {force?}` (copy the running firmware into the other slot now; refused while an upload or a sync runs, while the firmware is pending verify, and over a newer image unless `force`) `Ota.BootOther` (make the other slot the boot slot and restart; refused for an empty or invalid slot, another project's firmware, and while pending verify) |
+| Performance | `Sys.GetPerf` → `{windowMs, cpuMhz, tempC, cores, heap, tasks, eth}`: each core's load and each task's share of one core (`cpu`, %) over the `windowMs` since the previous call, by anyone (FreeRTOS run-time stats, 64-bit, from esp_timer; `null` on the first call after a start), the chip's temperature (`null` when the sensor can't be read), `heap.internal` / `heap.psram` (`total`, `free`, `minFree`: the lowest since the start, `largest`: the largest free block), each task's `name`, `core` (-1: either), `prio`, `state` and `stackFree` (bytes never used since the start), and `eth` (`null` without Ethernet): the receive filter's counts since the start (`unicast`, `multi` passed; `unwanted`, `rate` dropped) and the frames the EMAC itself lost (`lostBuf`: no free receive buffer, `lostFifo`: its FIFO overflowed; added up every 100 ms), `storm` (broadcast is blocked now) and `storms` (broadcast storms since the start). The web page's **Performance** page shows it, read every 2 s while open, with the Ethernet counts' rates per second |
 | Log | `Log.Get {since, oldest?}` → `{seq, text, up_ms}` (the last 16 KB of log text, 8 KB per call; pass `seq` back. More than 8 KB waiting: the newest, or with `oldest: true` the oldest kept, so that calls in a row read all of it in order. `up_ms` is the log's own clock, the `(12345)` on each line, at the moment of the read. The web page's **Logs** page reads the whole ring that way when it opens, then follows the log live. With **Timestamps** on (remembered), each line shows the local time it was logged (`HH:MM:SS.mmm`, worked out from `up_ms`, as the box has no clock of its own). **Copy** puts the text shown on the clipboard, **Export .log** saves it as `<box name>-<YYYY-MM-DD-HHMMSS>.log`, and **Clear view** empties the view, not the box's log) |
 | Security | `Auth.GetStatus` (public: `auth_en`, `pin`: the secret is a PIN, false for an older firmware's text password; `authed`, `locked_s`) `Auth.Login {password}` (public: the PIN, or an older firmware's text password; a 12 h token) `Auth.Logout` |
 
 Every `*.SetConfig` takes `dry_run`. Config keys are camelCase (as stored). Status and result keys are
 snake_case, with one exception: `lastReset` (camelCase) in `Device.GetInfo` and `Sys.GetStatus`.
 
-**`Wifi.Scan`** (the page's "Scan for networks" button next to the Wi-Fi network name) lists the networks the
+**`Wifi.Scan`** (the page's "Scan for networks" button in the *Networks in range* card) lists the networks the
 box hears. It does not wait for the scan (3–6 s): `Wifi.Scan` starts one and answers at once with
 `{"scanning": true}` (also when one is already running; scans never queue), and `Wifi.Scan {"results": true}`
 starts nothing and returns the latest answer: `{results: [{ssid, rssi, auth, channel}], scanning, ageMs,
@@ -934,7 +1021,7 @@ listed on the status page.
 main/main.c               staged boot (NVS, RESET count, config, speaker and light, network, web, discovery, surfaces, button, supervisor)
 main/supervisor.c         applies settings, picks Companion, hotspot state, status to the light, OTA self-check, C6-lost restart, task watchdog
 main/supervisor_logic.c   the supervisor's decisions: C6 lost, OTA self-check, pin save (pure)
-main/svcbtn.c             the GPIO32 service button: short press, 5 s, 10 s (svcbtn_logic.c: hold times, pure)
+main/svcbtn.c             the service key (keyPin, GPIO32 by default): short press, 5 s, 10 s (svcbtn_logic.c: hold times, pure)
 main/quickreset_logic.c   RESET pressed 3 times (pure)
 components/breadcrumb/    restart breadcrumb in RTC memory (breadcrumb_logic.c: record and summary, pure)
 components/boxconfig/     the config: JSON in NVS, defaults, validation, factory reset; led_pins.c: the light's pins (pure)

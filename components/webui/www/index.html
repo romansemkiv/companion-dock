@@ -34,7 +34,7 @@ html,body{margin:0;background:var(--bg);color:var(--fg)}
 body{font:14px/1.5 var(--sans);-webkit-font-smoothing:antialiased}
 a{color:var(--acc);text-decoration:none}a:hover{text-decoration:underline}
 code,.mono{font-family:var(--mono);font-size:.92em;font-variant-numeric:tabular-nums}
-.dim{color:var(--dim)}.off{opacity:.5}
+.dim{color:var(--dim)}.off{opacity:.5}fieldset{border:0;margin:0;padding:0;min-width:0}
 .ic{width:18px;height:18px;flex:none;fill:currentColor;vertical-align:middle}
 .ic.sm{width:15px;height:15px}.ic.lg{width:22px;height:22px}
 
@@ -70,10 +70,12 @@ header.top h1{margin:0;font-size:17px;font-weight:600;display:flex;gap:10px;alig
 @keyframes spin{to{transform:rotate(360deg)}}
 .scanst{display:flex;align-items:center;gap:10px;color:var(--mut);font-size:13px;margin:0 0 14px;overflow-wrap:anywhere}
 .nets{list-style:none;margin:0 0 14px;padding:0;display:grid;gap:6px;max-height:300px;overflow:auto}
-.net{width:100%;height:auto;min-height:38px;padding:7px 12px;justify-content:flex-start;gap:10px;text-align:left;background:var(--panel);color:var(--fg);border-color:var(--line);font-weight:500}
-.net:hover,.net:focus-visible{background:var(--acc-soft);border-color:var(--acc);filter:none}
-.net .nm{flex:1;min-width:0;white-space:normal;overflow-wrap:anywhere}
-.net small{color:var(--mut);font:11.5px var(--mono)}
+.netr{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;min-height:38px;padding:5px 6px 5px 12px;border:1px solid var(--line);border-radius:8px;background:var(--panel)}
+.netr.open{border-color:var(--acc)}
+.netr .nm{flex:1 1 140px;min-width:0;font-weight:500;overflow-wrap:anywhere}
+.netr small{color:var(--mut);font:11.5px var(--mono)}
+.netr .btns{margin:0;gap:6px}
+.netpw{flex:1 0 100%;margin:4px 0 2px}.netpw label.f{margin-bottom:8px}
 .bars{display:inline-flex;align-items:flex-end;gap:2px;height:14px;flex:none}
 .bars i{width:3px;border-radius:1px;background:var(--line2)}
 .bars i:nth-child(1){height:4px}.bars i:nth-child(2){height:7px}.bars i:nth-child(3){height:10px}.bars i:nth-child(4){height:14px}
@@ -179,6 +181,11 @@ td.empty{color:var(--mut);text-align:center;padding:18px;white-space:normal}
 .bn.warn{background:var(--warn-soft);color:var(--warn)}.bn.bad{background:var(--bad-soft);color:var(--bad)}.bn.ok{background:var(--ok-soft);color:var(--ok)}.bn.acc{background:var(--acc-soft);color:var(--acc)}
 .bn .ic{margin-top:2px}.bn button{margin-left:auto;flex:none}.bn button+button{margin-left:0}
 .bar{height:6px;background:var(--line);border-radius:3px;overflow:hidden;margin:10px 0 12px}.bar i{display:block;height:100%;background:var(--acc);width:0;transition:width .3s}
+.pfrow{display:grid;grid-template-columns:52px 1fr 62px;align-items:center;gap:10px}.pfrow .bar{margin:7px 0}.pfrow b{text-align:right;font:600 13px var(--mono)}
+.tscroll{overflow-x:auto}.ptab td,.ptab th{padding:6px 8px}.ptab td+td,.ptab th+th{text-align:right;font-family:var(--mono)}.ptab .low{color:var(--warn)}
+.srt{all:unset;cursor:pointer;color:inherit;font:inherit;letter-spacing:inherit;text-transform:inherit;white-space:nowrap}.srt:focus-visible{outline:2px solid var(--acc);outline-offset:2px;border-radius:3px}
+.ptab th[aria-sort] .srt{color:var(--fg)}.ptab th[aria-sort=ascending] .srt:after{content:' \2191'}.ptab th[aria-sort=descending] .srt:after{content:' \2193'}
+@media (max-width:600px){.ptab .pst{display:none}.ptab td,.ptab th{padding:6px 4px;font-size:12px}.ptab th{letter-spacing:.02em}}
 pre{margin:0;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:12px;overflow:auto;font:12px/1.55 var(--mono);max-height:64vh;white-space:pre-wrap;overflow-wrap:anywhere;color:var(--mut)}
 #toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(18px + env(safe-area-inset-bottom,0px));z-index:70;display:none;align-items:center;gap:10px;max-width:min(460px,calc(100vw - 32px));padding:11px 14px;border-radius:10px;background:var(--panel);border:1px solid var(--line2);box-shadow:0 12px 32px rgba(0,0,0,.35);font-weight:500;color:var(--fg)}
 #toast .ic{color:var(--ok)}#toast.bad .ic{color:var(--bad)}
@@ -219,7 +226,7 @@ pre{margin:0;background:var(--panel2);border:1px solid var(--line);border-radius
 <body>
 <!-- Icons: Phosphor Icons (regular), MIT License, (c) 2023 Phosphor Icons, https://phosphoricons.com
      (all but i-keys, i-speaker, i-companion, i-satellite and i-dock, drawn for this page) -->
-<svg xmlns="http://www.w3.org/2000/svg" style="display:none"><symbol id="i-speaker" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M15.5 9a4.2 4.2 0 0 1 0 6M18 6.5a8 8 0 0 1 0 11"/></g></symbol><symbol id="i-keys" viewBox="0 0 24 24"><g fill="currentColor"><circle cx="5" cy="5" r="2.6"/><circle cx="12" cy="5" r="2.6"/><circle cx="19" cy="5" r="2.6"/><circle cx="5" cy="12" r="2.6"/><circle cx="12" cy="12" r="2.6"/><circle cx="19" cy="12" r="2.6"/><circle cx="5" cy="19" r="2.6"/><circle cx="12" cy="19" r="2.6"/><circle cx="19" cy="19" r="2.6"/></g></symbol><symbol id="i-house" viewBox="0 0 256 256"><path d="M219.31,108.68l-80-80a16,16,0,0,0-22.62,0l-80,80A15.87,15.87,0,0,0,32,120v96a8,8,0,0,0,8,8h64a8,8,0,0,0,8-8V160h32v56a8,8,0,0,0,8,8h64a8,8,0,0,0,8-8V120A15.87,15.87,0,0,0,219.31,108.68ZM208,208H160V152a8,8,0,0,0-8-8H104a8,8,0,0,0-8,8v56H48V120l80-80,80,80Z"/></symbol><symbol id="i-companion" viewBox="0 0 256 256"><path d="M178.16,176H111.32A48,48,0,1,1,25.6,139.19a8,8,0,0,1,12.8,9.61A31.69,31.69,0,0,0,32,168a32,32,0,0,0,64,0,8,8,0,0,1,8-8h74.16a16,16,0,1,1,0,16ZM64,184a16,16,0,0,0,14.08-23.61l35.77-58.14a8,8,0,0,0-2.62-11,32,32,0,1,1,46.1-40.06A8,8,0,1,0,172,44.79a48,48,0,1,0-75.62,55.33L64.44,152c-.15,0-.29,0-.44,0a16,16,0,0,0,0,32Zm128-64a48.18,48.18,0,0,0-18,3.49L142.08,71.6A16,16,0,1,0,128,80l.44,0,35.78,58.15a8,8,0,0,0,11,2.61A32,32,0,1,1,192,200a8,8,0,0,0,0,16,48,48,0,0,0,0-96Z"/></symbol><symbol id="i-satellite" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m13.5 6.5-3.148-3.148a1.205 1.205 0 0 0-1.704 0L6.352 5.648a1.205 1.205 0 0 0 0 1.704L9.5 10.5"/><path d="M16.5 7.5 19 5"/><path d="m17.5 10.5 3.148 3.148a1.205 1.205 0 0 1 0 1.704l-2.296 2.296a1.205 1.205 0 0 1-1.704 0L13.5 14.5"/><path d="M9 21a6 6 0 0 0-6-6"/><path d="M9.352 10.648a1.205 1.205 0 0 0 0 1.704l2.296 2.296a1.205 1.205 0 0 0 1.704 0l4.296-4.296a1.205 1.205 0 0 0 0-1.704l-2.296-2.296a1.205 1.205 0 0 0-1.704 0z"/></g></symbol><symbol id="i-dock" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2.5"/><path d="M7 14h10"/></g></symbol><symbol id="i-network" viewBox="0 0 256 256"><path d="M232,112H136V88h8a16,16,0,0,0,16-16V40a16,16,0,0,0-16-16H112A16,16,0,0,0,96,40V72a16,16,0,0,0,16,16h8v24H24a8,8,0,0,0,0,16H56v32H48a16,16,0,0,0-16,16v32a16,16,0,0,0,16,16H80a16,16,0,0,0,16-16V176a16,16,0,0,0-16-16H72V128H184v32h-8a16,16,0,0,0-16,16v32a16,16,0,0,0,16,16h32a16,16,0,0,0,16-16V176a16,16,0,0,0-16-16h-8V128h32a8,8,0,0,0,0-16ZM112,40h32V72H112ZM80,208H48V176H80Zm128,0H176V176h32Z"/></symbol><symbol id="i-wifi-high" viewBox="0 0 256 256"><path d="M140,204a12,12,0,1,1-12-12A12,12,0,0,1,140,204ZM237.08,87A172,172,0,0,0,18.92,87,8,8,0,0,0,29.08,99.37a156,156,0,0,1,197.84,0A8,8,0,0,0,237.08,87ZM205,122.77a124,124,0,0,0-153.94,0A8,8,0,0,0,61,135.31a108,108,0,0,1,134.06,0,8,8,0,0,0,11.24-1.3A8,8,0,0,0,205,122.77Zm-32.26,35.76a76.05,76.05,0,0,0-89.42,0,8,8,0,0,0,9.42,12.94,60,60,0,0,1,70.58,0,8,8,0,1,0,9.42-12.94Z"/></symbol><symbol id="i-broadcast" viewBox="0 0 256 256"><path d="M128,88a40,40,0,1,0,40,40A40,40,0,0,0,128,88Zm0,64a24,24,0,1,1,24-24A24,24,0,0,1,128,152Zm73.71,7.14a80,80,0,0,1-14.08,22.2,8,8,0,0,1-11.92-10.67,63.95,63.95,0,0,0,0-85.33,8,8,0,1,1,11.92-10.67,80.08,80.08,0,0,1,14.08,84.47ZM69,103.09a64,64,0,0,0,11.26,67.58,8,8,0,0,1-11.92,10.67,79.93,79.93,0,0,1,0-106.67A8,8,0,1,1,80.29,85.34,63.77,63.77,0,0,0,69,103.09ZM248,128a119.58,119.58,0,0,1-34.29,84,8,8,0,1,1-11.42-11.2,103.9,103.9,0,0,0,0-145.56A8,8,0,1,1,213.71,44,119.58,119.58,0,0,1,248,128ZM53.71,200.78A8,8,0,1,1,42.29,212a119.87,119.87,0,0,1,0-168,8,8,0,1,1,11.42,11.2,103.9,103.9,0,0,0,0,145.56Z"/></symbol><symbol id="i-cloud-arrow-down" viewBox="0 0 256 256"><path d="M248,128a87.34,87.34,0,0,1-17.6,52.81,8,8,0,1,1-12.8-9.62A71.34,71.34,0,0,0,232,128a72,72,0,0,0-144,0,8,8,0,0,1-16,0,88,88,0,0,1,3.29-23.88C74.2,104,73.1,104,72,104a48,48,0,0,0,0,96H96a8,8,0,0,1,0,16H72A64,64,0,1,1,81.29,88.68,88,88,0,0,1,248,128Zm-69.66,42.34L160,188.69V128a8,8,0,0,0-16,0v60.69l-18.34-18.35a8,8,0,0,0-11.32,11.32l32,32a8,8,0,0,0,11.32,0l32-32a8,8,0,0,0-11.32-11.32Z"/></symbol><symbol id="i-circuitry" viewBox="0 0 256 256"><path d="M208,32H48A16,16,0,0,0,32,48V208a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V48A16,16,0,0,0,208,32ZM88,160a8,8,0,1,1-8,8A8,8,0,0,1,88,160ZM48,48H80v97.38a24,24,0,1,0,16,0V115.31l48,48V208H48ZM208,208H160V160a8,8,0,0,0-2.34-5.66L96,92.69V48h32V72a8,8,0,0,0,2.34,5.66l16,16A23.74,23.74,0,0,0,144,104a24,24,0,1,0,24-24,23.74,23.74,0,0,0-10.34,2.35L144,68.69V48h64V208ZM168,96a8,8,0,1,1-8,8A8,8,0,0,1,168,96Z"/></symbol><symbol id="i-terminal-window" viewBox="0 0 256 256"><path d="M128,128a8,8,0,0,1-3,6.25l-40,32a8,8,0,1,1-10-12.5L107.19,128,75,102.25a8,8,0,1,1,10-12.5l40,32A8,8,0,0,1,128,128Zm48,24H136a8,8,0,0,0,0,16h40a8,8,0,0,0,0-16Zm56-96V200a16,16,0,0,1-16,16H40a16,16,0,0,1-16-16V56A16,16,0,0,1,40,40H216A16,16,0,0,1,232,56ZM216,200V56H40V200H216Z"/></symbol><symbol id="i-list" viewBox="0 0 256 256"><path d="M224,128a8,8,0,0,1-8,8H40a8,8,0,0,1,0-16H216A8,8,0,0,1,224,128ZM40,72H216a8,8,0,0,0,0-16H40a8,8,0,0,0,0,16ZM216,184H40a8,8,0,0,0,0,16H216a8,8,0,0,0,0-16Z"/></symbol><symbol id="i-sun" viewBox="0 0 256 256"><path d="M120,40V16a8,8,0,0,1,16,0V40a8,8,0,0,1-16,0Zm72,88a64,64,0,1,1-64-64A64.07,64.07,0,0,1,192,128Zm-16,0a48,48,0,1,0-48,48A48.05,48.05,0,0,0,176,128ZM58.34,69.66A8,8,0,0,0,69.66,58.34l-16-16A8,8,0,0,0,42.34,53.66Zm0,116.68-16,16a8,8,0,0,0,11.32,11.32l16-16a8,8,0,0,0-11.32-11.32ZM192,72a8,8,0,0,0,5.66-2.34l16-16a8,8,0,0,0-11.32-11.32l-16,16A8,8,0,0,0,192,72Zm5.66,114.34a8,8,0,0,0-11.32,11.32l16,16a8,8,0,0,0,11.32-11.32ZM48,128a8,8,0,0,0-8-8H16a8,8,0,0,0,0,16H40A8,8,0,0,0,48,128Zm80,80a8,8,0,0,0-8,8v24a8,8,0,0,0,16,0V216A8,8,0,0,0,128,208Zm112-88H216a8,8,0,0,0,0,16h24a8,8,0,0,0,0-16Z"/></symbol><symbol id="i-moon" viewBox="0 0 256 256"><path d="M233.54,142.23a8,8,0,0,0-8-2,88.08,88.08,0,0,1-109.8-109.8,8,8,0,0,0-10-10,104.84,104.84,0,0,0-52.91,37A104,104,0,0,0,136,224a103.09,103.09,0,0,0,62.52-20.88,104.84,104.84,0,0,0,37-52.91A8,8,0,0,0,233.54,142.23ZM188.9,190.34A88,88,0,0,1,65.66,67.11a89,89,0,0,1,31.4-26A106,106,0,0,0,96,56,104.11,104.11,0,0,0,200,160a106,106,0,0,0,14.92-1.06A89,89,0,0,1,188.9,190.34Z"/></symbol><symbol id="i-check-circle" viewBox="0 0 256 256"><path d="M173.66,98.34a8,8,0,0,1,0,11.32l-56,56a8,8,0,0,1-11.32,0l-24-24a8,8,0,0,1,11.32-11.32L112,148.69l50.34-50.35A8,8,0,0,1,173.66,98.34ZM232,128A104,104,0,1,1,128,24,104.11,104.11,0,0,1,232,128Zm-16,0a88,88,0,1,0-88,88A88.1,88.1,0,0,0,216,128Z"/></symbol><symbol id="i-warning" viewBox="0 0 256 256"><path d="M236.8,188.09,149.35,36.22h0a24.76,24.76,0,0,0-42.7,0L19.2,188.09a23.51,23.51,0,0,0,0,23.72A24.35,24.35,0,0,0,40.55,224h174.9a24.35,24.35,0,0,0,21.33-12.19A23.51,23.51,0,0,0,236.8,188.09ZM222.93,203.8a8.5,8.5,0,0,1-7.48,4.2H40.55a8.5,8.5,0,0,1-7.48-4.2,7.59,7.59,0,0,1,0-7.72L120.52,44.21a8.75,8.75,0,0,1,15,0l87.45,151.87A7.59,7.59,0,0,1,222.93,203.8ZM120,144V104a8,8,0,0,1,16,0v40a8,8,0,0,1-16,0Zm20,36a12,12,0,1,1-12-12A12,12,0,0,1,140,180Z"/></symbol><symbol id="i-x" viewBox="0 0 256 256"><path d="M205.66,194.34a8,8,0,0,1-11.32,11.32L128,139.31,61.66,205.66a8,8,0,0,1-11.32-11.32L116.69,128,50.34,61.66A8,8,0,0,1,61.66,50.34L128,116.69l66.34-66.35a8,8,0,0,1,11.32,11.32L139.31,128Z"/></symbol><symbol id="i-arrow-clockwise" viewBox="0 0 256 256"><path d="M240,56v48a8,8,0,0,1-8,8H184a8,8,0,0,1,0-16H211.4L184.81,71.64l-.25-.24a80,80,0,1,0-1.67,114.78,8,8,0,0,1,11,11.63A95.44,95.44,0,0,1,128,224h-1.32A96,96,0,1,1,195.75,60L224,85.8V56a8,8,0,1,1,16,0Z"/></symbol><symbol id="i-trash" viewBox="0 0 256 256"><path d="M216,48H176V40a24,24,0,0,0-24-24H104A24,24,0,0,0,80,40v8H40a8,8,0,0,0,0,16h8V208a16,16,0,0,0,16,16H192a16,16,0,0,0,16-16V64h8a8,8,0,0,0,0-16ZM96,40a8,8,0,0,1,8-8h48a8,8,0,0,1,8,8v8H96Zm96,168H64V64H192ZM112,104v64a8,8,0,0,1-16,0V104a8,8,0,0,1,16,0Zm48,0v64a8,8,0,0,1-16,0V104a8,8,0,0,1,16,0Z"/></symbol><symbol id="i-upload-simple" viewBox="0 0 256 256"><path d="M224,144v64a8,8,0,0,1-8,8H40a8,8,0,0,1-8-8V144a8,8,0,0,1,16,0v56H208V144a8,8,0,0,1,16,0ZM93.66,77.66,120,51.31V144a8,8,0,0,0,16,0V51.31l26.34,26.35a8,8,0,0,0,11.32-11.32l-40-40a8,8,0,0,0-11.32,0l-40,40A8,8,0,0,0,93.66,77.66Z"/></symbol><symbol id="i-download-simple" viewBox="0 0 256 256"><path d="M224,144v64a8,8,0,0,1-8,8H40a8,8,0,0,1-8-8V144a8,8,0,0,1,16,0v56H208V144a8,8,0,0,1,16,0Zm-101.66,5.66a8,8,0,0,0,11.32,0l40-40a8,8,0,0,0-11.32-11.32L136,124.69V32a8,8,0,0,0-16,0v92.69L93.66,98.34a8,8,0,0,0-11.32,11.32Z"/></symbol><symbol id="i-copy" viewBox="0 0 256 256"><path d="M216,32H88a8,8,0,0,0-8,8V80H40a8,8,0,0,0-8,8V216a8,8,0,0,0,8,8H168a8,8,0,0,0,8-8V176h40a8,8,0,0,0,8-8V40A8,8,0,0,0,216,32ZM160,208H48V96H160Zm48-48H176V88a8,8,0,0,0-8-8H96V48H208Z"/></symbol><symbol id="i-floppy-disk" viewBox="0 0 256 256"><path d="M219.31,72,184,36.69A15.86,15.86,0,0,0,172.69,32H48A16,16,0,0,0,32,48V208a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V83.31A15.86,15.86,0,0,0,219.31,72ZM168,208H88V152h80Zm40,0H184V152a16,16,0,0,0-16-16H88a16,16,0,0,0-16,16v56H48V48H172.69L208,83.31ZM160,72a8,8,0,0,1-8,8H96a8,8,0,0,1,0-16h56A8,8,0,0,1,160,72Z"/></symbol><symbol id="i-key" viewBox="0 0 256 256"><path d="M216.57,39.43A80,80,0,0,0,83.91,120.78L28.69,176A15.86,15.86,0,0,0,24,187.31V216a16,16,0,0,0,16,16H72a8,8,0,0,0,8-8V208H96a8,8,0,0,0,8-8V184h16a8,8,0,0,0,5.66-2.34l9.56-9.57A79.73,79.73,0,0,0,160,176h.1A80,80,0,0,0,216.57,39.43ZM224,98.1c-1.09,34.09-29.75,61.86-63.89,61.9H160a63.7,63.7,0,0,1-23.65-4.51,8,8,0,0,0-8.84,1.68L116.69,168H96a8,8,0,0,0-8,8v16H72a8,8,0,0,0-8,8v16H40V187.31l58.83-58.82a8,8,0,0,0,1.68-8.84A63.72,63.72,0,0,1,96,95.92c0-34.14,27.81-62.8,61.9-63.89A64,64,0,0,1,224,98.1ZM192,76a12,12,0,1,1-12-12A12,12,0,0,1,192,76Z"/></symbol><symbol id="i-info" viewBox="0 0 256 256"><path d="M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm0,192a88,88,0,1,1,88-88A88.1,88.1,0,0,1,128,216Zm16-40a8,8,0,0,1-8,8,16,16,0,0,1-16-16V128a8,8,0,0,1,0-16,16,16,0,0,1,16,16v40A8,8,0,0,1,144,176ZM112,84a12,12,0,1,1,12,12A12,12,0,0,1,112,84Z"/></symbol><symbol id="i-plug" viewBox="0 0 256 256"><path d="M237.66,66.34a8,8,0,0,0-11.32,0L192,100.69,155.31,64l34.35-34.34a8,8,0,1,0-11.32-11.32L144,52.69,117.66,26.34a8,8,0,0,0-11.32,11.32L112.69,44l-53,53a40,40,0,0,0,0,56.57l15.71,15.71L26.34,218.34a8,8,0,0,0,11.32,11.32l49.09-49.09,15.71,15.71a40,40,0,0,0,56.57,0l53-53,6.34,6.35a8,8,0,0,0,11.32-11.32L203.31,112l34.35-34.34A8,8,0,0,0,237.66,66.34ZM147.72,185a24,24,0,0,1-33.95,0L71,142.23a24,24,0,0,1,0-33.95l53-53L200.69,132Z"/></symbol><symbol id="i-lock" viewBox="0 0 256 256"><path d="M208,80H176V56a48,48,0,0,0-96,0V80H48A16,16,0,0,0,32,96V208a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V96A16,16,0,0,0,208,80ZM96,56a32,32,0,0,1,64,0V80H96ZM208,208H48V96H208V208Zm-68-56a12,12,0,1,1-12-12A12,12,0,0,1,140,152Z"/></symbol><symbol id="i-play" viewBox="0 0 256 256"><path d="M232.4,114.49,88.32,26.35a16,16,0,0,0-16.2-.3A15.86,15.86,0,0,0,64,39.87V216.13A15.94,15.94,0,0,0,80,232a16.07,16.07,0,0,0,8.36-2.35L232.4,141.51a15.81,15.81,0,0,0,0-27ZM80,215.94V40l143.83,88Z"/></symbol></svg>
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none"><symbol id="i-speaker" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M15.5 9a4.2 4.2 0 0 1 0 6M18 6.5a8 8 0 0 1 0 11"/></g></symbol><symbol id="i-keys" viewBox="0 0 24 24"><g fill="currentColor"><circle cx="5" cy="5" r="2.6"/><circle cx="12" cy="5" r="2.6"/><circle cx="19" cy="5" r="2.6"/><circle cx="5" cy="12" r="2.6"/><circle cx="12" cy="12" r="2.6"/><circle cx="19" cy="12" r="2.6"/><circle cx="5" cy="19" r="2.6"/><circle cx="12" cy="19" r="2.6"/><circle cx="19" cy="19" r="2.6"/></g></symbol><symbol id="i-house" viewBox="0 0 256 256"><path d="M219.31,108.68l-80-80a16,16,0,0,0-22.62,0l-80,80A15.87,15.87,0,0,0,32,120v96a8,8,0,0,0,8,8h64a8,8,0,0,0,8-8V160h32v56a8,8,0,0,0,8,8h64a8,8,0,0,0,8-8V120A15.87,15.87,0,0,0,219.31,108.68ZM208,208H160V152a8,8,0,0,0-8-8H104a8,8,0,0,0-8,8v56H48V120l80-80,80,80Z"/></symbol><symbol id="i-companion" viewBox="0 0 256 256"><path d="M178.16,176H111.32A48,48,0,1,1,25.6,139.19a8,8,0,0,1,12.8,9.61A31.69,31.69,0,0,0,32,168a32,32,0,0,0,64,0,8,8,0,0,1,8-8h74.16a16,16,0,1,1,0,16ZM64,184a16,16,0,0,0,14.08-23.61l35.77-58.14a8,8,0,0,0-2.62-11,32,32,0,1,1,46.1-40.06A8,8,0,1,0,172,44.79a48,48,0,1,0-75.62,55.33L64.44,152c-.15,0-.29,0-.44,0a16,16,0,0,0,0,32Zm128-64a48.18,48.18,0,0,0-18,3.49L142.08,71.6A16,16,0,1,0,128,80l.44,0,35.78,58.15a8,8,0,0,0,11,2.61A32,32,0,1,1,192,200a8,8,0,0,0,0,16,48,48,0,0,0,0-96Z"/></symbol><symbol id="i-satellite" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m13.5 6.5-3.148-3.148a1.205 1.205 0 0 0-1.704 0L6.352 5.648a1.205 1.205 0 0 0 0 1.704L9.5 10.5"/><path d="M16.5 7.5 19 5"/><path d="m17.5 10.5 3.148 3.148a1.205 1.205 0 0 1 0 1.704l-2.296 2.296a1.205 1.205 0 0 1-1.704 0L13.5 14.5"/><path d="M9 21a6 6 0 0 0-6-6"/><path d="M9.352 10.648a1.205 1.205 0 0 0 0 1.704l2.296 2.296a1.205 1.205 0 0 0 1.704 0l4.296-4.296a1.205 1.205 0 0 0 0-1.704l-2.296-2.296a1.205 1.205 0 0 0-1.704 0z"/></g></symbol><symbol id="i-dock" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2.5"/><path d="M7 14h10"/></g></symbol><symbol id="i-network" viewBox="0 0 256 256"><path d="M232,112H136V88h8a16,16,0,0,0,16-16V40a16,16,0,0,0-16-16H112A16,16,0,0,0,96,40V72a16,16,0,0,0,16,16h8v24H24a8,8,0,0,0,0,16H56v32H48a16,16,0,0,0-16,16v32a16,16,0,0,0,16,16H80a16,16,0,0,0,16-16V176a16,16,0,0,0-16-16H72V128H184v32h-8a16,16,0,0,0-16,16v32a16,16,0,0,0,16,16h32a16,16,0,0,0,16-16V176a16,16,0,0,0-16-16h-8V128h32a8,8,0,0,0,0-16ZM112,40h32V72H112ZM80,208H48V176H80Zm128,0H176V176h32Z"/></symbol><symbol id="i-wifi-high" viewBox="0 0 256 256"><path d="M140,204a12,12,0,1,1-12-12A12,12,0,0,1,140,204ZM237.08,87A172,172,0,0,0,18.92,87,8,8,0,0,0,29.08,99.37a156,156,0,0,1,197.84,0A8,8,0,0,0,237.08,87ZM205,122.77a124,124,0,0,0-153.94,0A8,8,0,0,0,61,135.31a108,108,0,0,1,134.06,0,8,8,0,0,0,11.24-1.3A8,8,0,0,0,205,122.77Zm-32.26,35.76a76.05,76.05,0,0,0-89.42,0,8,8,0,0,0,9.42,12.94,60,60,0,0,1,70.58,0,8,8,0,1,0,9.42-12.94Z"/></symbol><symbol id="i-broadcast" viewBox="0 0 256 256"><path d="M128,88a40,40,0,1,0,40,40A40,40,0,0,0,128,88Zm0,64a24,24,0,1,1,24-24A24,24,0,0,1,128,152Zm73.71,7.14a80,80,0,0,1-14.08,22.2,8,8,0,0,1-11.92-10.67,63.95,63.95,0,0,0,0-85.33,8,8,0,1,1,11.92-10.67,80.08,80.08,0,0,1,14.08,84.47ZM69,103.09a64,64,0,0,0,11.26,67.58,8,8,0,0,1-11.92,10.67,79.93,79.93,0,0,1,0-106.67A8,8,0,1,1,80.29,85.34,63.77,63.77,0,0,0,69,103.09ZM248,128a119.58,119.58,0,0,1-34.29,84,8,8,0,1,1-11.42-11.2,103.9,103.9,0,0,0,0-145.56A8,8,0,1,1,213.71,44,119.58,119.58,0,0,1,248,128ZM53.71,200.78A8,8,0,1,1,42.29,212a119.87,119.87,0,0,1,0-168,8,8,0,1,1,11.42,11.2,103.9,103.9,0,0,0,0,145.56Z"/></symbol><symbol id="i-cloud-arrow-down" viewBox="0 0 256 256"><path d="M248,128a87.34,87.34,0,0,1-17.6,52.81,8,8,0,1,1-12.8-9.62A71.34,71.34,0,0,0,232,128a72,72,0,0,0-144,0,8,8,0,0,1-16,0,88,88,0,0,1,3.29-23.88C74.2,104,73.1,104,72,104a48,48,0,0,0,0,96H96a8,8,0,0,1,0,16H72A64,64,0,1,1,81.29,88.68,88,88,0,0,1,248,128Zm-69.66,42.34L160,188.69V128a8,8,0,0,0-16,0v60.69l-18.34-18.35a8,8,0,0,0-11.32,11.32l32,32a8,8,0,0,0,11.32,0l32-32a8,8,0,0,0-11.32-11.32Z"/></symbol><symbol id="i-gauge" viewBox="0 0 256 256"><path d="M207.06,72.67A111.24,111.24,0,0,0,128,40h-.4C66.07,40.21,16,91,16,153.13V176a16,16,0,0,0,16,16H224a16,16,0,0,0,16-16V152A111.25,111.25,0,0,0,207.06,72.67ZM224,176H119.71l54.76-75.3a8,8,0,0,0-12.94-9.42L99.92,176H32V153.13c0-3.08.15-6.12.43-9.13H56a8,8,0,0,0,0-16H35.27c10.32-38.86,44-68.24,84.73-71.66V80a8,8,0,0,0,16,0V56.33A96.14,96.14,0,0,1,221,128H200a8,8,0,0,0,0,16h23.67c.21,2.65.33,5.31.33,8Z"/></symbol><symbol id="i-circuitry" viewBox="0 0 256 256"><path d="M208,32H48A16,16,0,0,0,32,48V208a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V48A16,16,0,0,0,208,32ZM88,160a8,8,0,1,1-8,8A8,8,0,0,1,88,160ZM48,48H80v97.38a24,24,0,1,0,16,0V115.31l48,48V208H48ZM208,208H160V160a8,8,0,0,0-2.34-5.66L96,92.69V48h32V72a8,8,0,0,0,2.34,5.66l16,16A23.74,23.74,0,0,0,144,104a24,24,0,1,0,24-24,23.74,23.74,0,0,0-10.34,2.35L144,68.69V48h64V208ZM168,96a8,8,0,1,1-8,8A8,8,0,0,1,168,96Z"/></symbol><symbol id="i-terminal-window" viewBox="0 0 256 256"><path d="M128,128a8,8,0,0,1-3,6.25l-40,32a8,8,0,1,1-10-12.5L107.19,128,75,102.25a8,8,0,1,1,10-12.5l40,32A8,8,0,0,1,128,128Zm48,24H136a8,8,0,0,0,0,16h40a8,8,0,0,0,0-16Zm56-96V200a16,16,0,0,1-16,16H40a16,16,0,0,1-16-16V56A16,16,0,0,1,40,40H216A16,16,0,0,1,232,56ZM216,200V56H40V200H216Z"/></symbol><symbol id="i-list" viewBox="0 0 256 256"><path d="M224,128a8,8,0,0,1-8,8H40a8,8,0,0,1,0-16H216A8,8,0,0,1,224,128ZM40,72H216a8,8,0,0,0,0-16H40a8,8,0,0,0,0,16ZM216,184H40a8,8,0,0,0,0,16H216a8,8,0,0,0,0-16Z"/></symbol><symbol id="i-sun" viewBox="0 0 256 256"><path d="M120,40V16a8,8,0,0,1,16,0V40a8,8,0,0,1-16,0Zm72,88a64,64,0,1,1-64-64A64.07,64.07,0,0,1,192,128Zm-16,0a48,48,0,1,0-48,48A48.05,48.05,0,0,0,176,128ZM58.34,69.66A8,8,0,0,0,69.66,58.34l-16-16A8,8,0,0,0,42.34,53.66Zm0,116.68-16,16a8,8,0,0,0,11.32,11.32l16-16a8,8,0,0,0-11.32-11.32ZM192,72a8,8,0,0,0,5.66-2.34l16-16a8,8,0,0,0-11.32-11.32l-16,16A8,8,0,0,0,192,72Zm5.66,114.34a8,8,0,0,0-11.32,11.32l16,16a8,8,0,0,0,11.32-11.32ZM48,128a8,8,0,0,0-8-8H16a8,8,0,0,0,0,16H40A8,8,0,0,0,48,128Zm80,80a8,8,0,0,0-8,8v24a8,8,0,0,0,16,0V216A8,8,0,0,0,128,208Zm112-88H216a8,8,0,0,0,0,16h24a8,8,0,0,0,0-16Z"/></symbol><symbol id="i-moon" viewBox="0 0 256 256"><path d="M233.54,142.23a8,8,0,0,0-8-2,88.08,88.08,0,0,1-109.8-109.8,8,8,0,0,0-10-10,104.84,104.84,0,0,0-52.91,37A104,104,0,0,0,136,224a103.09,103.09,0,0,0,62.52-20.88,104.84,104.84,0,0,0,37-52.91A8,8,0,0,0,233.54,142.23ZM188.9,190.34A88,88,0,0,1,65.66,67.11a89,89,0,0,1,31.4-26A106,106,0,0,0,96,56,104.11,104.11,0,0,0,200,160a106,106,0,0,0,14.92-1.06A89,89,0,0,1,188.9,190.34Z"/></symbol><symbol id="i-check-circle" viewBox="0 0 256 256"><path d="M173.66,98.34a8,8,0,0,1,0,11.32l-56,56a8,8,0,0,1-11.32,0l-24-24a8,8,0,0,1,11.32-11.32L112,148.69l50.34-50.35A8,8,0,0,1,173.66,98.34ZM232,128A104,104,0,1,1,128,24,104.11,104.11,0,0,1,232,128Zm-16,0a88,88,0,1,0-88,88A88.1,88.1,0,0,0,216,128Z"/></symbol><symbol id="i-warning" viewBox="0 0 256 256"><path d="M236.8,188.09,149.35,36.22h0a24.76,24.76,0,0,0-42.7,0L19.2,188.09a23.51,23.51,0,0,0,0,23.72A24.35,24.35,0,0,0,40.55,224h174.9a24.35,24.35,0,0,0,21.33-12.19A23.51,23.51,0,0,0,236.8,188.09ZM222.93,203.8a8.5,8.5,0,0,1-7.48,4.2H40.55a8.5,8.5,0,0,1-7.48-4.2,7.59,7.59,0,0,1,0-7.72L120.52,44.21a8.75,8.75,0,0,1,15,0l87.45,151.87A7.59,7.59,0,0,1,222.93,203.8ZM120,144V104a8,8,0,0,1,16,0v40a8,8,0,0,1-16,0Zm20,36a12,12,0,1,1-12-12A12,12,0,0,1,140,180Z"/></symbol><symbol id="i-x" viewBox="0 0 256 256"><path d="M205.66,194.34a8,8,0,0,1-11.32,11.32L128,139.31,61.66,205.66a8,8,0,0,1-11.32-11.32L116.69,128,50.34,61.66A8,8,0,0,1,61.66,50.34L128,116.69l66.34-66.35a8,8,0,0,1,11.32,11.32L139.31,128Z"/></symbol><symbol id="i-arrow-clockwise" viewBox="0 0 256 256"><path d="M240,56v48a8,8,0,0,1-8,8H184a8,8,0,0,1,0-16H211.4L184.81,71.64l-.25-.24a80,80,0,1,0-1.67,114.78,8,8,0,0,1,11,11.63A95.44,95.44,0,0,1,128,224h-1.32A96,96,0,1,1,195.75,60L224,85.8V56a8,8,0,1,1,16,0Z"/></symbol><symbol id="i-trash" viewBox="0 0 256 256"><path d="M216,48H176V40a24,24,0,0,0-24-24H104A24,24,0,0,0,80,40v8H40a8,8,0,0,0,0,16h8V208a16,16,0,0,0,16,16H192a16,16,0,0,0,16-16V64h8a8,8,0,0,0,0-16ZM96,40a8,8,0,0,1,8-8h48a8,8,0,0,1,8,8v8H96Zm96,168H64V64H192ZM112,104v64a8,8,0,0,1-16,0V104a8,8,0,0,1,16,0Zm48,0v64a8,8,0,0,1-16,0V104a8,8,0,0,1,16,0Z"/></symbol><symbol id="i-upload-simple" viewBox="0 0 256 256"><path d="M224,144v64a8,8,0,0,1-8,8H40a8,8,0,0,1-8-8V144a8,8,0,0,1,16,0v56H208V144a8,8,0,0,1,16,0ZM93.66,77.66,120,51.31V144a8,8,0,0,0,16,0V51.31l26.34,26.35a8,8,0,0,0,11.32-11.32l-40-40a8,8,0,0,0-11.32,0l-40,40A8,8,0,0,0,93.66,77.66Z"/></symbol><symbol id="i-download-simple" viewBox="0 0 256 256"><path d="M224,144v64a8,8,0,0,1-8,8H40a8,8,0,0,1-8-8V144a8,8,0,0,1,16,0v56H208V144a8,8,0,0,1,16,0Zm-101.66,5.66a8,8,0,0,0,11.32,0l40-40a8,8,0,0,0-11.32-11.32L136,124.69V32a8,8,0,0,0-16,0v92.69L93.66,98.34a8,8,0,0,0-11.32,11.32Z"/></symbol><symbol id="i-copy" viewBox="0 0 256 256"><path d="M216,32H88a8,8,0,0,0-8,8V80H40a8,8,0,0,0-8,8V216a8,8,0,0,0,8,8H168a8,8,0,0,0,8-8V176h40a8,8,0,0,0,8-8V40A8,8,0,0,0,216,32ZM160,208H48V96H160Zm48-48H176V88a8,8,0,0,0-8-8H96V48H208Z"/></symbol><symbol id="i-floppy-disk" viewBox="0 0 256 256"><path d="M219.31,72,184,36.69A15.86,15.86,0,0,0,172.69,32H48A16,16,0,0,0,32,48V208a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V83.31A15.86,15.86,0,0,0,219.31,72ZM168,208H88V152h80Zm40,0H184V152a16,16,0,0,0-16-16H88a16,16,0,0,0-16,16v56H48V48H172.69L208,83.31ZM160,72a8,8,0,0,1-8,8H96a8,8,0,0,1,0-16h56A8,8,0,0,1,160,72Z"/></symbol><symbol id="i-key" viewBox="0 0 256 256"><path d="M216.57,39.43A80,80,0,0,0,83.91,120.78L28.69,176A15.86,15.86,0,0,0,24,187.31V216a16,16,0,0,0,16,16H72a8,8,0,0,0,8-8V208H96a8,8,0,0,0,8-8V184h16a8,8,0,0,0,5.66-2.34l9.56-9.57A79.73,79.73,0,0,0,160,176h.1A80,80,0,0,0,216.57,39.43ZM224,98.1c-1.09,34.09-29.75,61.86-63.89,61.9H160a63.7,63.7,0,0,1-23.65-4.51,8,8,0,0,0-8.84,1.68L116.69,168H96a8,8,0,0,0-8,8v16H72a8,8,0,0,0-8,8v16H40V187.31l58.83-58.82a8,8,0,0,0,1.68-8.84A63.72,63.72,0,0,1,96,95.92c0-34.14,27.81-62.8,61.9-63.89A64,64,0,0,1,224,98.1ZM192,76a12,12,0,1,1-12-12A12,12,0,0,1,192,76Z"/></symbol><symbol id="i-info" viewBox="0 0 256 256"><path d="M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm0,192a88,88,0,1,1,88-88A88.1,88.1,0,0,1,128,216Zm16-40a8,8,0,0,1-8,8,16,16,0,0,1-16-16V128a8,8,0,0,1,0-16,16,16,0,0,1,16,16v40A8,8,0,0,1,144,176ZM112,84a12,12,0,1,1,12,12A12,12,0,0,1,112,84Z"/></symbol><symbol id="i-plug" viewBox="0 0 256 256"><path d="M237.66,66.34a8,8,0,0,0-11.32,0L192,100.69,155.31,64l34.35-34.34a8,8,0,1,0-11.32-11.32L144,52.69,117.66,26.34a8,8,0,0,0-11.32,11.32L112.69,44l-53,53a40,40,0,0,0,0,56.57l15.71,15.71L26.34,218.34a8,8,0,0,0,11.32,11.32l49.09-49.09,15.71,15.71a40,40,0,0,0,56.57,0l53-53,6.34,6.35a8,8,0,0,0,11.32-11.32L203.31,112l34.35-34.34A8,8,0,0,0,237.66,66.34ZM147.72,185a24,24,0,0,1-33.95,0L71,142.23a24,24,0,0,1,0-33.95l53-53L200.69,132Z"/></symbol><symbol id="i-lock" viewBox="0 0 256 256"><path d="M208,80H176V56a48,48,0,0,0-96,0V80H48A16,16,0,0,0,32,96V208a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V96A16,16,0,0,0,208,80ZM96,56a32,32,0,0,1,64,0V80H96ZM208,208H48V96H208V208Zm-68-56a12,12,0,1,1-12-12A12,12,0,0,1,140,152Z"/></symbol><symbol id="i-play" viewBox="0 0 256 256"><path d="M232.4,114.49,88.32,26.35a16,16,0,0,0-16.2-.3A15.86,15.86,0,0,0,64,39.87V216.13A15.94,15.94,0,0,0,80,232a16.07,16.07,0,0,0,8.36-2.35L232.4,141.51a15.81,15.81,0,0,0,0-27ZM80,215.94V40l143.83,88Z"/></symbol></svg>
 <div id="app">
 <aside id="side">
   <div class="brand"><div class="logo"><svg class="ic"><use href="#i-keys"/></svg></div><div><b id="devname">Companion Box</b><small id="devid">connecting…</small></div></div>
@@ -519,7 +526,7 @@ const NAV=[
  ['Overview',[['home','house','Home']]],
  ['Companion',[['companion','companion','Companion']]],
  ['Connectivity',[['ethernet','network','Ethernet'],['wifi','wifi-high','Wi-Fi'],['ap','broadcast','Access point']]],
- ['System',[['firmware','cloud-arrow-down','Firmware'],['device','circuitry','Device'],['feedback','speaker','Speaker & LED'],['logs','terminal-window','Logs']]],
+ ['System',[['firmware','cloud-arrow-down','Firmware'],['device','circuitry','Device'],['feedback','speaker','Speaker & LED'],['perf','gauge','Performance'],['logs','terminal-window','Logs']]],
 ];
 const TITLES=Object.fromEntries(NAV.flatMap(g=>g[1]).map(([k,i,t])=>[k,[i,t]]));
 fill($('#nav'),NAV.map(([g,items])=>[h('div',{class:'grp'},g),items.map(([k,i,t])=>h('a',{href:'#'+k,'data-p':k},ic(i),h('span',null,t)))]));
@@ -614,17 +621,19 @@ async ethernet(pg){
 },
 async wifi(pg){
   const c=await rpc('Wifi.GetConfig');if(pg!==PG)return;pg.cfg=c;const off=c.wifiEnabled===false?'off':null;
-  /* three cards: the state, the primary network, the backup network */
+  /* four cards: the state, the networks in range, the primary network, the backup network. Wi-Fi off: all but the
+     first dimmed and disabled (a disabled fieldset: every field and button in it, Save too whatever dirt() says);
+     Turn Wi-Fi on stays */
   show(panel('Wi-Fi',[h('p',{class:'note'},'For places without a network cable. Power the box from its USB-C port.'),h('div',{id:'wfst',class:'kvw'}),
-    h('div',{class:'btns'},btn(off?'Turn Wi-Fi on':'Turn Wi-Fi off',act(()=>setWifiOn(!!off)),'ghost','wifi-high',{'data-k':'wifion'}),off&&h('span',{class:'note'},'Wi-Fi is off. The setup hotspot stays.'))],h('span',{id:'wfpill'}),'wifi-high'),
-  panel('Primary network',h('div',{class:off},h('div',{id:'wmst',class:'kvw'}),
+    h('div',{class:'btns'},btn(off?'Turn Wi-Fi on':'Turn Wi-Fi off',act(()=>setWifiOn(!!off)),'ghost','wifi-high',{'data-k':'wifion'}),off&&h('span',{class:'note'},'Wi-Fi is off. The setup hotspot stays on if it is enabled.'))],h('span',{id:'wfpill'}),'wifi-high'),
+  panel('Networks in range',h('fieldset',{class:off,disabled:!!off},h('p',{class:'note'},'Scan once, then make a network the primary or the backup. A hidden network: type its name in the card below.'),
+    h('div',{class:'btns',style:'margin:-4px 0 14px'},btn(scanLabel(),act(scanWifi),'ghost','wifi-high',{id:'wfscanb'})),h('div',{id:'wfscan'},scanFresh()?scanView(SCAN):null)),null,'wifi-high'),
+  panel('Primary network',h('fieldset',{class:off,disabled:!!off},h('div',{id:'wmst',class:'kvw'}),
     fld('ssid','Network name',c.wifiSsid,'text',{autocomplete:'off',spellcheck:'false',maxlength:32,placeholder:'Studio Wi-Fi'}),
-    h('div',{class:'btns',style:'margin:-4px 0 14px'},btn('Scan for networks',act(scanWifi),'ghost','wifi-high')),h('div',{id:'wfscan'}),
     pfld('wpass',c.wifiHasPass?'New password':'Password','',{autocomplete:'new-password',placeholder:c.wifiHasPass?'Leave empty to keep the saved one':''}),
     saveRow(saveWifi,c.wifiHasPass&&btn('Forget password',act(()=>forgetWifiPass('main')),'ghost','trash'),useBtn('main',c.wifiSsid))),h('span',{id:'wmpill'}),'wifi-high'),
-  panel('Backup network',h('div',{class:off},h('p',{class:'note'},'The box joins this one when it cannot join the network above for 30 seconds, and stays on it while it works. Leave the name empty for no backup. It is only used while the network above has a name.'),h('div',{id:'wbst',class:'kvw'}),
+  panel('Backup network',h('fieldset',{class:off,disabled:!!off},h('p',{class:'note'},'The box joins this one when it cannot join the network above for 30 seconds, and stays on it while it works. Leave the name empty for no backup. It is only used while the network above has a name.'),h('div',{id:'wbst',class:'kvw'}),
     fld('bssid','Network name',c.wifiBackupSsid,'text',{autocomplete:'off',spellcheck:'false',maxlength:32,placeholder:'Phone-Hotspot'}),
-    h('div',{class:'btns',style:'margin:-4px 0 14px'},btn('Scan for networks',act(()=>scanWifi('backup')),'ghost','wifi-high')),h('div',{id:'wfscan2'}),
     pfld('bpass',c.wifiBackupHasPass?'New password':'Password','',{autocomplete:'new-password',placeholder:c.wifiBackupHasPass?'Leave empty to keep the saved one':''}),
     saveRow(saveWifiBackup,c.wifiBackupHasPass&&btn('Forget password',act(()=>forgetWifiPass('backup')),'ghost','trash'),useBtn('backup',c.wifiSsid&&c.wifiBackupSsid))),h('span',{id:'wbpill'}),'wifi-high'));
 },
@@ -683,7 +692,7 @@ async device(pg){
       h('p',{class:'note'},"Companion's Surfaces → Discover can point this box at itself. Turn off to require the PIN for that too."),
       saveRow(saveDevice,a.auth_en&&btn(a.pin?'Remove PIN':'Remove password',act(removePass),'ghost','trash'))],
       a.auth_en?pill('ok',a.pin?'PIN on':'Password on'):pill('','No PIN'),'key')),
-    panel('Factory reset',[h('p',{class:'note'},'All settings go back to defaults, including Wi-Fi and the hotspot, which gets a new random password (shown on the decks). Decks keep their pages in Companion. Holding the service button (GPIO32) for 10 seconds does the same.'),
+    panel('Factory reset',[h('p',{class:'note'},'All settings go back to defaults, including Wi-Fi and the hotspot, which gets a new random password (shown on the decks). Decks keep their pages in Companion. Holding the service key for 10 seconds does the same.'),
       h('div',{class:'btns'},btn('Factory reset',()=>{rst.hidden=false},'danger','trash')),rst],null,'trash'));
   renderMsg();clearInterval(pg.tick);pg.tick=setInterval(renderMsg,1000);
 },
@@ -692,8 +701,10 @@ async feedback(pg){
   const range=(id,v,min)=>{const i=h('input',{id,type:'range',min,max:100,step:1});i.value=v;return i};
   const pct=(i,l)=>{const t=h('span',null),up=()=>{t.textContent=`${l}: ${i.value} %`};up();i.addEventListener('input',up);return h('label',{class:'f'},t,i)};
   const row=(id,label,on,...evs)=>h('div',{class:'snd'},chk(id,label,on),evs.map(([e,t])=>btn(t||'',act(()=>testSound(e)),t?'ghost':'ghost icon','play',{title:'Play','aria-label':'Play: '+(t?label+', '+t:label)})));
-  const pins=(c.ledPins||[]).includes(c.ledPin)?c.ledPins:[c.ledPin,...(c.ledPins||[])];
-  const sel=h('select',{id:'ledpin'},pins.map(p=>h('option',{value:p},'GPIO'+p)));sel.value=String(c.ledPin);
+  /* a pin list: the free header pins and the current one, without the other's pin (the light and the key never share) */
+  const pinSel=(id,cur,other)=>{const s=h('select',{id},[...new Set([cur,...(c.ledPins||[])])].filter(p=>p===cur||p!==other).sort((a,b)=>a-b)
+    .map(p=>h('option',{value:p},'GPIO'+p)));s.value=String(cur);return s};
+  const sel=pinSel('ledpin',c.ledPin,c.keyPin);
   show(h('div',{class:'grid'},
     panel('Speaker',[chk('spkon','Speaker on',c.speakerEnabled),pct(range('spkvol',c.speakerVolume,0),'Volume'),
       row('sready','Ready, after a start',c.soundReady,['ready']),
@@ -705,7 +716,25 @@ async feedback(pg){
     panel('Status light',[chk('ledon','Show the status on the light',c.ledEnabled),chk('ledfl','Flash with each event (key clicks too)',c.ledFlash),
       h('label',{class:'f'},h('span',null,'Data pin'),sel),pct(range('ledbri',c.ledBrightness,1),'Brightness'),
       kv(LIGHT.map(([col,l,m])=>[m,[h('span',{class:'dot',style:'box-shadow:0 0 0 1px var(--line2);background:'+col}),l]])),
-      h('p',{class:'note'},'One WS2812B NeoPixel: 5 V, GND and its data input on this pin. Find my box blinks it also when it is off.'),saveRow(saveLight)],null,'sun')));
+      h('p',{class:'note'},'One WS2812B NeoPixel: 5 V (a NeoKey\'s: 3V3), GND and its data input on this pin. Find my box blinks it also when it is off.'),saveRow(saveLight)],null,'sun'),
+    panel('Service key',[chk('keyon','Service key on',c.keyEnabled),h('label',{class:'f'},h('span',null,'Pin'),pinSel('keypin',c.keyPin,c.ledPin)),
+      pick('keyshort','Short press',KEY_ACTS.slice(0,5),c.keyShort),pick('keylong','Long press (held 3 s)',KEY_ACTS,c.keyLong),
+      h('div',{id:'keyst',class:'kvw'}),
+      h('p',{class:'note'},'A push button from this pin to GND. A NeoKey (Adafruit 5756): A to the pin, C to GND; its NeoPixel is the status light (In to the light\'s pin, VDD to 3V3, GND). Each mark (3, 5, 10 s) confirms: let go then. Held 5 s: the setup hotspot. Held 10 s: factory reset. Off: the key does nothing, not even the reset.'),
+      saveRow(saveKey)],null,'keys')));
+},
+/* Performance: Sys.GetPerf now, after 1 s (the first CPU shares need two readings) and then every 2 s while open */
+async perf(pg){
+  fill(V(),h('div',{class:'grid'},panel('CPU',h('div',{id:'pfcpu'}),null,'gauge'),panel('Memory',h('div',{id:'pfmem'}),null,'circuitry'),
+    panel('Ethernet in',h('div',{id:'pfeth'}),null,'network')),
+    panel('Tasks',h('div',{class:'tscroll'},h('table',{class:'ptab'},h('thead',null,h('tr',{id:'pfhead'},PCOLS.map(([k,t])=>h('th',k==='state'?{class:'pst'}:null,
+      h('button',{type:'button',class:'srt',onclick:()=>perfSortBy(k)},t))))),
+      h('tbody',{id:'pftasks'}))),h('span',{class:'note'},'Stack free: never used since the start'),'list'));
+  perfHeads();
+  const tick=async()=>{let r;try{r=await rpc('Sys.GetPerf')}catch(e){if(pg===PG)fill($('#pfcpu'),h('p',{class:'note'},'Could not read: '+errText(e)));return}
+    if(pg!==PG)return;perfDraw(r,pg.last,Date.now()-pg.at);pg.last=r;pg.at=Date.now()};
+  await tick();if(pg!==PG)return;   // left meanwhile: no timers on a page that go() no longer clears
+  pg.timer=setTimeout(tick,1000);pg.tick=setInterval(tick,2000);
 },
 async logs(pg){
   pg.seq=0;pg.lines=[];pg.len=0;pg.tail='';pg.ts=true;try{pg.ts=localStorage.getItem('logts')!=='0'}catch(_){}
@@ -883,35 +912,92 @@ LIVE.wifi=()=>{const s=S.sys||{},n=s.net||{},c=PG.cfg||{},v=(s.c6||{}).running,
   for(const k of ['main','backup']){const b=$('#use-'+k);if(b)b.hidden=n.sta_net===k}};
 /* Wifi.Scan: the networks in range. st: {busy} | {error: text} | {results: [{ssid, rssi, auth, channel}]} -> the node to show */
 const sigBars=r=>r>=-55?4:r>=-65?3:r>=-75?2:1;
-/* the two scan targets: the field ids, where the list goes and which saved-password flag counts */
-const WF={main:{ssid:'ssid',pass:'wpass',out:'wfscan',has:'wifiHasPass'},backup:{ssid:'bssid',pass:'bpass',out:'wfscan2',has:'wifiBackupHasPass'}};
-function scanView(st,who='main'){
+/* the last scan, kept for SCAN_KEEP_MS across page redraws and visits: one scan serves both networks */
+let SCAN=null;   // a scanView state, with at: when it ended
+const SCAN_KEEP_MS=5*60e3;
+const scanFresh=()=>!!SCAN&&(SCAN.busy||Date.now()-SCAN.at<SCAN_KEEP_MS);
+function scanView(st){
   if(st.busy)return h('div',{class:'scanst',role:'status'},h('span',{class:'spin'}),'Scanning. This takes a few seconds.');
   if(st.error)return h('div',{class:'scanst',role:'alert'},ic('warning'),'Scan failed: '+st.error);
   if(!st.results.length)return h('div',{class:'scanst'},'No networks found.');
-  return h('ul',{class:'nets'},st.results.map(n=>h('li',null,h('button',{type:'button',class:'net',title:n.ssid+', channel '+n.channel,'aria-label':`${n.ssid}, ${n.auth==='open'?'open':'secured'}, ${n.rssi} dBm`,onclick:()=>{const w=WF[who],t=pickNet(n,$('#'+w.ssid),$('#'+w.pass),!!(PG.cfg||{})[w.has]);fill($('#'+w.out),t&&h('p',{class:'note'},t));dirt()}},
-    h('span',{class:'bars b'+sigBars(n.rssi)},h('i'),h('i'),h('i'),h('i')),h('span',{class:'nm'},n.ssid),
-    n.auth!=='open'&&ic('lock','sm'),h('small',null,n.rssi+' dBm')))))}
-/* a network picked from the list: its name into the field, then the password (left empty for an open one).
-   Returns a hint when a saved password would stop the box joining an open network */
-function pickNet(n,ssid,pass,hasPass){
-  ssid.value=n.ssid;
-  if(n.auth==='open')pass.value='';
-  pass.focus();
-  return n.auth==='open'&&hasPass?'Open network: use "Forget password" so the box joins without one.':''}
+  return h('ul',{class:'nets'},st.results.map(netRow))}
+/* one network: signal, name, lock, dBm; the slot it already has, else a button for each slot */
+function netRow(n){
+  const c=PG.cfg||{},slot=n.ssid===c.wifiSsid?'main':n.ssid===c.wifiBackupSsid?'backup':null,ent=n.auth==='wpa2_enterprise';
+  let li;   // the row, for its buttons
+  return li=h('li',{class:'netr',title:n.ssid+', channel '+n.channel},h('span',{class:'bars b'+sigBars(n.rssi),'aria-hidden':'true'},h('i'),h('i'),h('i'),h('i')),h('span',{class:'nm'},n.ssid),
+    n.auth!=='open'&&h('span',{'aria-label':'secured',title:'Secured'},ic('lock','sm')),h('small',null,n.rssi+' dBm'),
+    slot?pill('ok',slot==='main'?'Primary':'Backup')
+      :ent?h('small',null,'Enterprise: not supported')
+      :h('div',{class:'btns'},['main','backup'].map(w=>btn(w==='main'?'Primary':'Backup',()=>pickNet(li,n,w),'ghost sm',null,
+        {'aria-label':`Make ${n.ssid} the ${w==='main'?'primary':'backup'} network`}))))}
+/* Primary or Backup pressed: an open network is saved at once; a secured one asks for its password under its row first */
+function pickNet(li,n,who){
+  if(n.auth==='open')return assignNet(n,who,'');
+  for(const f of document.querySelectorAll('.netpw'))f.remove();
+  for(const r of document.querySelectorAll('.netr.open'))r.classList.remove('open');
+  const bk=who==='backup',save=btn(bk?'Save as backup':'Save as primary',act(()=>assignNet(n,who,gv('scanpass'))),'sm','floppy-disk'),
+    f=h('div',{class:'netpw'},pfld('scanpass','Password for '+n.ssid,'',{autocomplete:'new-password'}),
+      h('div',{class:'btns'},save,btn('Cancel',()=>{f.remove();li.classList.remove('open')},'ghost sm')));
+  f.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.id==='scanpass'){e.preventDefault();save.click()}
+    else if(e.key==='Escape'){f.remove();li.classList.remove('open');li.querySelector('button').focus()}});
+  li.classList.add('open');li.append(f);$('#scanpass').focus()}
+/* the network into its slot, with its password ('' for an open one, which also drops a saved password) */
+async function assignNet(n,who,pass){
+  const bk=who==='backup';
+  if(n.auth!=='open'&&(pass.length<8||bytes(pass)>63))return bad('scanpass',PASS863);
+  const p=bk?{wifiBackupSsid:n.ssid,wifiBackupPass:pass}:{wifiSsid:n.ssid,wifiPass:pass};
+  if(via()==='wifi'&&!await confirmAction({title:bk?'Change the backup network?':'Change the Wi-Fi network?',body:P('This page reaches the box over Wi-Fi, so it may lose the connection.'),ok:'Save'}))return;
+  await call('Wifi.SetConfig',p,bk?(PG.cfg||{}).wifiSsid?`Saved. ${n.ssid} is the backup network.`:`Saved. ${n.ssid} is the backup; it is used once a primary network is set.`
+    :`Saved. The box joins ${n.ssid} now.`);
+  refreshStatus()}   // the page is drawn again from the new settings (rev.cfg): the list shows the new slots
 /* Wifi.Scan answers: {scanning} while the box is still scanning, else the list or why it failed -> the state scanView draws */
 const scanOutcome=r=>r.scanning?{error:'the box did not finish in time'}:r.error?{error:r.error}:{results:r.results||[]};
-/* the scan runs on the box for 3-6 s: start it, then ask for the answer twice a second for up to 10 s */
-async function scanWifi(who='main'){
-  const pg=PG,out=WF[who].out;
-  fill($('#'+out),scanView({busy:true},who));
+const scanLabel=()=>scanFresh()&&!SCAN.busy?'Scan again':'Scan for networks';
+/* the list and the button's label, on the Wi-Fi page only (a scan left running never draws over another page) */
+const drawScan=()=>{if(page!=='wifi')return;const o=$('#wfscan'),b=$('#wfscanb');if(o)fill(o,scanFresh()?scanView(SCAN):null);if(b)b.lastChild.textContent=scanLabel()};
+/* the scan runs on the box for 3-6 s: start it, then ask for the answer twice a second for up to 10 s. It finishes
+   even when the page is left, so the list is there on the way back */
+async function scanWifi(){
+  if(SCAN&&SCAN.busy)return;
+  SCAN={busy:true};drawScan();
   let st;
   try{
     let r=await rpc('Wifi.Scan');
-    for(let i=0;r.scanning&&i<20;i++){await sleep(500);if(pg!==PG)return;r=await rpc('Wifi.Scan',{results:true})}
+    for(let i=0;r.scanning&&i<20;i++){await sleep(500);r=await rpc('Wifi.Scan',{results:true})}
     st=scanOutcome(r)}
   catch(e){st={error:errText(e)}}
-  if(pg===PG)fill($('#'+out),scanView(st,who))}
+  SCAN=Object.assign(st,{at:Date.now()});drawScan()}
+/* the Performance page's numbers: r a Sys.GetPerf answer, last the one before it, ms between them (rates per second) */
+const KB=b=>b>=10485760?(b/1048576).toFixed(1)+' MB':Math.round(b/1024).toLocaleString('en')+' KB',pct=v=>v==null?'...':v.toFixed(1)+' %';
+function perfDraw(r,last,ms){
+  fill($('#pfcpu'),r.cores.map((c,i)=>h('div',{class:'pfrow'},h('span',null,'Core '+i),h('div',{class:'bar'},h('i',{style:'width:'+(c||0)+'%'})),h('b',null,pct(c)))),
+    kv([['Clock',r.cpuMhz?r.cpuMhz+' MHz':'-'],['Temperature',r.tempC==null?'-':r.tempC.toFixed(1)+' °C'],['Over',r.windowMs?(r.windowMs/1000).toFixed(1)+' s':'the next reading']]));
+  const mem=(t,m)=>[[t+' free',KB(m.free)+' of '+KB(m.total)],['Lowest free',KB(m.minFree)],['Largest block',KB(m.largest)]];
+  fill($('#pfmem'),kv([...mem('Internal',r.heap.internal),...mem('PSRAM',r.heap.psram)]));
+  const e=r.eth,le=last&&last.eth,n=(k,warn)=>{const v=e[k],s=v.toLocaleString('en')+(le&&ms>0?` (${Math.round(Math.max(0,v-le[k])*1000/ms).toLocaleString('en')}/s)`:'');
+    return warn&&v?pill('bad',s):s};
+  fill($('#pfeth'),e?kv([['To the box',n('unicast')],['Broadcast, multicast',n('multi')],['Dropped: no use',n('unwanted')],['Dropped: over budget',n('rate')],
+    ['Lost: no buffer',n('lostBuf',1)],['Lost: FIFO full',n('lostFifo',1)],
+    ['Broadcast storms',e.storm?[pill('warn','Blocked now'),' ',String(e.storms)]:String(e.storms||0)]]):h('p',{class:'note'},'Ethernet is not running.'));
+  perfTasks(r.tasks)}
+/* the task table: sorted by a column (PSORT, remembered in this browser), the task's name breaking ties. Numbers sort
+   biggest first and names A to Z at the first click, the other way round at the next; a share not known yet (null) last */
+const PCOLS=[['name','Task'],['core','Core'],['prio','Prio'],['state','State'],['cpu','CPU'],['stackFree','Stack free']];
+let PSORT={k:'cpu',d:-1};
+try{const v=JSON.parse(localStorage.getItem('psort'));if(v&&PCOLS.some(c=>c[0]===v.k)&&(v.d===1||v.d===-1))PSORT=v}catch(_){}
+const pcmp=(k,d)=>(a,b)=>{const x=a[k],y=b[k];
+  const c=x==null||y==null?(x==null)-(y==null):typeof x==='string'?d*x.localeCompare(y):d*(x-y);return c||a.name.localeCompare(b.name)};
+function perfTasks(tasks){
+  fill($('#pftasks'),tasks.slice().sort(pcmp(PSORT.k,PSORT.d)).map(t=>h('tr',null,h('td',null,t.name),
+    h('td',null,t.core<0?'any':String(t.core)),h('td',null,String(t.prio)),h('td',{class:'pst'},t.state),h('td',null,pct(t.cpu)),
+    h('td',t.stackFree<512?{class:'low'}:null,t.stackFree.toLocaleString('en')+' B'))))}
+/* the headers say which column sorts and which way (aria-sort, an arrow) */
+function perfHeads(){const r=$('#pfhead');if(!r)return;[...r.children].forEach((th,i)=>{const k=PCOLS[i][0];
+  if(k===PSORT.k)th.setAttribute('aria-sort',PSORT.d>0?'ascending':'descending');else th.removeAttribute('aria-sort')})}
+function perfSortBy(k){PSORT=PSORT.k===k?{k,d:-PSORT.d}:{k,d:k==='name'||k==='state'?1:-1};
+  try{localStorage.setItem('psort',JSON.stringify(PSORT))}catch(_){}
+  perfHeads();if(PG.last)perfTasks(PG.last.tasks)}
 const NAME32='At most 32 bytes (accented letters and symbols count 2-4)',PASS863='8-63 characters';
 async function saveWifi(){
   const ssid=gv('ssid').trim(),pass=gv('wpass'),p={wifiSsid:ssid};
@@ -922,8 +1008,8 @@ async function saveWifi(){
 }
 /* the station on or off, a button of its own (a switch never acts by itself); the hotspot keeps its own settings */
 async function setWifiOn(on){
-  if(!on&&via()==='wifi'&&!await confirmAction({title:'Turn Wi-Fi off?',body:P('This page reaches the box over Wi-Fi: it loses the connection. The setup hotspot stays.'),ok:'Turn off'}))return;
-  try{await call('Wifi.SetConfig',{wifiEnabled:on},on?'Wi-Fi on: the box joins the primary network.':'Wi-Fi off. The setup hotspot stays.')}catch(_){}
+  if(!on&&via()==='wifi'&&!await confirmAction({title:'Turn Wi-Fi off?',body:P('This page reaches the box over Wi-Fi: it loses the connection. The setup hotspot stays on if it is enabled.'),ok:'Turn off'}))return;
+  try{await call('Wifi.SetConfig',{wifiEnabled:on},on?'Wi-Fi on: the box joins the primary network.':'Wi-Fi off. The setup hotspot stays on if it is enabled.')}catch(_){}
   refreshStatus();
 }
 /* the backup pair: the name empty means no backup; a missing password keeps the saved one */
@@ -1054,7 +1140,7 @@ async function saveDevice(){
     if(a.auth_en&&!old)return bad('pwold','Enter the current '+(a.pin?'PIN':'password')+' first');
     if(!await confirmAction({title:a.auth_en?'Change the settings PIN?':'Set a settings PIN?',icon:'key',kind:'info',ok:a.auth_en?'Change PIN':'Set PIN',body:[
       P(a.auth_en?'Every other browser is signed out and needs the new PIN.':'This page then asks for it before it shows or changes anything, and the decks ask for it before their locked keys work.'),
-      P(B('Keep it somewhere safe.'),' Without it, nobody can sign in here, and the factory reset on this page is locked as well. The only way back is the service button (GPIO32): hold it for 10 seconds for a factory reset, which erases every setting.')]}))return;
+      P(B('Keep it somewhere safe.'),' Without it, nobody can sign in here, and the factory reset on this page is locked as well. The only way back is the service key, while it is switched on (Speaker & LED page: off by default, GPIO32 unless moved): hold it for 10 seconds for a factory reset, which erases every setting.')]}))return;
   }
   let did=false;const u={},ad=gv('cadopt');
   if(name!==pg.cfg.boxName)u.boxName=name;
@@ -1133,6 +1219,20 @@ async function saveLight(){
     P('The box drives that pin from now on: connect nothing to it but the light\'s data input.'),P('Move the data wire over from GPIO',String(c.ledPin),'.')]}))return;
   await call('Feedback.SetConfig',p,'Saved. Applied at once.');Object.assign(c,p);
 }
+/* the service key's actions, a press each (restart: the long press only) */
+const KEY_ACTS=[['menu','Open or close the box menu'],['find','Find my box'],['sound','Sound on / off'],['light','Status light on / off'],['none','Nothing'],['restart','Restart the box']];
+/* the service key: a move asks first (rewire), and so does turning it off (its 10 s factory reset goes with it) */
+async function saveKey(){
+  const c=PG.cfg,p={keyEnabled:gv('keyon'),keyPin:Number(gv('keypin')),keyShort:gv('keyshort'),keyLong:gv('keylong')};
+  if(p.keyPin!==c.keyPin&&!await confirmAction({title:`Move the service key to GPIO${p.keyPin}?`,ok:'Move it',body:[
+    P('Connect the key between that pin and GND.'),P('Move the wire over from GPIO',String(c.keyPin),'.')]}))return;
+  if(c.keyEnabled&&!p.keyEnabled&&!await confirmAction({title:'Turn the service key off?',ok:'Turn off',
+    body:P('Its presses and holds do nothing then, the 10 s factory reset included.')}))return;
+  await call('Feedback.SetConfig',p,'Saved. Applied at once.');Object.assign(c,p);
+}
+/* the key's live state (Sys.GetStatus.key, pushed as it changes): press it to check the wiring */
+LIVE.feedback=()=>{const k=(S.sys||{}).key||{},e=$('#keyst');if(e)fill(e,kv([['Now',k.down?pill('ok','Pressed'):'Not pressed'],
+  ['Presses',(k.presses||0)+' since the start']]))};
 /* the speaker field of a Feedback.Test / Device.Identify answer as words: null when it works; "starting"
    (the codec still coming up after a start) is no fault */
 const spkNote=s=>s==='ok'?null:s==='starting'?'The speaker is still starting: try again in a few seconds.':'The speaker does not work: '+s;
