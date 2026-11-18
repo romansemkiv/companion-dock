@@ -7,6 +7,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { checkFullImage, imageInfo, planFresh, planUpdate, readBoard } from "../installer/flasher/plan.mjs";
 
@@ -35,7 +36,20 @@ function box() {
   flash.set(SETTINGS, NVS);
   return flash;
 }
-const reader = (flash) => async (addr, size) => flash.slice(addr, addr + size);
+/* The board as the page reaches it: md5(address, size) is the flasher's checksum of a stretch of flash, read(address,
+   size) a small read. reads lists what was asked for. */
+function reader(flash, { broken = false } = {}) {
+  const reads = [];
+  return {
+    reads,
+    md5: async (addr, size) => createHash("md5").update(flash.subarray(addr, addr + size)).digest("hex"),
+    read: async (addr, size) => {
+      reads.push({ addr, size });
+      if (broken) throw new Error("No serial data received.");
+      return flash.slice(addr, addr + size);
+    },
+  };
+}
 function apply(flash, parts) {
   for (const p of parts) {
     assert.equal(p.address % 0x1000, 0, "a part starts on a flash sector");
@@ -100,6 +114,36 @@ test("of two boot records the later one wins", async () => {
   flash.set(appHeader({ version: "0.2.5" }), OTA_1);
   const board = await readBoard(FULL, reader(flash));
   assert.equal(board.slot, 0);
+});
+
+test("the board check asks for small pieces only, never a bulk read", async () => {
+  const flash = box();
+  flash.set(otaRecord(2, 0x55f63774), OTADATA);
+  const io = reader(flash);
+  await readBoard(FULL, io);
+  assert.ok(io.reads.length > 0);
+  for (const r of io.reads) assert.ok(r.size <= 256, `0x${r.addr.toString(16)}: ${r.size} bytes in one read`);
+});
+
+test("an update is still offered when the board's flash can't be read, on its checksums alone", async () => {
+  const flash = box();
+  const board = await readBoard(FULL, reader(flash, { broken: true }));
+  assert.equal(board.readFailed, true);
+  assert.equal(board.app, null);
+  const plan = planUpdate(FULL, board);
+  assert.equal(plan.ok, true);
+  apply(flash, plan.parts);
+  assert.deepEqual(region(flash, NVS, NVS_END), Buffer.from(SETTINGS));
+  assert.deepEqual(region(flash, OTA_0, OTA_0 + APP.length), Buffer.from(APP));
+});
+
+test("a board that reads well isn't reported as unreadable", async () => {
+  assert.equal((await readBoard(FULL, reader(box()))).readFailed, false);
+});
+
+test("a blank board is told apart without reading it", async () => {
+  const io = reader(new Uint8Array(FLASH_SIZE).fill(0xff), { broken: true });
+  assert.deepEqual(planUpdate(FULL, await readBoard(FULL, io)), { ok: false, why: "blank" });
 });
 
 test("an update keeps the settings and replaces the app", async () => {

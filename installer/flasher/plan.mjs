@@ -1,4 +1,5 @@
 // What the installer writes, and where. No DOM and no serial port in here: tools/test_installer.mjs runs it in Node.
+import { md5 } from "./md5.mjs";
 //
 // A full image is the whole flash from 0x0: the bootloader at 0x2000, the partition table at 0x8000, then the
 // partitions the table names, the first app slot last. Everything between the table and that app is blank in the
@@ -67,38 +68,51 @@ function crc32(bytes, init) {
   return ~c >>> 0;
 }
 
-/* The slot the bootloader starts: the boot record keeps two copies, a sector each; the valid one with the higher
-   sequence wins, and with none the first slot runs (there is no factory app). A copy is valid when its checksum
-   holds and its state isn't invalid (3) or aborted (4), the marks of a rolled-back update. */
-function runningSlot(otadata, slots) {
+/* The slot the bootloader starts: the boot record keeps two copies (records: the first 32 bytes of each); the valid
+   one with the higher sequence wins, and with none the first slot runs (there is no factory app). A copy is valid
+   when its checksum holds and its state isn't invalid (3) or aborted (4), the marks of a rolled-back update. */
+function runningSlot(records, slots) {
   let best = 0;
-  for (let at = 0; at + 32 <= otadata.length && at < 2 * SECTOR; at += SECTOR) {
-    const seq = u32(otadata, at), state = u32(otadata, at + 24);
+  for (const r of records) {
+    if (r.length < 32) continue;
+    const seq = u32(r, 0), state = u32(r, 24);
     if (seq === 0xffffffff || state === 3 || state === 4) continue;
-    if (crc32(otadata.subarray(at, at + 4), 0xffffffff) !== u32(otadata, at + 28)) continue;
+    if (crc32(r.subarray(0, 4), 0xffffffff) !== u32(r, 28)) continue;
     if (seq > best) best = seq;
   }
   return best ? (best - 1) % slots : 0;
 }
 
-/* Look at a board before writing: read(address, size) returns that much of its flash.
-   table: "same" (laid out like the image, so its settings are where this firmware keeps them), "other" or "blank".
-   slot, app: the slot it starts and the app in it ({ version, project }), or null when no app is there. */
-export async function readBoard(full, read) {
-  const { table, app } = mapOf(full);
-  const boot = await read(BOOT_AT, BOOT_END - BOOT_AT);
-  const theirs = parseTable(boot.subarray(TABLE_AT - BOOT_AT));
-  const board = { boot, table: "blank", slot: null, app: null };
-  if (!theirs.length) return board;
-  /* the same up to the first app slot: the settings, the boot record and where the app goes. What follows may
-     differ (an older table has a smaller core dump partition) and an update brings it up to date. */
-  const needed = table.filter((e) => e.offset <= app.offset);
-  board.table = needed.every((e) => theirs.some((t) => same(t, e))) ? "same" : "other";
-  if (board.table !== "same") return board;
-  const od = theirs.find((e) => e.type === TYPE_DATA && e.subtype === SUB_OTADATA);
-  const slots = otaSlots(theirs);
-  board.slot = runningSlot(await read(od.offset, od.size), slots.length);
-  board.app = appInfo(await read(slots[board.slot].offset, 256));
+/* Look at a board before writing. io.md5(address, size) is the flasher's MD5 (lowercase hex) of a stretch of the
+   board's flash; io.read(address, size) returns up to 256 bytes of it and may throw.
+
+   What decides whether an update is safe comes from checksums alone, the command every write is already verified
+   with: the board's partition table must begin with the image's entries up to the first app slot (the settings, the
+   boot record and where the app goes; what follows may differ, an older table has a smaller core dump partition,
+   and an update brings it up to date). Reading is only for what the page tells the user and for refusing another
+   project's app: a board whose flash can't be read is still updated (readFailed says the reads failed).
+
+   table: "same", "other" or "blank". bootSame: its bootloader and partition table are the image's.
+   slot, app: the slot it starts and the app in it ({ version, project }); app null: none there, or not read. */
+export async function readBoard(full, io) {
+  const { table, otadata, app } = mapOf(full);
+  const lead = full.subarray(TABLE_AT, TABLE_AT + 32 * (table.indexOf(app) + 1));
+  const board = { table: "other", bootSame: false, slot: null, app: null, readFailed: false };
+  if ((await io.md5(TABLE_AT, lead.length)) !== md5(lead)) {
+    if ((await io.md5(TABLE_AT, 32)) === md5(new Uint8Array(32).fill(0xff))) board.table = "blank";
+    return board;
+  }
+  board.table = "same";
+  board.bootSame = (await io.md5(BOOT_AT, BOOT_END - BOOT_AT)) === md5(full.subarray(BOOT_AT, BOOT_END));
+  try {
+    const slots = otaSlots(table);
+    const records = [await io.read(otadata.offset, 32), await io.read(otadata.offset + SECTOR, 32)];
+    const slot = runningSlot(records, slots.length);
+    board.app = appInfo(await io.read(slots[slot].offset, 256));
+    board.slot = slot;
+  } catch {
+    board.readFailed = true;
+  }
   return board;
 }
 
@@ -120,8 +134,6 @@ export function planUpdate(full, board) {
     { name: "the boot record", address: otadata.offset, data: full.subarray(otadata.offset, otadata.offset + otadata.size) },
   ];
   /* last, and only when it changed: a stop before this point leaves a box that still starts */
-  const boot = full.subarray(BOOT_AT, BOOT_END);
-  if (boot.length !== board.boot.length || boot.some((b, i) => b !== board.boot[i]))
-    parts.push({ name: "the bootloader", address: BOOT_AT, data: boot });
+  if (!board.bootSame) parts.push({ name: "the bootloader", address: BOOT_AT, data: full.subarray(BOOT_AT, BOOT_END) });
   return { ok: true, parts };
 }
