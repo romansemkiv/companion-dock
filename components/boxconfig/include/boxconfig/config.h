@@ -169,6 +169,12 @@ const char *boxcfg_led_pin_problem(int gpio);
 /* Those pins, ascending: writes at most max of them, returns how many. */
 int boxcfg_led_pins(int *out, int max);
 
+/* Another component's claim on header pins: NULL when gpio is not claimed, else why (shown as the refusal).
+ * A claimed pin is refused by boxcfg_led_pin_problem and left out of boxcfg_led_pins, so API writes can't
+ * pick it; a stored config already on it still loads (boxcfg_from_json_lenient). */
+typedef const char *(*boxcfg_pin_claim_fn)(int gpio);
+void boxcfg_set_pin_claim(boxcfg_pin_claim_fn fn); /* one claimant; NULL clears */
+
 /* keyShort, keyLong: what the service key's short and long presses do */
 enum {
     BOXCFG_KEY_ACT_MENU = 0,    /* "menu": the box menu opened on the decks, or closed */

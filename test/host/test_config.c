@@ -617,6 +617,39 @@ static void test_service_key(void)
     TEST_ASSERT_EQUAL_UINT8(9, v);
 }
 
+static const char *claim_22(int gpio) { return gpio == 22 ? "used by the test" : NULL; }
+
+/* another component's claim on header pins: refused for API writes and left out of the list, not at load */
+static void test_pin_claim(void)
+{
+    box_config_t c, s;
+    char err[96];
+    boxcfg_defaults(&c, MAC, fake_rand);
+    boxcfg_defaults(&s, MAC, fake_rand);
+    boxcfg_set_pin_claim(claim_22);
+    TEST_ASSERT_EQUAL_STRING("used by the test", boxcfg_led_pin_problem(22));
+    TEST_ASSERT_NULL(boxcfg_led_pin_problem(23));
+    TEST_ASSERT_NOT_NULL(boxcfg_led_pin_problem(6)); /* a taken pin keeps its own reason */
+    int pins[64];
+    const int n = boxcfg_led_pins(pins, 64);
+    TEST_ASSERT_EQUAL_INT(16, n);
+    for (int i = 0; i < n; i++) TEST_ASSERT_NOT_EQUAL_INT(22, pins[i]);
+    TEST_ASSERT_FALSE(boxcfg_from_json(&c, "{\"ledPin\":22}", err, sizeof err));
+    char key[24];
+    boxcfg_err_key(err, key, sizeof key);
+    TEST_ASSERT_EQUAL_STRING("ledPin", key);
+    TEST_ASSERT_FALSE(boxcfg_from_json(&c, "{\"keyPin\":22}", err, sizeof err));
+    boxcfg_err_key(err, key, sizeof key);
+    TEST_ASSERT_EQUAL_STRING("keyPin", key);
+    TEST_ASSERT_TRUE(boxcfg_from_json(&c, "{\"ledPin\":23}", err, sizeof err));
+    /* a stored config already on 22 still loads it: claims don't apply at load */
+    TEST_ASSERT_EQUAL_INT(0, boxcfg_from_json_lenient(&s, "{\"ledPin\":22}", NULL, 0));
+    TEST_ASSERT_EQUAL_INT8(22, s.led_pin);
+    boxcfg_set_pin_claim(NULL);
+    TEST_ASSERT_NULL(boxcfg_led_pin_problem(22));
+    TEST_ASSERT_EQUAL_INT(17, boxcfg_led_pins(pins, 64));
+}
+
 /* The LED's data pin and the service key's: a free header pin of the board that this firmware
  * doesn't use itself (GPIO7/8 the codec's I2C bus). */
 static void test_led_pins(void)
@@ -1222,6 +1255,7 @@ int main(void)
 {
     UNITY_BEGIN();
     RUN_TEST(test_defaults);
+    RUN_TEST(test_pin_claim);
     RUN_TEST(test_json_partial_update);
     RUN_TEST(test_json_invalid_leaves_unchanged);
     RUN_TEST(test_json_wrong_type_and_syntax);

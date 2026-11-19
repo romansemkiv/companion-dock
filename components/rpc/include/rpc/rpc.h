@@ -26,7 +26,7 @@ extern "C" {
 #define RPC_E_NO_METHOD (-32601)
 #define RPC_E_PARSE (-32700)
 
-#define RPC_MAX_METHODS 48
+#define RPC_MAX_METHODS 96
 
 typedef struct {
     int code;      /* 0 = no error */

@@ -387,6 +387,27 @@ static void test_table_full_drops(void)
     cJSON_Delete(a);
 }
 
+/* the table holds RPC_MAX_METHODS (96) names: the last is callable, one more overflows */
+static char s_fresh[RPC_MAX_METHODS + 1][16];
+
+static void test_table_holds_96(void)
+{
+    rpc_reset();
+    s_overflows = 0;
+    rpc_set_overflow_hook(overflow);
+    TEST_ASSERT_EQUAL_INT(96, RPC_MAX_METHODS);
+    for (int i = 0; i < RPC_MAX_METHODS; i++) {
+        snprintf(s_fresh[i], sizeof s_fresh[i], "Hold.H%d", i);
+        rpc_register(s_fresh[i], m_null, 0);
+    }
+    TEST_ASSERT_EQUAL_INT(0, s_overflows);
+    TEST_ASSERT_TRUE(rpc_method_exists(s_fresh[RPC_MAX_METHODS - 1]));
+    snprintf(s_fresh[RPC_MAX_METHODS], sizeof s_fresh[0], "Hold.More");
+    rpc_register(s_fresh[RPC_MAX_METHODS], m_null, 0);
+    TEST_ASSERT_EQUAL_INT(1, s_overflows);
+    TEST_ASSERT_FALSE(rpc_method_exists("Hold.More"));
+}
+
 int main(void)
 {
     UNITY_BEGIN();
@@ -408,5 +429,6 @@ int main(void)
     RUN_TEST(test_list_and_flags);
     RUN_TEST(test_register_same_name_replaces);
     RUN_TEST(test_table_full_drops);
+    RUN_TEST(test_table_holds_96);
     return UNITY_END();
 }

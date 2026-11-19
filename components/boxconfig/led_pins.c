@@ -9,6 +9,7 @@
 #include <string.h>
 
 #include "boxconfig/config.h"
+#include "boxconfig_private.h"
 
 #define GPIO_MAX 54
 
@@ -56,18 +57,36 @@ static const char *const TAKEN[GPIO_MAX + 1] = {
     [54] = "GPIO54 is the Wi-Fi chip's reset",
 };
 
-const char *boxcfg_led_pin_problem(int gpio)
+static boxcfg_pin_claim_fn s_claim;
+
+void boxcfg_set_pin_claim(boxcfg_pin_claim_fn fn) { s_claim = fn; }
+
+static bool is_free(int gpio)
 {
     for (size_t i = 0; i < sizeof FREE / sizeof *FREE; i++)
-        if (FREE[i] == gpio) return NULL;
+        if (FREE[i] == gpio) return true;
+    return false;
+}
+
+const char *boxcfg_pin_problem_base(int gpio)
+{
+    if (is_free(gpio)) return NULL;
     if (gpio >= 0 && gpio <= GPIO_MAX && TAKEN[gpio]) return TAKEN[gpio];
     return "not a free pin: use GPIO 0-5, 20-23, 26, 27, 32, 33 or 46-48";
+}
+
+const char *boxcfg_led_pin_problem(int gpio)
+{
+    const char *why = boxcfg_pin_problem_base(gpio);
+    if (!why && s_claim) why = s_claim(gpio);
+    return why;
 }
 
 int boxcfg_led_pins(int *out, int max)
 {
     int n = 0;
-    for (size_t i = 0; i < sizeof FREE / sizeof *FREE && n < max; i++) out[n++] = FREE[i];
+    for (size_t i = 0; i < sizeof FREE / sizeof *FREE && n < max; i++)
+        if (!s_claim || !s_claim(FREE[i])) out[n++] = FREE[i];
     return n;
 }
 

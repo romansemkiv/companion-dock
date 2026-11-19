@@ -1,4 +1,5 @@
 #include "boxconfig/config.h"
+#include "boxconfig_private.h"
 
 #include <ctype.h>
 #include <stdio.h>
@@ -151,7 +152,7 @@ static bool get_int(const cJSON *root, const char *key, int lo, int hi, int *dst
 }
 
 /* The speaker, the status light (components/feedback) and the service key (main/svcbtn.c). */
-static bool get_feedback(const cJSON *root, box_config_t *t, char *err, size_t errlen)
+static bool get_feedback(const cJSON *root, box_config_t *t, bool claims, char *err, size_t errlen)
 {
     int vol = t->speaker_volume, pin = t->led_pin, bright = t->led_brightness, kpin = t->key_pin;
     bool ok = get_bool(root, "speakerEnabled", &t->speaker_enabled, err, errlen) &&
@@ -167,12 +168,16 @@ static bool get_feedback(const cJSON *root, box_config_t *t, char *err, size_t e
               get_int(root, "ledBrightness", 1, 100, &bright, err, errlen) &&
               get_bool(root, "keyEnabled", &t->key_enabled, err, errlen) &&
               get_int(root, "keyPin", 0, 54, &kpin, err, errlen);
-    const char *why = ok ? boxcfg_led_pin_problem(pin) : NULL;
+    /* another component's claim on a pin counts for the pins this request names, and not at all when loading
+     * what is stored */
+    const char *why = !ok ? NULL : claims && cJSON_GetObjectItemCaseSensitive(root, "ledPin") ? boxcfg_led_pin_problem(pin)
+                                                                                             : boxcfg_pin_problem_base(pin);
     if (why) {
         set_err(err, errlen, "ledPin", why);
         ok = false;
     }
-    why = ok ? boxcfg_key_pin_problem(kpin) : NULL;
+    why = !ok ? NULL : claims && cJSON_GetObjectItemCaseSensitive(root, "keyPin") ? boxcfg_key_pin_problem(kpin)
+                                                                                  : boxcfg_pin_problem_base(kpin);
     if (why) {
         set_err(err, errlen, "keyPin", why);
         ok = false;
@@ -327,7 +332,7 @@ static bool known_key(const char *k)
 }
 
 /* boxcfg_from_json on a parsed object. */
-static bool from_root(box_config_t *c, const cJSON *root, char *err, size_t errlen)
+static bool from_root(box_config_t *c, const cJSON *root, bool claims, char *err, size_t errlen)
 {
     box_config_t t = *c;
     bool ok =
@@ -379,7 +384,7 @@ static bool from_root(box_config_t *c, const cJSON *root, char *err, size_t errl
         }
     }
     if (ok) ok = get_surface_mode(root, &t.surface_mode, err, errlen);
-    if (ok) ok = get_feedback(root, &t, err, errlen);
+    if (ok) ok = get_feedback(root, &t, claims, err, errlen);
     if (ok) ok = get_deck_brightness(root, &t, err, errlen);
     if (ok) ok = get_deck_limit(root, &t, err, errlen);
     if (ok) ok = get_gesture(root, &t, err, errlen);
@@ -395,7 +400,7 @@ bool boxcfg_from_cjson(box_config_t *c, const cJSON *root, char *err, size_t err
         set_err(err, errlen, "json", "expected an object");
         return false;
     }
-    return from_root(c, root, err, errlen);
+    return from_root(c, root, true, err, errlen);
 }
 
 bool boxcfg_from_json(box_config_t *c, const char *json, char *err, size_t errlen)
@@ -580,7 +585,7 @@ int boxcfg_from_json_lenient(box_config_t *c, const char *json, char *skipped, s
             bool ok = false;
             if (one && dup && cJSON_AddItemToObject(one, it->string, dup)) {
                 dup = NULL; /* owned by one */
-                ok = from_root(c, one, err, sizeof err);
+                ok = from_root(c, one, false, err, sizeof err);
             } else {
                 snprintf(err, sizeof err, "%s: no memory", it->string);
             }
