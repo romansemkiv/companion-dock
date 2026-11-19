@@ -18,15 +18,29 @@ idf_build_get_property(python PYTHON)
 set(page "index.html")
 set(pack "${CMAKE_CURRENT_SOURCE_DIR}/../../tools/pack_page.py")
 set(index_gz "${CMAKE_CURRENT_BINARY_DIR}/index.html.gz")
+# Optional: a JS file whose text goes in at the page's /*@ext*/ marker (sections and navigation another build
+# adds), and the size limit in bytes to use instead of pack_page.LIMIT. Both empty: the page as the source has it.
+set(WEBUI_PAGE_EXT "" CACHE STRING "A JS file packed into the page at its /*@ext*/ marker")
+set(WEBUI_PAGE_LIMIT "" CACHE STRING "The page's gzipped size limit in bytes (empty: pack_page.LIMIT)")
+set(pack_args "")
+set(pack_deps "")
+if(WEBUI_PAGE_EXT)
+    list(APPEND pack_args --ext "${WEBUI_PAGE_EXT}")
+    list(APPEND pack_deps "${WEBUI_PAGE_EXT}")
+endif()
+if(WEBUI_PAGE_LIMIT)
+    list(APPEND pack_args --limit "${WEBUI_PAGE_LIMIT}")
+endif()
 add_custom_command(OUTPUT "${index_gz}"
-    COMMAND "${python}" "${pack}" "${CMAKE_CURRENT_SOURCE_DIR}/www/${page}" "${index_gz}"
-    DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/www/${page}" "${pack}"
+    COMMAND "${python}" "${pack}" "${CMAKE_CURRENT_SOURCE_DIR}/www/${page}" "${index_gz}" ${pack_args}
+    DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/www/${page}" "${pack}" ${pack_deps}
     VERBATIM)
 target_add_binary_data(${COMPONENT_LIB} "${index_gz}" BINARY)
-# the page's size against its limit (pack_page.LIMIT), printed whenever the component is rebuilt
+# the page's size against its limit (pack_page.LIMIT, or WEBUI_PAGE_LIMIT), printed whenever the component is rebuilt
 add_custom_command(TARGET ${COMPONENT_LIB} POST_BUILD
-    COMMAND "${python}" -B -c "import os,sys;sys.path.insert(0,sys.argv[3]);import pack_page as p;g=os.path.getsize(sys.argv[2]);print('webui: index.html %d bytes, embedded gzip %d bytes (%.1f KB of %d KB)'%(os.path.getsize(sys.argv[1]),g,g/1024,p.LIMIT//1024))"
+    COMMAND "${python}" -B -c "import os,sys;sys.path.insert(0,sys.argv[3]);import pack_page as p;g=os.path.getsize(sys.argv[2]);print('webui: index.html %d bytes, embedded gzip %d bytes (%.1f KB of %d KB)'%(os.path.getsize(sys.argv[1]),g,g/1024,int(sys.argv[4] or p.LIMIT)//1024))"
             "${CMAKE_CURRENT_SOURCE_DIR}/www/${page}" "${index_gz}" "${CMAKE_CURRENT_SOURCE_DIR}/../../tools"
+            "${WEBUI_PAGE_LIMIT}"
     VERBATIM)
 
 # PBKDF2 (10 000 HMAC rounds per password check) runs on the HTTP server's task: optimise this file

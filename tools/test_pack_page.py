@@ -162,6 +162,46 @@ with tempfile.TemporaryDirectory() as d:
     check(over == 1 and not over_written, "over the limit: exit %r, output written %r" % (over, over_written))
     check(ok == 0 and os.path.getsize(gz) <= pp.LIMIT, "the page is not within the limit")
 
+# ---- --ext: a file's text replaces the /*@ext*/ marker ----
+def run_main(*argv):
+    devnull = open(os.devnull, "w")
+    old = sys.stdout, sys.stderr
+    sys.stdout = sys.stderr = devnull
+    try:
+        return pp.main(["pack_page.py"] + list(argv))
+    finally:
+        sys.stdout, sys.stderr = old
+        devnull.close()
+
+
+with tempfile.TemporaryDirectory() as d:
+    gz, hout, ext = (os.path.join(d, n) for n in ("a.gz", "a.html", "ext.js"))
+    open(ext, "w").write("EXT.nav.push(['Extra',[['x','house','X']]]);\n")
+    check(run_main(PAGE, gz, "--html", hout, "--ext", ext) == 0, "ext: packing with --ext failed")
+    got = open(hout, encoding="utf-8").read() if os.path.exists(hout) else ""
+    check("EXT.nav.push(['Extra',[['x','house','X']]]);" in got, "ext: the file's text is not in the page")
+    check(0 <= got.find("EXT.nav.push") < got.find("const NAV"), "ext: its text is not before const NAV")
+    check("/*@ext*/" not in got, "ext: the marker is left")
+
+    nomark = os.path.join(d, "nomark.html")
+    open(nomark, "w").write("<script>const a = 1</script>\n")
+    gz2 = os.path.join(d, "b.gz")
+    check(run_main(nomark, gz2, "--ext", ext) == 1 and not os.path.exists(gz2),
+          "ext: a page without the marker: exit 1 and nothing written expected")
+    twice = os.path.join(d, "twice.html")
+    open(twice, "w").write("<script>/*@ext*/\n/*@ext*/</script>\n")
+    check(run_main(twice, gz2, "--ext", ext) == 1 and not os.path.exists(gz2), "ext: two markers must fail")
+
+    # no --ext: the marker goes as any comment, under the limit; an empty ext file gives the same bytes
+    h0, h1, empty = (os.path.join(d, n) for n in ("n0.html", "n1.html", "empty.js"))
+    open(empty, "w").write("")
+    check(run_main(PAGE, gz, "--html", h0) == 0 and run_main(PAGE, gz2, "--html", h1, "--ext", empty) == 0,
+          "no ext: packing failed")
+    p0 = open(h0, encoding="utf-8").read()
+    check("/*@ext*/" not in p0 and "@ext" not in p0, "no ext: the marker is in the output")
+    check(p0 == open(h1, encoding="utf-8").read(), "no ext: an empty ext file changes the page")
+    check(os.path.getsize(gz) <= pp.LIMIT, "no ext: over the limit")
+
 if fails:
     for f in fails:
         print("test_pack_page: " + f)

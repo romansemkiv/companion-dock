@@ -3,7 +3,7 @@
 the embedded copy drops them, with each line's indentation and blank lines, then is gzip -9 compressed (mtime 0, so
 the output is reproducible) and its size is checked against the limit.
 
-  pack_page.py <index.html> <out.gz> [--html <out.html>] [--limit BYTES]
+  pack_page.py <index.html> <out.gz> [--html <out.html>] [--limit BYTES] [--ext FILE]
 
 - Markup: <!-- --> comments go, except a licence notice (one naming a licence stays in every copy).
 - <style>: /* */ comments go, every run of white space becomes one space, none is kept next to { } ; ,
@@ -16,6 +16,9 @@ the output is reproducible) and its size is checked against the limit.
 - The limit: LIMIT bytes gzipped, the one place it is set (the build and the host tests both run this). Over it,
   this exits 1 with the sizes and writes nothing. --limit overrides it (a test of the failure). --html: also
   writes the stripped page (the host tests check that its scripts compile and run, tools/check_pages.js).
+- --ext FILE: FILE's text replaces the one /*@ext*/ marker line of the page (before the stripping, so it is
+  stripped like the rest); the marker must occur exactly once, else this exits 1 and writes nothing. Without
+  --ext the marker is a comment and goes. The page reads what the file adds from its EXT object.
   tools/test_pack_page.py tests this file.
 """
 import gzip
@@ -201,9 +204,16 @@ def pack(html):
     return "\n".join(x for x in out if x) + "\n"
 
 
+EXT_MARKER = "/*@ext*/"
+
+
 def main(argv):
     args = argv[1:]
-    limit, html_out = LIMIT, None
+    limit, html_out, ext = LIMIT, None, None
+    if "--ext" in args:
+        k = args.index("--ext")
+        ext = args[k + 1]
+        del args[k:k + 2]
     if "--limit" in args:
         k = args.index("--limit")
         limit = int(args[k + 1])
@@ -216,6 +226,12 @@ def main(argv):
         sys.stderr.write(__doc__)
         return 2
     src = open(args[0], encoding="utf-8").read()
+    if ext is not None:
+        if src.count(EXT_MARKER) != 1:
+            sys.stderr.write("webui: the marker %s must occur exactly once in %s (found %d)\n" % (
+                EXT_MARKER, args[0], src.count(EXT_MARKER)))
+            return 1
+        src = src.replace(EXT_MARKER, open(ext, encoding="utf-8").read())
     page = pack(src).encode("utf-8")
     gz = gzip.compress(page, 9, mtime=0)
     raw_gz = len(gzip.compress(src.encode("utf-8"), 9, mtime=0))

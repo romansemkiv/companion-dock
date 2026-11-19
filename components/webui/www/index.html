@@ -522,12 +522,18 @@ function signs(n){
 }
 
 /* ---------- navigation ---------- */
+/* What another build adds: nav = [[group, [[key, icon, title], ...]], ...], pages = {key: page}. The packer
+   (tools/pack_page.py --ext FILE) puts the file's text at the marker below; with no file this stays empty. */
+const EXT={nav:[],pages:{}};
+/*@ext*/
 const NAV=[
  ['Overview',[['home','house','Home']]],
  ['Companion',[['companion','companion','Companion']]],
  ['Connectivity',[['ethernet','network','Ethernet'],['wifi','wifi-high','Wi-Fi'],['ap','broadcast','Access point']]],
  ['System',[['firmware','cloud-arrow-down','Firmware'],['device','circuitry','Device'],['feedback','speaker','Speaker & LED'],['perf','gauge','Performance'],['logs','terminal-window','Logs']]],
 ];
+for(const [g,items] of EXT.nav){const own=NAV.find(x=>x[0]===g);
+  if(own)own[1].push(...items);else NAV.splice(NAV.findIndex(x=>x[0]==='System'),0,[g,items])}
 const TITLES=Object.fromEntries(NAV.flatMap(g=>g[1]).map(([k,i,t])=>[k,[i,t]]));
 fill($('#nav'),NAV.map(([g,items])=>[h('div',{class:'grp'},g),items.map(([k,i,t])=>h('a',{href:'#'+k,'data-p':k},ic(i),h('span',null,t)))]));
 function setDrawer(open){const sd=$('#side'),was=sd.classList.contains('open');if(open===was)return;
@@ -748,6 +754,7 @@ async logs(pg){
   pollLog(pg);
 },
 };
+Object.assign(PAGES,EXT.pages);
 
 /* ---------- Home ---------- */
 /* The signal chain: Network → Companion → Decks, each link with its state (dot), one word, one line and, when
