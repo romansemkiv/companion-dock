@@ -1,10 +1,10 @@
-# auth_logic.c, web_logic.c, ws_table.c, notify_logic.c and perf_logic.c are pure (also built by the host tests);
-# the rest is ESP.
+# auth_logic.c, web_logic.c, ws_table.c, notify_logic.c, perf_logic.c and cfgext_logic.c are pure (also built by the
+# host tests); the rest is ESP.
 idf_component_register(SRCS "web.c" "web_logic.c" "ws_table.c" "methods.c" "auth.c" "auth_logic.c" "logbuf.c"
-                            "notify.c" "notify_logic.c" "deckact.c" "perf.c" "perf_logic.c"
+                            "notify.c" "notify_logic.c" "deckact.c" "perf.c" "perf_logic.c" "cfgext_logic.c"
                        INCLUDE_DIRS "include"
-                       REQUIRES boxconfig esp_common netmgr surfaces
-                       PRIV_REQUIRES rpc json esp_http_server app_update esp_app_format nvs_flash esp_hw_support
+                       REQUIRES boxconfig esp_common json netmgr surfaces
+                       PRIV_REQUIRES rpc esp_http_server app_update esp_app_format nvs_flash esp_hw_support
                                      esp_system esp_timer esp_netif freertos log lwip heap discovery
                                      satclient usbdeck c6fw elgdock breadcrumb feedback slotsync deckui esp_driver_tsens)
 

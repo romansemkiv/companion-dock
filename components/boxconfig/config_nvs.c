@@ -124,6 +124,20 @@ esp_err_t boxcfg_save(const box_config_t *c)
     return e;
 }
 
+#define RESET_HOOKS 4
+static void (*s_reset_hooks[RESET_HOOKS])(void); /* registered at start-up, read-only after */
+static int s_n_reset_hooks;
+
+void boxcfg_on_factory_reset(void (*fn)(void))
+{
+    if (!fn) return;
+    if (s_n_reset_hooks >= RESET_HOOKS) {
+        ESP_LOGE(TAG, "no room for another factory reset callback (%d taken)", RESET_HOOKS);
+        return;
+    }
+    s_reset_hooks[s_n_reset_hooks++] = fn;
+}
+
 esp_err_t boxcfg_factory_reset(void)
 {
     nvs_handle_t h;
@@ -132,5 +146,6 @@ esp_err_t boxcfg_factory_reset(void)
     e = nvs_erase_all(h);
     if (e == ESP_OK) e = nvs_commit(h);
     nvs_close(h);
+    for (int i = 0; e == ESP_OK && i < s_n_reset_hooks; i++) s_reset_hooks[i]();
     return e;
 }

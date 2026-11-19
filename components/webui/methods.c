@@ -15,6 +15,10 @@
  * The Wi-Fi station passwords (main and backup) and the settings password's verifier never leave the
  * box: Wifi.GetConfig reports only whether each is stored.
  *
+ * Settings another component owns (webui/ext.h): a section's GetConfig adds them after its own keys; its SetConfig
+ * splits the params (cfgext_split), asks every owner to check its keys (dry_run) before the section's own are saved,
+ * and has the owners save theirs after. A call without such keys is handled as before they existed.
+ *
  * Key style: config keys are boxconfig's camelCase names (the same in GetConfig and SetConfig), but
  * for Companion's "mode", which is boxconfig's "surfaceMode" (the stored config and the seed tool keep
  * that name); status and result keys are snake_case. */
@@ -26,6 +30,7 @@
 #include "boxconfig/config.h"
 #include "breadcrumb/breadcrumb.h"
 #include "c6fw/c6fw.h"
+#include "cfgext_logic.h"
 #include "discovery/discovery.h"
 #include "elgdock/elgdock.h"
 #include "esp_app_desc.h"
@@ -47,6 +52,7 @@
 #include "surfaces/surfaces.h"
 #include "usbdeck/usbdeck.h"
 #include "web_logic.h"
+#include "webui/ext.h"
 #include "webui/webui.h"
 #include "webui_priv.h"
 
@@ -171,40 +177,92 @@ static bool apply_cfg(cfg_apply_fn fn, const void *src, bool dry, char *msg, siz
 
 static companion_instance_t *instances(int *n);
 
-static bool in_list(const char *const *list, const char *key)
+/* ---- settings another component owns (webui/ext.h) ---- */
+
+static const webui_cfg_ext_t *s_ext[WEBUI_CFG_EXT_MAX]; /* registered at start-up, read-only after */
+static int s_n_ext;
+
+bool webui_cfg_ext_register(const webui_cfg_ext_t *x)
 {
-    for (; list && *list; list++)
-        if (!strcmp(*list, key)) return true;
-    return false;
+    if (!x || !x->section || !x->keys || !x->get || !x->set) return false;
+    if (s_n_ext >= WEBUI_CFG_EXT_MAX) {
+        ESP_LOGE(TAG, "no room for more %s settings (%d taken)", x->section, WEBUI_CFG_EXT_MAX);
+        return false;
+    }
+    s_ext[s_n_ext++] = x;
+    return true;
 }
 
-/* *.SetConfig: only the section's keys (and dry_run) are taken; the read-only keys its GetConfig
- * returns are ignored, anything else is refused. */
-static cJSON *set_section(const cJSON *p, const char *const *keys, const char *const *ro, rpc_err_t *err)
+/* The end of a *.GetConfig: the keys other components own in that section. */
+static cJSON *ext_get(const char *section, cJSON *r)
+{
+    for (int i = 0; i < s_n_ext; i++)
+        if (!strcmp(s_ext[i]->section, section)) s_ext[i]->get(r);
+    return r;
+}
+
+/* *.SetConfig: only the section's keys (and dry_run) are taken, its own and those other components own there; the
+ * read-only keys its GetConfig returns are ignored, anything else is refused. The owners check theirs first (a
+ * refusal: nothing is saved), then the section's own are saved as before (skipped when only owned keys came), then,
+ * unless dry_run, the owners save theirs. */
+static cJSON *set_section(const cJSON *p, const char *section, const char *const *keys, const char *const *ro,
+                          rpc_err_t *err)
 {
     const cJSON *dr = cJSON_GetObjectItemCaseSensitive(p, "dry_run");
     if (dr && !cJSON_IsBool(dr)) /* {"dry_run":1} must not apply for real */
         return rpc_fail(err, RPC_E_INVALID_ARG, "dry_run must be true or false");
     const bool dry = cJSON_IsTrue(dr);
-    cJSON *f = cJSON_CreateObject();
-    const cJSON *it;
-    cJSON_ArrayForEach(it, p) {
-        if (!strcmp(it->string, "dry_run") || in_list(ro, it->string)) continue;
-        if (!in_list(keys, it->string)) {
-            cJSON_Delete(f);
-            return rpc_fail(err, RPC_E_INVALID_ARG, "unknown key %s", it->string);
+    const webui_cfg_ext_t *x[WEBUI_CFG_EXT_MAX];
+    const char *const *xk[WEBUI_CFG_EXT_MAX];
+    int nx = 0;
+    for (int i = 0; i < s_n_ext; i++)
+        if (!strcmp(s_ext[i]->section, section)) {
+            x[nx] = s_ext[i];
+            xk[nx++] = s_ext[i]->keys;
         }
-        cJSON_AddItemToObject(f, it->string, cJSON_Duplicate(it, true));
+    cJSON *f, *xp[WEBUI_CFG_EXT_MAX];
+    char e[sizeof err->msg];
+    if (!cfgext_split(p, keys, ro, xk, nx, &f, xp, e, sizeof e))
+        return rpc_fail(err, strcmp(e, CFGEXT_NO_MEMORY) ? RPC_E_INVALID_ARG : RPC_E_UNAVAILABLE, "%s", e);
+    bool owned = false; /* keys another component owns came */
+    for (int i = 0; i < nx; i++) owned |= xp[i] != NULL;
+    const bool own = !owned || !f || f->child; /* the section's own apply runs: always, as before, when none came */
+    cJSON *r = NULL;
+    bool ext_saved = false;
+    for (int i = 0; owned && i < nx; i++)
+        if (xp[i] && !x[i]->set(xp[i], true, e, sizeof e)) {
+            rpc_fail(err, RPC_E_INVALID_ARG, "%s", e);
+            goto out;
+        }
+    if (own) {
+        char *json = cJSON_PrintUnformatted(f); /* printed and parsed again: see apply_json_text */
+        if (!json) {
+            rpc_fail(err, RPC_E_UNAVAILABLE, RPC_MSG_NO_MEMORY);
+            goto out;
+        }
+        char msg[96];
+        esp_err_t se;
+        const bool ok = apply_cfg(apply_json_text, json, dry, msg, sizeof msg, &se);
+        cJSON_free(json);
+        if (!ok) {
+            rpc_fail(err, se == ESP_OK ? RPC_E_INVALID_ARG : RPC_E_UNAVAILABLE, "%s", msg);
+            goto out;
+        }
     }
-    char *json = cJSON_PrintUnformatted(f); /* printed and parsed again: see apply_json_text */
+    for (int i = 0; !dry && i < nx; i++) {
+        if (!xp[i]) continue;
+        if (!x[i]->set(xp[i], false, e, sizeof e)) {
+            rpc_fail(err, RPC_E_UNAVAILABLE, "saving the settings failed: %s", e);
+            goto out;
+        }
+        ext_saved = true;
+    }
+    r = cfg_result(dry);
+out:
+    if (ext_saved && !own) webui_settings_saved(); /* the section's own save signals it otherwise (apply_cfg_hook) */
     cJSON_Delete(f);
-    if (!json) return rpc_fail(err, RPC_E_UNAVAILABLE, RPC_MSG_NO_MEMORY);
-    char msg[96];
-    esp_err_t se;
-    const bool ok = apply_cfg(apply_json_text, json, dry, msg, sizeof msg, &se);
-    cJSON_free(json);
-    if (!ok) return rpc_fail(err, se == ESP_OK ? RPC_E_INVALID_ARG : RPC_E_UNAVAILABLE, "%s", msg);
-    return cfg_result(dry);
+    for (int i = 0; i < nx; i++) cJSON_Delete(xp[i]);
+    return r;
 }
 
 /* Companion's Discover -> setup: a posted host that a visible
@@ -766,7 +824,12 @@ static cJSON *m_sys_perf(const cJSON *p, rpc_err_t *err)
 
 /* ---- Device.* ---- */
 
-/* Device.GetInfo -> {name, id, mac, model, hw, project, version, idf, build, auth_en, lastReset}.
+static const char *s_edition = "standard"; /* webui_set_edition */
+
+void webui_set_edition(const char *name) { s_edition = name ? name : "standard"; }
+
+/* Device.GetInfo -> {name, id, mac, model, hw, project, version, idf, build, edition, auth_en, lastReset}.
+ * edition: "standard" unless a component named another (webui_set_edition).
  * lastReset: {reason: this start's reset reason ("power-on", "software restart", "panic", ...),
  * breadcrumb: what the last deliberate restart recorded ("mode switch", "OTA", ...; "" when none was
  * under way), summary: the line Sys.GetStatus.lastReset gives}. */
@@ -793,6 +856,7 @@ static cJSON *m_device_info(const cJSON *p, rpc_err_t *err)
     cJSON_AddStringToObject(r, "idf", d->idf_ver);
     snprintf(b, sizeof b, "%s %s", d->date, d->time);
     cJSON_AddStringToObject(r, "build", b);
+    cJSON_AddStringToObject(r, "edition", s_edition);
     cJSON_AddBoolToObject(r, "auth_en", auth_enabled());
     cJSON *lr = cJSON_AddObjectToObject(r, "lastReset");
     cJSON_AddStringToObject(lr, "reason", breadcrumb_reset_reason());
@@ -879,7 +943,7 @@ static cJSON *m_device_get_config(const cJSON *p, rpc_err_t *err)
     cJSON_AddNumberToObject(r, "gestureTaps", s_cfg->gesture_taps);
     cJSON_AddNumberToObject(r, "gestureHoldSeconds", s_cfg->gesture_hold_s);
     webui_cfg_unlock();
-    return r;
+    return ext_get("Device", r);
 }
 
 /* A saved setting that applies at the next start and differs from this run's (the surface mode; the deck limit):
@@ -907,7 +971,7 @@ static cJSON *restart_to_apply(cJSON *r, const char *why, const char *what)
  * (webui_deck_push_settings). */
 static cJSON *m_device_set_config(const cJSON *p, rpc_err_t *err)
 {
-    cJSON *r = set_section(p, DEVICE_KEYS, NULL, err);
+    cJSON *r = set_section(p, "Device", DEVICE_KEYS, NULL, err);
     const cJSON *dl = cJSON_GetObjectItemCaseSensitive(p, "deckLimit");
     if (!r || !dl || (int)dl->valuedouble == s_deck_limit) return r; /* boxconfig took it: 2 or 4 */
     char what[24];
@@ -935,7 +999,7 @@ static cJSON *m_companion_get_config(const cJSON *p, rpc_err_t *err)
     cJSON_AddStringToObject(r, "companionPinId", s_cfg->companion_pin_id);
     cJSON_AddStringToObject(r, "mode", mode_name(s_cfg->surface_mode));
     webui_cfg_unlock();
-    return r;
+    return ext_get("Companion", r);
 }
 
 /* Companion.SetConfig {companionAuto?, companionHost?, companionPort?, companionPinId?, mode?,
@@ -962,7 +1026,7 @@ static cJSON *m_companion_set_config(const cJSON *p, rpc_err_t *err)
             cJSON_AddItemToObject(q, it->string, cJSON_Duplicate(it, true));
         }
     }
-    cJSON *r = set_section(q, COMPANION_KEYS, NULL, err);
+    cJSON *r = set_section(q, "Companion", COMPANION_KEYS, NULL, err);
     cJSON_Delete(q);
     if (!r || !mode) return r;
     const box_surface_mode_t want = strcmp(mode->valuestring, MODE_DOCK) ? BOX_SURFACE_SATELLITE : BOX_SURFACE_DOCK;
@@ -1059,10 +1123,10 @@ static cJSON *m_eth_get_config(const cJSON *p, rpc_err_t *err)
     cJSON_AddStringToObject(r, "ethGw", s_cfg->eth_gw);
     cJSON_AddStringToObject(r, "ethDns", s_cfg->eth_dns);
     webui_cfg_unlock();
-    return r;
+    return ext_get("Eth", r);
 }
 
-static cJSON *m_eth_set_config(const cJSON *p, rpc_err_t *err) { return set_section(p, ETH_KEYS, NULL, err); }
+static cJSON *m_eth_set_config(const cJSON *p, rpc_err_t *err) { return set_section(p, "Eth", ETH_KEYS, NULL, err); }
 
 static cJSON *m_eth_status(const cJSON *p, rpc_err_t *err)
 {
@@ -1094,12 +1158,15 @@ static cJSON *m_wifi_get_config(const cJSON *p, rpc_err_t *err)
     cJSON_AddBoolToObject(r, "wifiBackupHasPass", s_cfg->wifi_backup_pass[0] != '\0');
     cJSON_AddBoolToObject(r, "wifiEnabled", s_cfg->wifi_enabled);
     webui_cfg_unlock();
-    return r;
+    return ext_get("Wifi", r);
 }
 
 /* Wifi.SetConfig {wifiSsid?, wifiPass?, wifiBackupSsid?, wifiBackupPass?, wifiEnabled?}: a missing password keeps the
  * stored one. A backup name left empty means no backup. */
-static cJSON *m_wifi_set_config(const cJSON *p, rpc_err_t *err) { return set_section(p, WIFI_KEYS, WIFI_RO, err); }
+static cJSON *m_wifi_set_config(const cJSON *p, rpc_err_t *err)
+{
+    return set_section(p, "Wifi", WIFI_KEYS, WIFI_RO, err);
+}
 
 /* Wifi.Scan {results?}: the networks in range. Without params it starts a scan and returns at once
  * (it takes 3-6 s): {scanning: true} when one is under way (started now, or already running), or the
@@ -1216,11 +1283,11 @@ static cJSON *m_ap_get_config(const cJSON *p, rpc_err_t *err)
     cJSON_AddStringToObject(r, "apPass", s_cfg->ap_pass);
     webui_cfg_unlock();
     cJSON_AddStringToObject(r, "apSsid", ns.ap_ssid);
-    return r;
+    return ext_get("Ap", r);
 }
 
 /* Ap.SetConfig {apEnabled?, apSecured?, apPass?}: apPass must be 8-63 while apSecured (boxcfg) */
-static cJSON *m_ap_set_config(const cJSON *p, rpc_err_t *err) { return set_section(p, AP_KEYS, AP_RO, err); }
+static cJSON *m_ap_set_config(const cJSON *p, rpc_err_t *err) { return set_section(p, "Ap", AP_KEYS, AP_RO, err); }
 
 static cJSON *m_ap_status(const cJSON *p, rpc_err_t *err)
 {
@@ -1353,13 +1420,13 @@ static cJSON *m_feedback_get_config(const cJSON *p, rpc_err_t *err)
     webui_cfg_unlock();
     int pins[24];
     cJSON_AddItemToObject(r, "ledPins", cJSON_CreateIntArray(pins, boxcfg_led_pins(pins, 24)));
-    return r;
+    return ext_get("Feedback", r);
 }
 
 /* Feedback.SetConfig {the keys above, dry_run?}: applied at once, no restart (a new ledPin too). */
 static cJSON *m_feedback_set_config(const cJSON *p, rpc_err_t *err)
 {
-    return set_section(p, FEEDBACK_KEYS, FEEDBACK_RO, err);
+    return set_section(p, "Feedback", FEEDBACK_KEYS, FEEDBACK_RO, err);
 }
 
 /* Feedback.Test {event, volume?}: plays event's sound, also when it or the speaker is turned off, at

@@ -209,8 +209,12 @@ esp_err_t boxcfg_save(const box_config_t *c);
  * Automatic saves (the supervisor's Companion pin) wait while this is true; a deliberate save
  * (settings changed on the page or the API) clears it. */
 bool boxcfg_stored_kept(void);
-/* Erases the "boxcfg" namespace. */
+/* Erases the "boxcfg" namespace, then runs the boxcfg_on_factory_reset callbacks (not when the erase failed). */
 esp_err_t boxcfg_factory_reset(void);
+/* Adds fn to what boxcfg_factory_reset runs after the erase, in the order added: another component erasing the
+ * settings it keeps elsewhere. Up to 4 (more are dropped and logged). At start-up, before any factory reset can run;
+ * fn runs on the task doing the factory reset, mostly with the box's config lock held: it must not take that lock. */
+void boxcfg_on_factory_reset(void (*fn)(void));
 #endif
 
 #ifdef __cplusplus

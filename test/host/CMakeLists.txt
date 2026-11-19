@@ -173,6 +173,9 @@ target_include_directories(test_ws_table PRIVATE ${REPO_ROOT}/components/webui)
 add_host_test(notify_logic SOURCES test_notify_logic.c ../../components/webui/notify_logic.c WITH_CJSON)
 target_include_directories(test_notify_logic PRIVATE ${REPO_ROOT}/components/webui)
 
+add_host_test(cfgext SOURCES test_cfgext.c ../../components/webui/cfgext_logic.c WITH_CJSON)
+target_include_directories(test_cfgext PRIVATE ${REPO_ROOT}/components/webui)
+
 add_host_test(cora SOURCES test_cora.c ../../components/elgdock/cora.c)
 target_include_directories(test_cora PRIVATE ${REPO_ROOT}/components/elgdock)
 
