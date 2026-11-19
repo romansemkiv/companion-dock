@@ -74,7 +74,7 @@ is wired as the service button.
 | Console | UART0 (TX 37 / RX 38) | the board's USB-C port (CH343P USB-UART): flashing, logs, core dumps |
 | Speaker | ES8311 codec: I2C SDA 7 / SCL 8 (address 0x18), I2S MCLK 13, BCLK 12, WS 10, DOUT 9; amplifier enable 53 | fixed on the board; a speaker goes on the board's speaker connector ([Speaker and status light](#speaker-and-status-light)) |
 | **Status light** (optional, off by default) | **23** (a setting; 26 before 0.2.1) | one WS2812B-type NeoPixel: 5 V, GND, data in on the pin |
-| **Service key** (optional, off by default) | **32** (a setting) | a push button to GND: header pin 25, with GND beside it on pin 26 (check the pinout of your board). Internal pull-up. A NeoKey (Adafruit 5756) is key and status light in one ([Service key](#service-key)) |
+| **Service key** (optional, off by default) | **21** (a setting) | a push button to GND: header pin 12, with GND beside it on pin 10 (check the pinout of your board). Internal pull-up. A NeoKey (Adafruit 5756) is key and status light in one ([Service key](#service-key)) |
 | BOOT button | 35 | not usable: the same pin is Ethernet TXD1 |
 | RESET button | EN | pressed 3 times in a row: setup hotspot on for 15 minutes ([Recovery](#recovery)) |
 
@@ -117,14 +117,14 @@ default was GPIO26, and a box that saved it keeps it until you change it or rese
 
 ### Service key
 
-An optional push button from a header pin to GND (GPIO32 by default, header pin 25; GND is pin 26), read with the
-chip's pull-up. The *Speaker & LED* page's **Service key** card sets it (`Feedback.SetConfig`: `keyEnabled`,
+An optional push button from a header pin to GND (GPIO21 by default, header pin 12; GND is pin 10), read with the
+chip's pull-up. A box set up before 0.2.9 keeps the pin it had (GPIO32) until it is changed on the *Speaker & LED* page. The *Speaker & LED* page's **Service key** card sets it (`Feedback.SetConfig`: `keyEnabled`,
 `keyPin`, `keyShort`, `keyLong`), applied at once:
 
 - **Service key on** (`keyEnabled`, **off by default** on a new or factory-reset box: it is optional hardware. A box
   updated from before 0.2.8, where the key was always on, keeps it on): off, the key does nothing at all, the 10 s
   factory reset included (turning it off asks first).
-- **Pin** (`keyPin`, 32): any of the light's free pins but the light's own; a move asks first (rewire).
+- **Pin** (`keyPin`, 21): any of the light's free pins but the light's own; a move asks first (rewire).
 - **Short press** (`keyShort`, released before 3 s) and **Long press** (`keyLong`, held 3 s and released before
   5 s), each one of:
 
@@ -151,8 +151,8 @@ The card shows the key live (*Pressed* / *Not pressed*, the presses since the st
 
 | NeoKey pad | to |
 |---|---|
-| **A** (switch anode) | the key's pin (GPIO32) |
-| **C** (switch cathode) | GND |
+| **A** (switch anode) | the key's pin (GPIO21, header pin 12) |
+| **C** (switch cathode) | GND (pin 10) |
 | **I** (NeoPixel data in) | the light's pin (GPIO23) |
 | **+** (VDD) | **3V3** (powered at 3.3 V the NeoPixel reads the P4's 3.3 V data reliably) |
 | **−** | GND |
@@ -781,7 +781,7 @@ or that can cut you off (network changes, the settings password).
 
 > **Settings PIN warning.** If you set a settings PIN and forget it, the web page and the API stay locked,
 > and the page's factory reset needs that PIN too. The ways back are:
-> - the **service key** (GPIO32 unless moved), held 10 s, while it is on. **It is optional hardware, not on the
+> - the **service key** (GPIO21 unless moved), held 10 s, while it is on. **It is optional hardware, not on the
 >   board**: wire a push button (or a NeoKey) from its pin to GND before you need it;
 > - without the button, a **USB reflash**: erase the NVS partition over the USB-C port. That loses every
 >   setting (Wi-Fi, static IP, Companion choice, box name, dock map). The box then starts like a new one,
@@ -1021,7 +1021,7 @@ listed on the status page.
 main/main.c               staged boot (NVS, RESET count, config, speaker and light, network, web, discovery, surfaces, button, supervisor)
 main/supervisor.c         applies settings, picks Companion, hotspot state, status to the light, OTA self-check, C6-lost restart, task watchdog
 main/supervisor_logic.c   the supervisor's decisions: C6 lost, OTA self-check, pin save (pure)
-main/svcbtn.c             the service key (keyPin, GPIO32 by default): short press, 5 s, 10 s (svcbtn_logic.c: hold times, pure)
+main/svcbtn.c             the service key (keyPin, GPIO21 by default): short press, 5 s, 10 s (svcbtn_logic.c: hold times, pure)
 main/quickreset_logic.c   RESET pressed 3 times (pure)
 components/breadcrumb/    restart breadcrumb in RTC memory (breadcrumb_logic.c: record and summary, pure)
 components/boxconfig/     the config: JSON in NVS, defaults, validation, factory reset; led_pins.c: the light's pins (pure)

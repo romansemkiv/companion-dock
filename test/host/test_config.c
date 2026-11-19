@@ -476,7 +476,7 @@ static void test_feedback_json(void)
         {"{\"speakerVolume\":\"50\"}", "speakerVolume"}, {"{\"soundKeyClick\":\"on\"}", "soundKeyClick"},
         {"{\"soundDeckPlug\":null}", "soundDeckPlug"}, {"{\"ledEnabled\":0}", "ledEnabled"}, {"{\"ledFlash\":1}", "ledFlash"},
         {"{\"ledBrightness\":0}", "ledBrightness"},    {"{\"ledBrightness\":101}", "ledBrightness"},
-        {"{\"ledPin\":32}", "ledPin"},                 {"{\"ledPin\":7}", "ledPin"},
+        {"{\"ledPin\":21}", "ledPin"},                 {"{\"ledPin\":7}", "ledPin"},
         {"{\"ledPin\":9}", "ledPin"},                  {"{\"ledPin\":-1}", "ledPin"},
         {"{\"ledPin\":55}", "ledPin"},                 {"{\"ledPin\":26.5}", "ledPin"},
         {"{\"ledPin\":\"26\"}", "ledPin"},
@@ -489,15 +489,15 @@ static void test_feedback_json(void)
         TEST_ASSERT_EQUAL_STRING_MESSAGE(BAD[i][1], key, BAD[i][0]);
         TEST_ASSERT_EQUAL_MEMORY(&before, &c, sizeof c);
     }
-    /* why a pin is refused: GPIO32 is the service key's while the key is on it */
-    TEST_ASSERT_FALSE(boxcfg_from_json(&c, "{\"ledPin\":32}", err, sizeof err));
+    /* why a pin is refused: GPIO21 is the service key's while the key is on it */
+    TEST_ASSERT_FALSE(boxcfg_from_json(&c, "{\"ledPin\":21}", err, sizeof err));
     TEST_ASSERT_NOT_NULL(strstr(err, "service key"));
     TEST_ASSERT_FALSE(boxcfg_from_json(&c, "{\"ledPin\":8}", err, sizeof err));
     TEST_ASSERT_NOT_NULL(strstr(err, "speaker"));
 }
 
 /* The service key: off by default (optional hardware), but on for a config stored before it could be turned off
- * (boxcfg_stored_legacy); on GPIO32 with a short press for the box menu; its pin one of the light's free pins, never
+ * (boxcfg_stored_legacy); on GPIO21 (GPIO32 for a legacy config) with a short press for the box menu; its pin one of the light's free pins, never
  * the light's own; keyShort by name. */
 static void test_service_key(void)
 {
@@ -505,7 +505,7 @@ static void test_service_key(void)
     char err[96];
     boxcfg_defaults(&c, (const uint8_t[6]){1, 2, 3, 4, 5, 6}, fake_rand);
     TEST_ASSERT_FALSE(c.key_enabled);
-    TEST_ASSERT_EQUAL_INT8(32, c.key_pin);
+    TEST_ASSERT_EQUAL_INT8(21, c.key_pin); /* defaults: was 32 */
     TEST_ASSERT_EQUAL_UINT8(BOXCFG_KEY_ACT_MENU, c.key_short);
     TEST_ASSERT_EQUAL_UINT8(BOXCFG_KEY_ACT_FIND, c.key_long);
     box_config_t old;
@@ -517,12 +517,26 @@ static void test_service_key(void)
     /* ... where the key was always on: it stays on, on its pin (the way back from a forgotten PIN) */
     TEST_ASSERT_TRUE(boxcfg_stored_legacy(&old, BEFORE));
     TEST_ASSERT_TRUE(old.key_enabled);
-    TEST_ASSERT_EQUAL_INT8(32, old.key_pin);
+    TEST_ASSERT_EQUAL_INT8(32, old.key_pin); /* wired to 32 then: stays there */
     TEST_ASSERT_FALSE(boxcfg_stored_legacy(&old, BEFORE)); /* nothing more to change */
+    /* a config from before the key settings with the light on 32: the key keeps the default */
+    box_config_t lit;
+    boxcfg_defaults(&lit, (const uint8_t[6]){1, 2, 3, 4, 5, 6}, fake_rand);
+    static const char LIT32[] = "{\"ledEnabled\":true,\"ledPin\":32}";
+    boxcfg_from_json_lenient(&lit, LIT32, NULL, 0);
+    TEST_ASSERT_TRUE(boxcfg_stored_legacy(&lit, LIT32));
+    TEST_ASSERT_EQUAL_INT8(21, lit.key_pin);
+    /* a 0.2.8 config with keyPin stored: kept as stored */
+    box_config_t k;
+    boxcfg_defaults(&k, (const uint8_t[6]){1, 2, 3, 4, 5, 6}, fake_rand);
+    static const char K32[] = "{\"keyEnabled\":true,\"keyPin\":32}";
+    boxcfg_from_json_lenient(&k, K32, NULL, 0);
+    TEST_ASSERT_FALSE(boxcfg_stored_legacy(&k, K32));
+    TEST_ASSERT_EQUAL_INT8(32, k.key_pin);
     /* a config that says it is left alone: off stays off, and what it stores back says so from then on */
     box_config_t said;
     boxcfg_defaults(&said, (const uint8_t[6]){1, 2, 3, 4, 5, 6}, fake_rand);
-    TEST_ASSERT_FALSE(boxcfg_stored_legacy(&said, "{\"keyEnabled\":false}"));
+    TEST_ASSERT_FALSE(boxcfg_stored_legacy(&said, "{\"keyEnabled\":false,\"keyPin\":21}"));
     TEST_ASSERT_FALSE(said.key_enabled);
     char *full = boxcfg_to_json(&said, true);
     TEST_ASSERT_FALSE(boxcfg_stored_legacy(&said, full));

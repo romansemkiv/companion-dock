@@ -58,7 +58,7 @@ typedef struct {
     /* The service key (main/svcbtn.c): a push button from its pin to GND, read with the internal pull-up (a NeoKey,
      * Adafruit 5756: its A pad to the pin, C to GND). "keyEnabled" (false: optional hardware; true for a stored config
      * of before, without the key: boxcfg_stored_legacy): off, the key does nothing at all, not even
-     * the factory reset; "keyPin" (32): one boxcfg_key_pin_problem accepts, never ledPin; "keyShort" ("menu"): what a
+     * the factory reset; "keyPin" (21): one boxcfg_key_pin_problem accepts, never ledPin; "keyShort" ("menu"): what a
      * short press does, "keyLong" ("find"): a long one (held 3 s, released before 5 s), each a BOXCFG_KEY_ACT_*
      * (restart: the long press only). Held 5 s / 10 s: the setup hotspot / the factory reset, always. Applied at
      * once. */
@@ -125,8 +125,9 @@ int boxcfg_from_json_lenient(box_config_t *c, const char *json, char *skipped, s
 
 /* After boxcfg_from_json_lenient on the stored config: what a config stored by an earlier firmware meant without
  * saying it. One without "keyEnabled" is from before the service key could be turned off (0.2.8): the key was always
- * on then, on GPIO32, and stays on (its 10 s hold is the way back from a forgotten PIN); only a new or factory-reset
- * box starts with it off. True when it changed *c. json not a JSON object: nothing. */
+ * on then, on GPIO32, and stays on (its 10 s hold is the way back from a forgotten PIN); one without "keyPin" keeps
+ * that pin (BOXCFG_KEY_PIN_LEGACY) unless the light is on it; only a new or factory-reset box starts with the key off,
+ * on GPIO21. True when it changed *c. json not a JSON object: nothing. */
 bool boxcfg_stored_legacy(box_config_t *c, const char *json);
 
 /* How loading the stored config went. */
@@ -177,7 +178,8 @@ enum {
     BOXCFG_KEY_ACT_LIGHT = 4,   /* "light": the status light on / off (ledEnabled, saved) */
     BOXCFG_KEY_ACT_RESTART = 5, /* "restart": the box restarts (keyLong only: a brush of the key never restarts it) */
 };
-#define BOXCFG_KEY_PIN 32 /* keyPin's default: the service button's pin before it could be chosen */
+#define BOXCFG_KEY_PIN 21        /* keyPin's default: header pin 12, beside GND and the light's GPIO 23 */
+#define BOXCFG_KEY_PIN_LEGACY 32 /* the pin of a box set up before keyPin could be chosen (0.2.8 and earlier) */
 /* The action's name above; NULL for another value. */
 const char *boxcfg_key_act_name(int v);
 /* The action with that name; false for none. */

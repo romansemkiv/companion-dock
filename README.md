@@ -63,8 +63,9 @@ web page.
 Prices from the vendors' sites, November 2026; shipping not included. That is about **$33** for the box itself.
 
 The NeoPixel takes 5 V and GND from the board's header and its data input on GPIO 23, header pin 8 (another pin can be set on
-the web page). The NeoKey's switch goes between GPIO 32 and GND, and its NeoPixel takes 3V3, GND and the same data
-pin. The status light and the service key are off on a new box: switch them on, on the web page's **Speaker & LED**
+the web page). The NeoKey's switch goes between GPIO 21 (header pin 12) and GND (pin 10), beside the light's GPIO 23, and its NeoPixel
+takes 3V3, GND and the same data pin. A box set up before 0.2.9 keeps the key on GPIO 32 until it is changed on the web
+page. The status light and the service key are off on a new box: switch them on, on the web page's **Speaker & LED**
 page, once they are wired. Pin tables, power notes, the NeoKey's wiring and what the service key does (a short
 press, a long press, 5 s and 10 s holds) are in the [manual](docs/manual.md#service-key).
 

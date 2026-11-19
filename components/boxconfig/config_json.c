@@ -604,6 +604,12 @@ bool boxcfg_stored_legacy(box_config_t *c, const char *json)
         c->key_enabled = true;
         changed = true;
     }
+    /* no keyPin either: the key was wired to its old pin then, unless the light sits there */
+    if (cJSON_IsObject(root) && !cJSON_GetObjectItemCaseSensitive(root, "keyPin") && c->led_pin != BOXCFG_KEY_PIN_LEGACY &&
+        c->key_pin != BOXCFG_KEY_PIN_LEGACY) {
+        c->key_pin = BOXCFG_KEY_PIN_LEGACY;
+        changed = true;
+    }
     cJSON_Delete(root);
     return changed;
 }
