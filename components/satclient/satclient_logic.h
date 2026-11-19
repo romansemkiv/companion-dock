@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include "satclient/satclient_event.h"
 
 /* How long the connected loop may wait in select() for Companion's data: 0 while work for a ready
  * session is queued (a key press must go out now), otherwise idle_ms. A post() also writes the
@@ -22,3 +23,8 @@ typedef struct {
     void *ctx;
 } satc_io_t;
 size_t satc_write_all(const satc_io_t *io, const char *data, size_t len, int budget_ms, int step_ms);
+
+/* What a connection attempt that has ended tells the observer: SATC_EV_DROPPED when the session had been ready,
+ * SATC_EV_ATTEMPT_FAILED otherwise (the lookup or connect failed, or the connection ended before READY), or -1
+ * (nothing) for a deliberate change of target or a too-old Companion. `connected`: a TCP connection was made. */
+int satc_end_event(bool connected, bool got_ready, bool target_changed, bool too_old);

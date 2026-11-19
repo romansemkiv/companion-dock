@@ -7,6 +7,13 @@ uint32_t satc_wait_ms(unsigned queued, bool ready, uint32_t idle_ms)
     return queued && ready ? 0 : idle_ms;
 }
 
+int satc_end_event(bool connected, bool got_ready, bool target_changed, bool too_old)
+{
+    (void)connected; /* a connection that ended before READY fails like one never made */
+    if (target_changed || too_old) return -1;
+    return got_ready ? SATC_EV_DROPPED : SATC_EV_ATTEMPT_FAILED;
+}
+
 size_t satc_write_all(const satc_io_t *io, const char *data, size_t len, int budget_ms, int step_ms)
 {
     size_t off = 0;

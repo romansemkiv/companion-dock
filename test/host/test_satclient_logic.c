@@ -123,6 +123,26 @@ static void test_write_all_stalled_reader_times_out(void)
     TEST_ASSERT_EQUAL_INT(0, K.waits);
 }
 
+/* ---- the outcome of a connection that has ended ---- */
+
+static void test_end_event(void)
+{
+    TEST_ASSERT_EQUAL_INT(SATC_EV_ATTEMPT_FAILED, satc_end_event(false, false, false, false));
+    TEST_ASSERT_EQUAL_INT(SATC_EV_ATTEMPT_FAILED, satc_end_event(true, false, false, false));
+    TEST_ASSERT_EQUAL_INT(SATC_EV_DROPPED, satc_end_event(true, true, false, false));
+}
+
+/* a deliberate change of target, or a too-old Companion, is no outcome to report. */
+static void test_end_event_silent_cases(void)
+{
+    for (int c = 0; c < 2; c++)
+        for (int r = 0; r < 2; r++) {
+            TEST_ASSERT_EQUAL_INT(-1, satc_end_event(c, r, true, false));
+            TEST_ASSERT_EQUAL_INT(-1, satc_end_event(c, r, false, true));
+            TEST_ASSERT_EQUAL_INT(-1, satc_end_event(c, r, true, true));
+        }
+}
+
 int main(void)
 {
     UNITY_BEGIN();
@@ -132,5 +152,7 @@ int main(void)
     RUN_TEST(test_pending_work_wakes_the_loop);
     RUN_TEST(test_idle_waits_for_the_fallback);
     RUN_TEST(test_not_ready_keeps_the_fallback);
+    RUN_TEST(test_end_event);
+    RUN_TEST(test_end_event_silent_cases);
     return UNITY_END();
 }

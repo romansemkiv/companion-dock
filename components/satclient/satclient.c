@@ -67,6 +67,8 @@ static struct {
     char host[HOST_MAX];  /* mtx */
     uint16_t port;        /* mtx */
     uint32_t target_gen;  /* mtx */
+    void (*obs)(satc_event_t ev, void *ctx); /* mtx */
+    void *obs_ctx;        /* mtx */
     atomic_int state;
     bool io_failed, too_old, got_ready; /* task only */
 } g = {.fd = -1, .efd = -1};
@@ -108,6 +110,29 @@ void satclient_get_target(char *host, size_t cap, uint16_t *port)
     if (host && cap) snprintf(host, cap, "%s", g.host);
     if (port) *port = g.port;
     xSemaphoreGive(g.mtx);
+}
+
+void satclient_set_observer(void (*fn)(satc_event_t ev, void *ctx), void *ctx)
+{
+    if (!g.mtx) { /* before satclient_start: the task isn't running yet */
+        g.obs = fn;
+        g.obs_ctx = ctx;
+        return;
+    }
+    xSemaphoreTake(g.mtx, portMAX_DELAY);
+    g.obs = fn;
+    g.obs_ctx = ctx;
+    xSemaphoreGive(g.mtx);
+}
+
+/* Client task: calls the observer, copied out under the mutex and called without it. */
+static void notify(satc_event_t ev)
+{
+    xSemaphoreTake(g.mtx, portMAX_DELAY);
+    void (*fn)(satc_event_t, void *) = g.obs;
+    void *ctx = g.obs_ctx;
+    xSemaphoreGive(g.mtx);
+    if (fn) fn(ev, ctx);
 }
 
 /* ---- session callbacks ---- */
@@ -153,6 +178,7 @@ static void on_ready_w(void *ctx, const sat_caps_t *caps)
     g.got_ready = true;
     set_state(SATC_CONNECTED);
     if (g.user_cb.on_ready) g.user_cb.on_ready(ctx, caps);
+    notify(SATC_EV_READY);
 }
 
 static void on_too_old_w(void *ctx, const char *api_version)
@@ -430,6 +456,7 @@ static void client_task(void *arg)
             continue;
         }
         if (fd < 0) {
+            notify((satc_event_t)satc_end_event(false, false, false, false)); /* the target is unchanged here */
             wait_ms(backoff, seen);
             backoff = backoff >= 2000 ? 5000 : backoff * 2;
             continue;
@@ -480,7 +507,10 @@ static void client_task(void *arg)
         bool too_old = g.too_old;
         bool ready = g.got_ready;
         close_conn();
-        if (target_changed(seen)) {
+        const bool changed = target_changed(seen);
+        const int ev = satc_end_event(true, ready, changed, too_old);
+        if (ev >= 0) notify((satc_event_t)ev);
+        if (changed) {
             backoff = 500;
             continue;
         }

@@ -3,6 +3,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include "esp_err.h"
+#include "satclient/satclient_event.h"
 #include "satproto/session.h"
 
 typedef enum { SATC_IDLE, SATC_CONNECTING, SATC_CONNECTED, SATC_TOO_OLD } satc_state_t;
@@ -17,6 +18,14 @@ void satclient_set_target(const char *host, uint16_t port);
  * or the wait before the next try (the back-off, the 30 s after a too-old Companion) ends and the
  * client connects again at once. No-op while connected, or with no target. */
 void satclient_retry(void);
+
+/* One observer of the connection's outcomes; NULL clears. It is called on the client task (keep it short, and
+ * never wait on a lock a task that calls satclient_* holds), with no lock of the client's held: SATC_EV_ATTEMPT_FAILED
+ * for an attempt that failed (the lookup or connect failed, or the connection ended before the session was ready),
+ * SATC_EV_READY for a session that became ready (after the on_ready callback), SATC_EV_DROPPED for a ready session
+ * that ended. Never for a deliberate change of target, and never for a Companion that is too old (the attempt then
+ * reports nothing; the client waits 30 s and tries again). May be set before or after satclient_start, from any task. */
+void satclient_set_observer(void (*fn)(satc_event_t ev, void *ctx), void *ctx);
 
 satc_state_t satclient_state(void);
 /* Caps of the last session that reached READY, or of the last one refused as too old
