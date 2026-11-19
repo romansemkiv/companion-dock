@@ -168,16 +168,14 @@ static bool get_feedback(const cJSON *root, box_config_t *t, bool claims, char *
               get_int(root, "ledBrightness", 1, 100, &bright, err, errlen) &&
               get_bool(root, "keyEnabled", &t->key_enabled, err, errlen) &&
               get_int(root, "keyPin", 0, 54, &kpin, err, errlen);
-    /* another component's claim on a pin counts for the pins this request names, and not at all when loading
-     * what is stored */
-    const char *why = !ok ? NULL : claims && cJSON_GetObjectItemCaseSensitive(root, "ledPin") ? boxcfg_led_pin_problem(pin)
-                                                                                             : boxcfg_pin_problem_base(pin);
+    /* another component's claim on a pin counts for a move onto it: not for a pin the request leaves as it is (the
+     * Speaker & LED card sends both), and not at all when loading what is stored */
+    const char *why = !ok ? NULL : claims && pin != t->led_pin ? boxcfg_led_pin_problem(pin) : boxcfg_pin_problem_base(pin);
     if (why) {
         set_err(err, errlen, "ledPin", why);
         ok = false;
     }
-    why = !ok ? NULL : claims && cJSON_GetObjectItemCaseSensitive(root, "keyPin") ? boxcfg_key_pin_problem(kpin)
-                                                                                  : boxcfg_pin_problem_base(kpin);
+    why = !ok ? NULL : claims && kpin != t->key_pin ? boxcfg_key_pin_problem(kpin) : boxcfg_pin_problem_base(kpin);
     if (why) {
         set_err(err, errlen, "keyPin", why);
         ok = false;

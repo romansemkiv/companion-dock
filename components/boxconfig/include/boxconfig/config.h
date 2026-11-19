@@ -173,7 +173,8 @@ int boxcfg_led_pins(int *out, int max);
 
 /* Another component's claim on header pins: NULL when gpio is not claimed, else why (shown as the refusal).
  * A claimed pin is refused by boxcfg_led_pin_problem and left out of boxcfg_led_pins, so API writes can't
- * pick it; a stored config already on it still loads (boxcfg_from_json_lenient). */
+ * move the light or the key onto it; a write naming the pin one already has still goes through, and a stored
+ * config already on it still loads (boxcfg_from_json_lenient). */
 typedef const char *(*boxcfg_pin_claim_fn)(int gpio);
 void boxcfg_set_pin_claim(boxcfg_pin_claim_fn fn); /* one claimant; NULL clears */
 

@@ -7,7 +7,7 @@
 #include "boxconfig/config.h"
 
 void setUp(void) {}
-void tearDown(void) {}
+void tearDown(void) { boxcfg_set_pin_claim(NULL); } /* a failed test_pin_claim leaves no claim behind */
 
 static const uint8_t MAC[6] = {0x02, 0x00, 0x00, 0x00, 0xA1, 0xB2};
 static uint32_t counter;
@@ -678,6 +678,28 @@ static void test_pin_claim(void)
     boxcfg_err_key(err, key, sizeof key);
     TEST_ASSERT_EQUAL_STRING("keyPin", key);
     TEST_ASSERT_TRUE(boxcfg_from_json(&c, "{\"ledPin\":23}", err, sizeof err));
+    /* a config already on 22: a save that names the pin it has (the Speaker & LED card sends both) still goes
+     * through; only a move onto 22 is refused */
+    boxcfg_set_pin_claim(NULL);
+    TEST_ASSERT_TRUE(boxcfg_from_json(&c, "{\"ledPin\":22}", err, sizeof err));
+    boxcfg_set_pin_claim(claim_22);
+    TEST_ASSERT_TRUE_MESSAGE(boxcfg_from_json(&c, "{\"ledPin\":22,\"speakerVolume\":40}", err, sizeof err), err);
+    TEST_ASSERT_EQUAL_UINT8(40, c.speaker_volume);
+    TEST_ASSERT_TRUE_MESSAGE(boxcfg_from_json(&c, "{\"ledBrightness\":50}", err, sizeof err), err);
+    TEST_ASSERT_EQUAL_UINT8(50, c.led_brightness);
+    TEST_ASSERT_TRUE_MESSAGE(boxcfg_from_json(&c, "{\"ledPin\":22,\"keyPin\":21,\"keyEnabled\":true}", err, sizeof err), err);
+    TEST_ASSERT_TRUE(boxcfg_from_json(&c, "{\"ledPin\":23}", err, sizeof err)); /* off 22 ... */
+    TEST_ASSERT_FALSE(boxcfg_from_json(&c, "{\"ledPin\":22}", err, sizeof err)); /* ... and not back */
+    /* the key likewise */
+    boxcfg_set_pin_claim(NULL);
+    TEST_ASSERT_TRUE(boxcfg_from_json(&c, "{\"keyPin\":22}", err, sizeof err));
+    boxcfg_set_pin_claim(claim_22);
+    TEST_ASSERT_TRUE_MESSAGE(boxcfg_from_json(&c, "{\"ledPin\":23,\"keyPin\":22,\"keyShort\":\"find\"}", err, sizeof err), err);
+    TEST_ASSERT_EQUAL_UINT8(BOXCFG_KEY_ACT_FIND, c.key_short);
+    TEST_ASSERT_FALSE(boxcfg_from_json(&c, "{\"ledPin\":22,\"keyPin\":21}", err, sizeof err)); /* the light onto 22 */
+    boxcfg_err_key(err, key, sizeof key);
+    TEST_ASSERT_EQUAL_STRING("ledPin", key);
+    TEST_ASSERT_EQUAL_INT8(22, c.key_pin);
     /* a stored config already on 22 still loads it: claims don't apply at load */
     TEST_ASSERT_EQUAL_INT(0, boxcfg_from_json_lenient(&s, "{\"ledPin\":22}", NULL, 0));
     TEST_ASSERT_EQUAL_INT8(22, s.led_pin);
