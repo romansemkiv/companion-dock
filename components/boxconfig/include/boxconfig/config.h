@@ -176,6 +176,8 @@ int boxcfg_led_pins(int *out, int max);
  * move the light or the key onto it; a write naming the pin one already has still goes through, and a stored
  * config already on it still loads (boxcfg_from_json_lenient). */
 typedef const char *(*boxcfg_pin_claim_fn)(int gpio);
+/* fn runs under the box's config lock (an API write's pin check) and outside it (Feedback.GetConfig's pin list): it
+ * must not take that lock, nor wait on a task that does. Set at start-up. */
 void boxcfg_set_pin_claim(boxcfg_pin_claim_fn fn); /* one claimant; NULL clears */
 
 /* keyShort, keyLong: what the service key's short and long presses do */
@@ -188,7 +190,7 @@ enum {
     BOXCFG_KEY_ACT_RESTART = 5, /* "restart": the box restarts (keyLong only: a brush of the key never restarts it) */
 };
 #define BOXCFG_KEY_PIN 21        /* keyPin's default: header pin 12, beside GND and the light's GPIO 23 */
-#define BOXCFG_KEY_PIN_LEGACY 32 /* the pin of a box set up before keyPin could be chosen (0.2.8 and earlier) */
+#define BOXCFG_KEY_PIN_LEGACY 32 /* the pin of a box set up before keyPin could be chosen (before 0.2.8) */
 /* The action's name above; NULL for another value. */
 const char *boxcfg_key_act_name(int v);
 /* The action with that name; false for none. */
@@ -215,8 +217,11 @@ bool boxcfg_stored_kept(void);
 /* Erases the "boxcfg" namespace, then runs the boxcfg_on_factory_reset callbacks (not when the erase failed). */
 esp_err_t boxcfg_factory_reset(void);
 /* Adds fn to what boxcfg_factory_reset runs after the erase, in the order added: another component erasing the
- * settings it keeps elsewhere. Up to 4 (more are dropped and logged). At start-up, before any factory reset can run;
- * fn runs on the task doing the factory reset, mostly with the box's config lock held: it must not take that lock. */
+ * settings it keeps elsewhere. Up to 4 (more are dropped and logged). At start-up, before any factory reset can run.
+ * fn runs on the task doing the factory reset, and may run more than once for one reset (the settings are erased
+ * when it is asked for and again just before the restart), mostly with the box's config lock held and sometimes
+ * without it (a reset that joins a restart on its way): it must do the same thing every time and must not take
+ * that lock. */
 void boxcfg_on_factory_reset(void (*fn)(void));
 #endif
 

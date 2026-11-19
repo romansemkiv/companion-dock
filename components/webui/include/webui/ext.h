@@ -21,8 +21,10 @@ extern "C" {
  * section's own. *.SetConfig hands the keys to their owners and the rest to the section, all or nothing: first every
  * owner's set with dry_run true (a refusal: the call fails with its err, nothing is saved), then the section's own
  * keys, when any came, are saved (or checked, with the caller's dry_run), then, unless the caller's dry_run, every
- * owner's set with dry_run false (a failure there: "saving the settings failed: <err>"). get and set run on the web
- * server's task, without webui's config lock. */
+ * owner's set with dry_run false (a failure there: "saving the settings failed: <err>"; the section's own keys saved
+ * before it stay saved, and a restart they would bring, a new mode or deckLimit, does not happen in that call). get
+ * and set run one call at a time under the API's lock, on the calling task (usually the web server's; the decks'
+ * *.SetConfig calls run on their actions' worker), without webui's config lock. */
 typedef struct {
     const char *section;          /* "Device", "Companion", "Eth", "Wifi", "Ap", "Feedback" */
     const char *const *keys;      /* the keys it owns, NULL-terminated; never a built-in key of that section */

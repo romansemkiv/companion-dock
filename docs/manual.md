@@ -852,6 +852,8 @@ page shows both slots and the state of the copy, with **Sync now** and **Boot ot
   synced"); a sync waits while an upload runs. An upload replaces the copy with the new firmware, and 10
   minutes after that firmware started healthy it is copied over the previous one: going back with **Boot
   other slot** works within those 10 minutes; later, upload the old `.bin`.
+- **Back to 0.2.8.** A status light moved to GPIO32 on 0.2.9 stays dark on 0.2.8, where GPIO32 is the service
+  key's default pin: 0.2.8 skips that setting but keeps it stored, and the light comes back with 0.2.9.
 - **Boot other slot** (`Ota.BootOther`) makes the other slot the boot slot and restarts. That firmware then
   checks itself like an update and the box goes back if it fails. It is refused for an empty or invalid
   slot, another project's firmware, and while the running firmware is pending verify.

@@ -196,7 +196,7 @@ bool webui_cfg_ext_register(const webui_cfg_ext_t *x)
 /* The end of a *.GetConfig: the keys other components own in that section. */
 static cJSON *ext_get(const char *section, cJSON *r)
 {
-    for (int i = 0; i < s_n_ext; i++)
+    for (int i = 0; r && i < s_n_ext; i++) /* r NULL: the section's own result failed (no memory) */
         if (!strcmp(s_ext[i]->section, section)) s_ext[i]->get(r);
     return r;
 }

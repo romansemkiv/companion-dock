@@ -18,8 +18,8 @@ idf_build_get_property(python PYTHON)
 set(page "index.html")
 set(pack "${CMAKE_CURRENT_SOURCE_DIR}/../../tools/pack_page.py")
 set(index_gz "${CMAKE_CURRENT_BINARY_DIR}/index.html.gz")
-# Optional: a JS file whose text goes in at the page's /*@ext*/ marker (sections and navigation another build
-# adds), and the size limit in bytes to use instead of pack_page.LIMIT. Both empty: the page as the source has it.
+# Optional: a JS file whose text goes in at the page's /*@ext*/ marker (sections and navigation an extension
+# file adds), and the size limit in bytes to use instead of pack_page.LIMIT. Both empty: the page as the source has it.
 set(WEBUI_PAGE_EXT "" CACHE STRING "A JS file packed into the page at its /*@ext*/ marker")
 set(WEBUI_PAGE_LIMIT "" CACHE STRING "The page's gzipped size limit in bytes (empty: pack_page.LIMIT)")
 set(pack_args "")

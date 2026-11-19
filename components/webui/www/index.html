@@ -522,7 +522,7 @@ function signs(n){
 }
 
 /* ---------- navigation ---------- */
-/* What another build adds: nav = [[group, [[key, icon, title], ...]], ...], pages = {key: page}. The packer
+/* What an extension file adds: nav = [[group, [[key, icon, title], ...]], ...], pages = {key: page}. The packer
    (tools/pack_page.py --ext FILE) puts the file's text at the marker below; with no file this stays empty. */
 const EXT={nav:[],pages:{}};
 /*@ext*/
@@ -1147,7 +1147,7 @@ async function saveDevice(){
     if(a.auth_en&&!old)return bad('pwold','Enter the current '+(a.pin?'PIN':'password')+' first');
     if(!await confirmAction({title:a.auth_en?'Change the settings PIN?':'Set a settings PIN?',icon:'key',kind:'info',ok:a.auth_en?'Change PIN':'Set PIN',body:[
       P(a.auth_en?'Every other browser is signed out and needs the new PIN.':'This page then asks for it before it shows or changes anything, and the decks ask for it before their locked keys work.'),
-      P(B('Keep it somewhere safe.'),' Without it, nobody can sign in here, and the factory reset on this page is locked as well. The only way back is the service key, while it is switched on (Speaker & LED page: off by default, GPIO32 unless moved): hold it for 10 seconds for a factory reset, which erases every setting.')]}))return;
+      P(B('Keep it somewhere safe.'),' Without it, nobody can sign in here, and the factory reset on this page is locked as well. The only way back is the service key, while it is switched on (Speaker & LED page: off by default, on the pin set there, GPIO21 on a new box): hold it for 10 seconds for a factory reset, which erases every setting.')]}))return;
   }
   let did=false;const u={},ad=gv('cadopt');
   if(name!==pg.cfg.boxName)u.boxName=name;

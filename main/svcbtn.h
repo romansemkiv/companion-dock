@@ -1,4 +1,4 @@
-/* The service key: a push button from its pin (keyPin, GPIO32 by default) to GND, internal pull-up, active
+/* The service key: a push button from its pin (keyPin, GPIO21 by default) to GND, internal pull-up, active
  * low; a NeoKey (Adafruit 5756) wired A to the pin and C to GND among them. A short press does keyShort, a long
  * one (held 3 s, let go before 5 s) keyLong: the box menu, Find my box, sound on / off, light on / off, restart (long
  * only) or nothing; held 5 s then released: the setup hotspot for 15 minutes; held 10 s then released: factory reset
