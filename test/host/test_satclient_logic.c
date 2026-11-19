@@ -143,6 +143,25 @@ static void test_end_event_silent_cases(void)
         }
 }
 
+/* The wait between connection attempts: 500 ms, doubled up to 2 s, then 5 s each time. */
+static void test_backoff_grows(void)
+{
+    TEST_ASSERT_EQUAL_UINT32(500, SATC_BACKOFF_FIRST_MS);
+    TEST_ASSERT_EQUAL_UINT32(1000, satc_next_backoff(500, false));
+    TEST_ASSERT_EQUAL_UINT32(2000, satc_next_backoff(1000, false));
+    TEST_ASSERT_EQUAL_UINT32(5000, satc_next_backoff(2000, false));
+    TEST_ASSERT_EQUAL_UINT32(5000, satc_next_backoff(5000, false));
+}
+
+/* A wait cut short by a change of target starts the new target's waits from the first step: its next attempts come
+ * quickly instead of one attempt per 5 s. */
+static void test_backoff_resets_on_target_change(void)
+{
+    TEST_ASSERT_EQUAL_UINT32(SATC_BACKOFF_FIRST_MS, satc_next_backoff(5000, true));
+    TEST_ASSERT_EQUAL_UINT32(SATC_BACKOFF_FIRST_MS, satc_next_backoff(2000, true));
+    TEST_ASSERT_EQUAL_UINT32(SATC_BACKOFF_FIRST_MS, satc_next_backoff(500, true));
+}
+
 int main(void)
 {
     UNITY_BEGIN();
@@ -154,5 +173,7 @@ int main(void)
     RUN_TEST(test_not_ready_keeps_the_fallback);
     RUN_TEST(test_end_event);
     RUN_TEST(test_end_event_silent_cases);
+    RUN_TEST(test_backoff_grows);
+    RUN_TEST(test_backoff_resets_on_target_change);
     return UNITY_END();
 }

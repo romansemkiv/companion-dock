@@ -7,6 +7,12 @@ uint32_t satc_wait_ms(unsigned queued, bool ready, uint32_t idle_ms)
     return queued && ready ? 0 : idle_ms;
 }
 
+uint32_t satc_next_backoff(uint32_t backoff, bool target_changed)
+{
+    if (target_changed) return SATC_BACKOFF_FIRST_MS;
+    return backoff >= 2000 ? 5000 : backoff * 2;
+}
+
 int satc_end_event(bool connected, bool got_ready, bool target_changed, bool too_old)
 {
     (void)connected; /* a connection that ended before READY fails like one never made */

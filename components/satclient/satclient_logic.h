@@ -28,3 +28,9 @@ size_t satc_write_all(const satc_io_t *io, const char *data, size_t len, int bud
  * SATC_EV_ATTEMPT_FAILED otherwise (the lookup or connect failed, or the connection ended before READY), or -1
  * (nothing) for a deliberate change of target or a too-old Companion. `connected`: a TCP connection was made. */
 int satc_end_event(bool connected, bool got_ready, bool target_changed, bool too_old);
+
+/* The wait before the next connection attempt, after one that failed or ended: SATC_BACKOFF_FIRST_MS, doubled each
+ * time up to 2 s, then 5 s. A wait cut short by a change of target (target_changed) starts again from
+ * SATC_BACKOFF_FIRST_MS, so the new target gets quick attempts too, not one per 5 s. */
+#define SATC_BACKOFF_FIRST_MS 500u
+uint32_t satc_next_backoff(uint32_t backoff, bool target_changed);

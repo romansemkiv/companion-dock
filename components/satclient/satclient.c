@@ -425,7 +425,7 @@ static void run_connection(void)
 static void client_task(void *arg)
 {
     (void)arg;
-    uint32_t backoff = 500;
+    uint32_t backoff = SATC_BACKOFF_FIRST_MS;
     uint32_t seen = 0;
     char host[HOST_MAX];
     uint16_t port;
@@ -442,7 +442,7 @@ static void client_task(void *arg)
 
         if (host[0] == '\0') {
             set_state(SATC_IDLE);
-            backoff = 500;
+            backoff = SATC_BACKOFF_FIRST_MS;
             wait_ms(1000, seen);
             continue;
         }
@@ -452,13 +452,12 @@ static void client_task(void *arg)
         int fd = connect_to(host, port, seen);
         if (target_changed(seen)) {
             if (fd >= 0) close(fd);
-            backoff = 500;
+            backoff = SATC_BACKOFF_FIRST_MS;
             continue;
         }
         if (fd < 0) {
             notify((satc_event_t)satc_end_event(false, false, false, false)); /* the target is unchanged here */
-            wait_ms(backoff, seen);
-            backoff = backoff >= 2000 ? 5000 : backoff * 2;
+            backoff = satc_next_backoff(backoff, wait_ms(backoff, seen));
             continue;
         }
 
@@ -511,18 +510,17 @@ static void client_task(void *arg)
         const int ev = satc_end_event(true, ready, changed, too_old);
         if (ev >= 0) notify((satc_event_t)ev);
         if (changed) {
-            backoff = 500;
+            backoff = SATC_BACKOFF_FIRST_MS;
             continue;
         }
-        if (ready) backoff = 500;
+        if (ready) backoff = SATC_BACKOFF_FIRST_MS;
         if (too_old) {
             set_state(SATC_TOO_OLD);
             wait_ms(TOO_OLD_RETRY_MS, seen);
-            backoff = 500;
+            backoff = SATC_BACKOFF_FIRST_MS;
         } else {
             set_state(SATC_CONNECTING);
-            wait_ms(backoff, seen);
-            backoff = backoff >= 2000 ? 5000 : backoff * 2;
+            backoff = satc_next_backoff(backoff, wait_ms(backoff, seen));
         }
     }
 }
