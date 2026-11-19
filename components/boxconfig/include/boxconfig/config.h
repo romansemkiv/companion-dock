@@ -119,6 +119,8 @@ bool boxcfg_from_cjson(box_config_t *c, const struct cJSON *root, char *err, siz
 /* Loading the stored config: field by field. Every known key that is valid is laid over *c;
  * an invalid or unknown one is skipped and named in `skipped` ("key: why; ...", never a value; may be
  * NULL). The static address counts as a whole: ethDhcp false is taken only with valid addresses.
+ * ledPin and keyPin are checked against each other as stored, not against the other's default (a light
+ * on GPIO21 keeps it); with no keyPin stored, ledPin against the pin boxcfg_stored_legacy then gives the key.
  * Returns how many keys were skipped, or -1 (c unchanged) when json is not a JSON object. API writes
  * use boxcfg_from_json (all or nothing). */
 int boxcfg_from_json_lenient(box_config_t *c, const char *json, char *skipped, size_t n);

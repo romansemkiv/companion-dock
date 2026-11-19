@@ -557,6 +557,33 @@ char *boxcfg_satellite_config_json(const box_config_t *c)
     return s;
 }
 
+/* A stored ledPin or keyPin that is usable on its own: an integer GPIO that may carry the light or the key. */
+static bool stored_pin(const cJSON *root, const char *key, int *out)
+{
+    const cJSON *it = cJSON_GetObjectItemCaseSensitive(root, key);
+    if (!cJSON_IsNumber(it)) return false;
+    const double v = it->valuedouble;
+    if (!(v >= 0 && v <= 54 && v == (double)(long)v) || boxcfg_pin_problem_base((int)v)) return false;
+    *out = (int)v;
+    return true;
+}
+
+/* What the stored light's pin (key false) or key's pin (key true) must differ from at load: the other's pin as the
+ * stored config has it, never a default it didn't choose (the key's moved to GPIO21 in 0.2.9, a free pin for the
+ * light before). The other stored, usable and not the same pin: that one. No keyPin stored: the pin
+ * boxcfg_stored_legacy gives the key. Else (the other skipped, or both on one pin): the other's pin as loaded so
+ * far, so that one of them is skipped and the two still differ. */
+static int load_partner(const cJSON *root, const box_config_t *c, bool key)
+{
+    const int now = key ? c->led_pin : c->key_pin;
+    int mine = -1, theirs;
+    stored_pin(root, key ? "keyPin" : "ledPin", &mine);
+    if (!key && !cJSON_GetObjectItemCaseSensitive(root, "keyPin"))
+        return mine == BOXCFG_KEY_PIN_LEGACY ? now : BOXCFG_KEY_PIN_LEGACY;
+    if (stored_pin(root, key ? "ledPin" : "keyPin", &theirs) && theirs != mine) return theirs;
+    return now;
+}
+
 int boxcfg_from_json_lenient(box_config_t *c, const char *json, char *skipped, size_t n)
 {
     if (skipped && n) skipped[0] = '\0';
@@ -579,18 +606,27 @@ int boxcfg_from_json_lenient(box_config_t *c, const char *json, char *skipped, s
                 bad++;
                 continue;
             }
+            /* the light's pin and the key's: each checked against the other's as stored (load_partner), and only
+             * that one pin taken */
+            const bool led = !strcmp(it->string, "ledPin"), key = !strcmp(it->string, "keyPin");
+            box_config_t t = *c;
+            if (led) t.key_pin = (int8_t)load_partner(root, c, false);
+            if (key) t.led_pin = (int8_t)load_partner(root, c, true);
             cJSON *one = cJSON_CreateObject();
             cJSON *dup = cJSON_Duplicate(it, true);
             char err[96] = "";
             bool ok = false;
             if (one && dup && cJSON_AddItemToObject(one, it->string, dup)) {
                 dup = NULL; /* owned by one */
-                ok = from_root(c, one, false, err, sizeof err);
+                ok = from_root(&t, one, false, err, sizeof err);
             } else {
                 snprintf(err, sizeof err, "%s: no memory", it->string);
             }
             cJSON_Delete(dup);
             cJSON_Delete(one);
+            if (ok && led) c->led_pin = t.led_pin;
+            else if (ok && key) c->key_pin = t.key_pin;
+            else if (ok) *c = t;
             if (!ok) {
                 note_skipped(skipped, n, it->string, err);
                 bad++;

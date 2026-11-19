@@ -533,6 +533,42 @@ static void test_service_key(void)
     boxcfg_from_json_lenient(&k, K32, NULL, 0);
     TEST_ASSERT_FALSE(boxcfg_stored_legacy(&k, K32));
     TEST_ASSERT_EQUAL_INT8(32, k.key_pin);
+    /* the light on GPIO21, the key's default now: checked against the key's pin as the config stored it (or the
+     * pin it had then), never against a default it never chose. Every field loads, the pins as they were. */
+    static const struct { const char *json; int8_t led, key; } ON21[] = {
+        {"{\"ledPin\":21,\"keyPin\":32}", 21, 32}, /* 0.2.8 */
+        {"{\"ledPin\":21}", 21, 32},               /* before 0.2.8: the key on its old pin */
+        {"{\"ledPin\":21,\"keyPin\":23}", 21, 23}, /* 0.2.8, the key on the light's default */
+        {"{\"keyPin\":23,\"ledPin\":21}", 21, 23}, /* the same, in the other order */
+    };
+    for (size_t i = 0; i < sizeof ON21 / sizeof ON21[0]; i++) {
+        box_config_t p;
+        char skipped[160];
+        boxcfg_defaults(&p, (const uint8_t[6]){1, 2, 3, 4, 5, 6}, fake_rand);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(0, boxcfg_from_json_lenient(&p, ON21[i].json, skipped, sizeof skipped), skipped);
+        boxcfg_stored_legacy(&p, ON21[i].json);
+        TEST_ASSERT_EQUAL_INT8_MESSAGE(ON21[i].led, p.led_pin, ON21[i].json);
+        TEST_ASSERT_EQUAL_INT8_MESSAGE(ON21[i].key, p.key_pin, ON21[i].json);
+    }
+    /* both on one pin (never written by the firmware): one of them is skipped and the two still differ */
+    static const char *const SAME[] = {"{\"ledPin\":5,\"keyPin\":5}", "{\"ledPin\":21,\"keyPin\":21}",
+                                       "{\"ledPin\":23,\"keyPin\":23}", "{\"keyPin\":21,\"ledPin\":21}"};
+    for (size_t i = 0; i < sizeof SAME / sizeof SAME[0]; i++) {
+        box_config_t p;
+        boxcfg_defaults(&p, (const uint8_t[6]){1, 2, 3, 4, 5, 6}, fake_rand);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(1, boxcfg_from_json_lenient(&p, SAME[i], NULL, 0), SAME[i]);
+        TEST_ASSERT_NOT_EQUAL_MESSAGE(p.led_pin, p.key_pin, SAME[i]);
+    }
+    /* the key's stored pin unusable: skipped, and the light is checked against the pin the key keeps */
+    box_config_t bad;
+    boxcfg_defaults(&bad, (const uint8_t[6]){1, 2, 3, 4, 5, 6}, fake_rand);
+    TEST_ASSERT_EQUAL_INT(2, boxcfg_from_json_lenient(&bad, "{\"ledPin\":21,\"keyPin\":7}", NULL, 0));
+    TEST_ASSERT_EQUAL_INT8(23, bad.led_pin);
+    TEST_ASSERT_EQUAL_INT8(21, bad.key_pin);
+    boxcfg_defaults(&bad, (const uint8_t[6]){1, 2, 3, 4, 5, 6}, fake_rand);
+    TEST_ASSERT_EQUAL_INT(1, boxcfg_from_json_lenient(&bad, "{\"ledPin\":22,\"keyPin\":7}", NULL, 0));
+    TEST_ASSERT_EQUAL_INT8(22, bad.led_pin);
+    TEST_ASSERT_EQUAL_INT8(21, bad.key_pin);
     /* a config that says it is left alone: off stays off, and what it stores back says so from then on */
     box_config_t said;
     boxcfg_defaults(&said, (const uint8_t[6]){1, 2, 3, 4, 5, 6}, fake_rand);
