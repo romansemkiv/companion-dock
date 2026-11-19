@@ -3,6 +3,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <netdb.h>
+#include <stdarg.h>
 #include <stdatomic.h>
 #include <stdio.h>
 #include <string.h>
@@ -71,6 +72,7 @@ static struct {
     void *obs_ctx;        /* mtx */
     atomic_int state;
     bool io_failed, too_old, got_ready; /* task only */
+    satc_streak_t streak; /* task only: the failed connection attempts to one target in a row */
 } g = {.fd = -1, .efd = -1};
 
 static const char *state_name(satc_state_t s)
@@ -353,11 +355,35 @@ static void close_conn(void)
     }
 }
 
+/* One connection attempt's outcome for key ("host:port"): of a run of failures to the same target only the first is
+ * logged (why); the run's count is logged when it ends, at a connection made or an attempt to another target. */
+static void streak_step(const char *key, bool failed, const char *why)
+{
+    char was[sizeof g.streak.key];
+    memcpy(was, g.streak.key, sizeof was);
+    uint32_t ended = 0;
+    const int r = satc_streak_step(&g.streak, key, failed, &ended);
+    if (ended > 1) ESP_LOGI(TAG, "connect to %s failed %u times in a row", was, (unsigned)ended);
+    if (r == SATC_LOG_FIRST) ESP_LOGW(TAG, "%s", why);
+}
+
+static void fail_log(const char *key, const char *fmt, ...) __attribute__((format(printf, 2, 3)));
+static void fail_log(const char *key, const char *fmt, ...)
+{
+    char why[HOST_MAX + 48];
+    va_list ap;
+    va_start(ap, fmt);
+    vsnprintf(why, sizeof why, fmt, ap);
+    va_end(ap);
+    streak_step(key, true, why);
+}
+
 /* Returns connected fd or -1. Aborts early if the target changes. */
 static int connect_to(const char *host, uint16_t port, uint32_t seen)
 {
-    char portstr[8];
+    char portstr[8], key[HOST_MAX + 8];
     snprintf(portstr, sizeof portstr, "%u", (unsigned)port);
+    snprintf(key, sizeof key, "%s:%s", host, portstr);
     struct addrinfo hints = {.ai_family = AF_INET, .ai_socktype = SOCK_STREAM};
     struct addrinfo *res = NULL;
     /* A host name with the DNS server gone can take longer than the task watchdog's 10 s (lwIP
@@ -366,7 +392,7 @@ static int connect_to(const char *host, uint16_t port, uint32_t seen)
     int rc = getaddrinfo(host, portstr, &hints, &res);
     esp_task_wdt_add(NULL);
     if (rc != 0 || !res) {
-        ESP_LOGW(TAG, "resolve %s failed (%d)", host, rc);
+        fail_log(key, "resolve %s failed (%d)", host, rc);
         return -1;
     }
     int fd = socket(res->ai_family, res->ai_socktype, 0);
@@ -382,7 +408,7 @@ static int connect_to(const char *host, uint16_t port, uint32_t seen)
     int c = connect(fd, res->ai_addr, res->ai_addrlen);
     freeaddrinfo(res);
     if (c < 0 && errno != EINPROGRESS) {
-        ESP_LOGW(TAG, "connect failed (errno %d)", errno);
+        fail_log(key, "connect failed (errno %d)", errno);
         close(fd);
         return -1;
     }
@@ -397,7 +423,12 @@ static int connect_to(const char *host, uint16_t port, uint32_t seen)
             esp_task_wdt_reset();
             if (s > 0) break;
             waited += SELECT_MS;
-            if (waited >= CONNECT_TIMEOUT_MS || target_changed(seen)) {
+            if (target_changed(seen)) {
+                close(fd);
+                return -1;
+            }
+            if (waited >= CONNECT_TIMEOUT_MS) {
+                fail_log(key, "connect failed (no answer in %d ms)", CONNECT_TIMEOUT_MS);
                 close(fd);
                 return -1;
             }
@@ -406,11 +437,12 @@ static int connect_to(const char *host, uint16_t port, uint32_t seen)
         socklen_t el = sizeof err;
         getsockopt(fd, SOL_SOCKET, SO_ERROR, &err, &el);
         if (err) {
-            ESP_LOGW(TAG, "connect failed (err %d)", err);
+            fail_log(key, "connect failed (err %d)", err);
             close(fd);
             return -1;
         }
     }
+    streak_step(key, false, NULL);
     return fd;
 }
 

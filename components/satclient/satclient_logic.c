@@ -1,5 +1,6 @@
 #include "satclient_logic.h"
 
+#include <stdio.h>
 #include <string.h>
 
 uint32_t satc_wait_ms(unsigned queued, bool ready, uint32_t idle_ms)
@@ -41,4 +42,23 @@ size_t satc_write_all(const satc_io_t *io, const char *data, size_t len, int bud
         break;
     }
     return off;
+}
+
+int satc_streak_step(satc_streak_t *s, const char *key, bool failed, uint32_t *ended)
+{
+    const bool same = s->n && strncmp(s->key, key, sizeof s->key - 1) == 0;
+    const uint32_t over = !failed || !same ? s->n : 0; /* a success, or another target, ends the streak */
+    if (ended) *ended = over;
+    if (!failed) {
+        s->n = 0;
+        s->key[0] = '\0';
+        return SATC_LOG_NONE;
+    }
+    if (same) {
+        s->n++;
+        return SATC_LOG_QUIET;
+    }
+    snprintf(s->key, sizeof s->key, "%s", key);
+    s->n = 1;
+    return SATC_LOG_FIRST;
 }

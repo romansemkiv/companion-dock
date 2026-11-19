@@ -162,6 +162,62 @@ static void test_backoff_resets_on_target_change(void)
     TEST_ASSERT_EQUAL_UINT32(SATC_BACKOFF_FIRST_MS, satc_next_backoff(500, true));
 }
 
+/* A run of failed attempts to one target: the first is logged, the rest are counted, the count comes out when a
+ * connection is made; the next failure starts a new run. */
+static void test_streak_logs_once(void)
+{
+    satc_streak_t s;
+    memset(&s, 0, sizeof s);
+    uint32_t ended = 99;
+    TEST_ASSERT_EQUAL_INT(SATC_LOG_FIRST, satc_streak_step(&s, "10.0.0.9:16622", true, &ended));
+    TEST_ASSERT_EQUAL_UINT32(0, ended);
+    for (int i = 0; i < 4; i++) {
+        ended = 99;
+        TEST_ASSERT_EQUAL_INT(SATC_LOG_QUIET, satc_streak_step(&s, "10.0.0.9:16622", true, &ended));
+        TEST_ASSERT_EQUAL_UINT32(0, ended);
+    }
+    ended = 99;
+    TEST_ASSERT_EQUAL_INT(SATC_LOG_NONE, satc_streak_step(&s, "10.0.0.9:16622", false, &ended));
+    TEST_ASSERT_EQUAL_UINT32(5, ended);
+    ended = 99;
+    TEST_ASSERT_EQUAL_INT(SATC_LOG_NONE, satc_streak_step(&s, "10.0.0.9:16622", false, &ended));
+    TEST_ASSERT_EQUAL_UINT32(0, ended); /* no run to end */
+    ended = 99;
+    TEST_ASSERT_EQUAL_INT(SATC_LOG_FIRST, satc_streak_step(&s, "10.0.0.9:16622", true, &ended));
+    TEST_ASSERT_EQUAL_UINT32(0, ended);
+}
+
+/* Another target ends the run: its first failure is logged and the old run's count handed back. */
+static void test_streak_new_target(void)
+{
+    satc_streak_t s;
+    memset(&s, 0, sizeof s);
+    uint32_t ended = 99;
+    TEST_ASSERT_EQUAL_INT(SATC_LOG_FIRST, satc_streak_step(&s, "a:1", true, &ended));
+    TEST_ASSERT_EQUAL_INT(SATC_LOG_QUIET, satc_streak_step(&s, "a:1", true, &ended));
+    TEST_ASSERT_EQUAL_UINT32(0, ended);
+    TEST_ASSERT_EQUAL_INT(SATC_LOG_FIRST, satc_streak_step(&s, "b:2", true, &ended));
+    TEST_ASSERT_EQUAL_UINT32(2, ended);
+    TEST_ASSERT_EQUAL_INT(SATC_LOG_QUIET, satc_streak_step(&s, "b:2", true, NULL)); /* NULL ended accepted */
+    TEST_ASSERT_EQUAL_INT(SATC_LOG_NONE, satc_streak_step(&s, "c:3", false, &ended)); /* a success elsewhere ends it */
+    TEST_ASSERT_EQUAL_UINT32(2, ended);
+
+    /* a key longer than the struct holds is cut, and the cut key is what later attempts are compared with */
+    char longkey[73];
+    memset(longkey, 'h', 67);
+    memcpy(longkey + 67, ":1662", 6); /* 72 characters */
+    TEST_ASSERT_EQUAL_size_t(72, strlen(longkey));
+    TEST_ASSERT_EQUAL_INT(SATC_LOG_FIRST, satc_streak_step(&s, longkey, true, &ended));
+    TEST_ASSERT_EQUAL_UINT32(0, ended);
+    TEST_ASSERT_EQUAL_size_t(sizeof s.key - 1, strlen(s.key));
+    TEST_ASSERT_EQUAL_INT(SATC_LOG_QUIET, satc_streak_step(&s, longkey, true, &ended));
+    TEST_ASSERT_EQUAL_INT(SATC_LOG_QUIET, satc_streak_step(&s, longkey, true, &ended));
+    TEST_ASSERT_EQUAL_UINT32(0, ended);
+    TEST_ASSERT_EQUAL_INT(SATC_LOG_NONE, satc_streak_step(&s, longkey, false, NULL));
+    TEST_ASSERT_EQUAL_INT(SATC_LOG_FIRST, satc_streak_step(&s, "a:1", true, &ended));
+    TEST_ASSERT_EQUAL_UINT32(0, ended); /* NULL took the long run's count; nothing left over */
+}
+
 int main(void)
 {
     UNITY_BEGIN();
@@ -175,5 +231,7 @@ int main(void)
     RUN_TEST(test_end_event_silent_cases);
     RUN_TEST(test_backoff_grows);
     RUN_TEST(test_backoff_resets_on_target_change);
+    RUN_TEST(test_streak_logs_once);
+    RUN_TEST(test_streak_new_target);
     return UNITY_END();
 }
