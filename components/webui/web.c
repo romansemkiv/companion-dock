@@ -16,7 +16,8 @@
  *
  * Everything here runs on the server's one task (handlers, queued work, the close callback), so the
  * WebSocket table needs no lock; web_ws_listening is a plain counter. A firmware upload is the exception: it runs on
- * its own task (ota_task), and the OTA state is shared under s_ota_mux. */
+ * its own task (ota_task), and the OTA state is shared under s_ota_mux. webui_ws_push (any task) only builds its
+ * frame there and queues the send. */
 #include <ctype.h>
 #include <stdatomic.h>
 #include <stdio.h>
@@ -44,6 +45,7 @@
 #include "satclient/satclient.h"
 #include "slotsync/slotsync.h"
 #include "web_logic.h"
+#include "webui/ext.h"
 #include "webui/webui.h"
 #include "ws_table.h"
 #include "webui_priv.h"
@@ -58,6 +60,8 @@ extern const char index_gz_end[] asm("_binary_index_html_gz_end");
 static char s_etag[24]; /* "<app ELF SHA-256 prefix>": new with every build */
 
 #define MAX_WS WST_MAX
+#define HTTPD_SOCKETS 10 /* httpd's max_open_sockets (web_start) */
+_Static_assert(HTTPD_SOCKETS + 3 <= CONFIG_LWIP_MAX_SOCKETS, "httpd would not start: too few lwIP sockets");
 #define WS_SEND_TIMEOUT_S 2 /* a push to one client may hold up the server task this long */
 #define WS_FRAME_MAX 8192
 #define BODY_MAX 16384
@@ -87,14 +91,15 @@ static void ip4_str(uint32_t a, char *out, size_t n)
     snprintf(out, n, "%u.%u.%u.%u", b[0], b[1], b[2], b[3]);
 }
 
-/* The client's address ("192.168.1.20"), for the sign-in lockout and logs. */
-static void peer_addr(httpd_req_t *req, char *out, size_t n)
+/* A socket's peer address ("192.168.1.20"; an IPv4-mapped IPv6 one as the IPv4 address); "?" and false when it has
+ * none. */
+static bool sock_peer(int fd, char *out, size_t n)
 {
     struct sockaddr_in6 a;
     socklen_t l = sizeof a;
-    if (getpeername(httpd_req_to_sockfd(req), (struct sockaddr *)&a, &l) != 0) {
+    if (getpeername(fd, (struct sockaddr *)&a, &l) != 0) {
         snprintf(out, n, "?");
-        return;
+        return false;
     }
     if (a.sin6_family == AF_INET6) {
         const uint32_t *w = a.sin6_addr.un.u32_addr;
@@ -103,7 +108,11 @@ static void peer_addr(httpd_req_t *req, char *out, size_t n)
     } else {
         ip4_str(((struct sockaddr_in *)&a)->sin_addr.s_addr, out, n);
     }
+    return true;
 }
+
+/* The client's address, for the sign-in lockout and logs. */
+static void peer_addr(httpd_req_t *req, char *out, size_t n) { sock_peer(httpd_req_to_sockfd(req), out, n); }
 
 /* The socket's local IPv4 address (network order), the box's address the request came to; 0 if
  * unknown. */
@@ -441,6 +450,36 @@ static void ws_take_token(wst_slot_t *w, const char *frame)
     cJSON_Delete(j);
 }
 
+/* Extension points (webui/ext.h), server task only like the table: the WebSocket the running call came over (-1
+ * outside one), and what to call when a WebSocket client goes. */
+#define WS_CLOSE_FNS 4
+static int s_ws_cur_fd = -1;
+static TaskHandle_t s_ws_cur_task; /* the server's: a handler running elsewhere at the time (a deck's) gets -1 */
+static void (*s_ws_close_fns[WS_CLOSE_FNS])(int fd);
+
+int webui_ws_current_fd(void) { return xTaskGetCurrentTaskHandle() == s_ws_cur_task ? s_ws_cur_fd : -1; }
+
+void webui_ws_on_close(void (*fn)(int fd))
+{
+    if (!fn) return;
+    for (int i = 0; i < WS_CLOSE_FNS; i++)
+        if (!s_ws_close_fns[i]) {
+            s_ws_close_fns[i] = fn;
+            return;
+        }
+    ESP_LOGW(TAG, "no room for another WebSocket close callback");
+}
+
+/* Forgets a WebSocket client; the close callbacks run first, while it is still in the table. Nothing for a socket
+ * that is not in it (a plain HTTP one, or one forgotten already). */
+static void ws_forget(int fd)
+{
+    if (fd <= 0 || !wst_find(&s_ws, fd)) return;
+    for (int i = 0; i < WS_CLOSE_FNS; i++)
+        if (s_ws_close_fns[i]) s_ws_close_fns[i](fd);
+    wst_remove(&s_ws, fd);
+}
+
 /* A socket that cannot take a push is closed; on_close then forgets it, and the page reconnects. The
  * close is queued as server work. If the queue is full, the socket is shut down so the server sees
  * it close by itself; if the server no longer knows the socket, it is gone already. */
@@ -449,7 +488,7 @@ static void ws_close(wst_slot_t *w)
     if (w->closing) return;
     w->closing = true;
     const esp_err_t e = httpd_sess_trigger_close(s_srv, w->fd);
-    if (e == ESP_ERR_NOT_FOUND) wst_remove(&s_ws, w->fd);
+    if (e == ESP_ERR_NOT_FOUND) ws_forget(w->fd);
     else if (e != ESP_OK) shutdown(w->fd, SHUT_RDWR);
 }
 
@@ -526,14 +565,14 @@ static esp_err_t h_ws(httpd_req_t *req)
     esp_err_t e = httpd_ws_recv_frame(req, &f, 0);
     if (e != ESP_OK) return e;
     if (f.type == HTTPD_WS_TYPE_CLOSE) {
-        wst_remove(&s_ws, fd);
+        ws_forget(fd);
         return ESP_OK;
     }
     if (f.len == 0) return ESP_OK;
     /* the payload is still in the socket: returning without reading it would make httpd parse it as
      * the next frame's header, so anything else closes the socket */
     if (f.type != HTTPD_WS_TYPE_TEXT || f.len > WS_FRAME_MAX) {
-        wst_remove(&s_ws, fd);
+        ws_forget(fd);
         return ESP_FAIL;
     }
     uint8_t *buf = psram_alloc(f.len + 1);
@@ -552,7 +591,10 @@ static esp_err_t h_ws(httpd_req_t *req)
         uint8_t session[32];
         if (authed) memcpy(session, w->hash, sizeof session);
         const rpc_caller_t who = {.src = peer, .trusted = authed, .session = authed ? session : NULL};
+        s_ws_cur_task = xTaskGetCurrentTaskHandle();
+        s_ws_cur_fd = fd; /* webui_ws_current_fd, for this call only */
         char *out = rpc_handle_frame_as((const char *)buf, &who);
+        s_ws_cur_fd = -1;
         if (authed) ws_authed(w); /* a logout in this call drops the socket's sign-in now */
         if (out) {
             const size_t len = strlen(out);
@@ -565,7 +607,8 @@ static esp_err_t h_ws(httpd_req_t *req)
     return e;
 }
 
-void web_ws_broadcast_now(char *text)
+/* web_ws_broadcast_now, to the clients for which want(fd, ctx) is true too (want NULL: all of them). */
+static void ws_broadcast(char *text, bool (*want)(int fd, void *ctx), void *ctx)
 {
     if (!s_srv || !text) return;
     const size_t len = strlen(text);
@@ -575,15 +618,75 @@ void web_ws_broadcast_now(char *text)
         wst_slot_t *w = &s_ws.s[i];
         if (!w->fd || w->closing) continue;
         if (!open && !ws_authed(w)) continue; /* not signed in, signed out or expired */
+        if (want && !want(w->fd, ctx)) continue;
         if (httpd_ws_get_fd_info(s_srv, w->fd) != HTTPD_WS_CLIENT_WEBSOCKET ||
             ws_send_text(s_srv, w->fd, text, len) != ESP_OK)
             ws_close(w); /* maybe part of a frame went out: the session cannot go on */
     }
 }
 
+void web_ws_broadcast_now(char *text) { ws_broadcast(text, NULL, NULL); }
+
 esp_err_t web_queue_work(void (*fn)(void *), void *arg)
 {
     return s_srv ? httpd_queue_work(s_srv, fn, arg) : ESP_ERR_INVALID_STATE;
+}
+
+/* ---------- WebSocket extension points (webui/ext.h) ---------- */
+
+typedef struct {
+    char *text; /* the frame, cJSON-allocated */
+    bool (*want)(int fd, void *ctx);
+    void *ctx;
+} ws_push_t;
+
+/* On the server task. */
+static void ws_push_work(void *arg)
+{
+    ws_push_t *p = arg;
+    ws_broadcast(p->text, p->want, p->ctx);
+    cJSON_free(p->text);
+    free(p);
+}
+
+esp_err_t webui_ws_push(const char *method, cJSON *params, bool (*want)(int fd, void *ctx), void *ctx)
+{
+    if (!method) {
+        cJSON_Delete(params);
+        return ESP_ERR_INVALID_ARG;
+    }
+    if (!s_srv) {
+        cJSON_Delete(params);
+        return ESP_ERR_INVALID_STATE;
+    }
+    if (!params) params = cJSON_CreateObject();
+    /* NotifyStatus's shape (notify.c) */
+    cJSON *frame = cJSON_CreateObject();
+    const bool built = frame && params && cJSON_AddStringToObject(frame, "src", rpc_device_id()) &&
+                       cJSON_AddStringToObject(frame, "dst", "user") &&
+                       cJSON_AddStringToObject(frame, "method", method) &&
+                       cJSON_AddItemToObject(frame, "params", params);
+    if (!built) cJSON_Delete(params); /* not in the frame */
+    char *text = built ? cJSON_PrintUnformatted(frame) : NULL;
+    cJSON_Delete(frame);
+    ws_push_t *p = text ? malloc(sizeof *p) : NULL;
+    if (!p) {
+        cJSON_free(text);
+        return ESP_ERR_NO_MEM;
+    }
+    *p = (ws_push_t){.text = text, .want = want, .ctx = ctx};
+    const esp_err_t e = web_queue_work(ws_push_work, p);
+    if (e != ESP_OK) {
+        cJSON_free(text);
+        free(p);
+    }
+    return e;
+}
+
+bool webui_ws_peer(int fd, char *ip, size_t n)
+{
+    if (!ip || !n || fd <= 0 || !wst_find(&s_ws, fd)) return false; /* fd 0 would find a free slot */
+    return sock_peer(fd, ip, n);
 }
 
 /* ---------- POST /ota ---------- */
@@ -1220,7 +1323,7 @@ static esp_err_t h_404(httpd_req_t *req, httpd_err_code_t code)
 static void on_close(httpd_handle_t hd, int fd)
 {
     (void)hd;
-    wst_remove(&s_ws, fd);
+    ws_forget(fd);
     close(fd);
 }
 
@@ -1271,7 +1374,9 @@ esp_err_t web_start(void)
      * round trips varied 270-320 ms with the core it landed on). */
     c.core_id = 1;
     c.task_priority = 3; /* convenience: below every task a show needs (docs/manual.md, Task priorities) */
-    c.max_open_sockets = 8;
+    /* WST_MAX WebSocket clients with 4 left for HTTP requests beside them (lru_purge_enable closes the least recently
+     * used socket for a new one when all are open); httpd needs 3 lwIP sockets of its own on top */
+    c.max_open_sockets = HTTPD_SOCKETS;
     c.lru_purge_enable = true;
     c.recv_wait_timeout = RECV_TIMEOUT_S;
     c.send_wait_timeout = 10;

@@ -11,7 +11,7 @@
 extern "C" {
 #endif
 
-#define WST_MAX 4
+#define WST_MAX 6
 
 typedef struct {
     int fd;           /* 0 = free */

@@ -19,12 +19,12 @@ static void test_add_find_remove_full(void)
     wst_slot_t *a = wst_add(&t, 54);
     TEST_ASSERT_NOT_NULL(a);
     TEST_ASSERT_EQUAL_PTR(a, wst_add(&t, 54)); /* same socket, same slot */
-    for (int fd = 55; fd < 54 + WST_MAX; fd++) TEST_ASSERT_NOT_NULL(wst_add(&t, fd));
-    TEST_ASSERT_NULL(wst_add(&t, 99)); /* full */
-    TEST_ASSERT_EQUAL_INT(WST_MAX, atomic_load(&t.n));
+    for (int fd = 55; fd < 60; fd++) TEST_ASSERT_NOT_NULL(wst_add(&t, fd)); /* six clients */
+    TEST_ASSERT_NULL(wst_add(&t, 99)); /* the seventh: full */
+    TEST_ASSERT_EQUAL_INT(6, atomic_load(&t.n));
     wst_remove(&t, 54);
     wst_remove(&t, 54); /* twice: no-op */
-    TEST_ASSERT_EQUAL_INT(WST_MAX - 1, atomic_load(&t.n));
+    TEST_ASSERT_EQUAL_INT(5, atomic_load(&t.n));
     TEST_ASSERT_NULL(wst_find(&t, 54));
     TEST_ASSERT_NOT_NULL(wst_add(&t, 99));
 }
