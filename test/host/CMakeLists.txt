@@ -201,3 +201,10 @@ target_include_directories(test_feedback_sound PRIVATE ${REPO_ROOT}/components/f
 
 add_host_test(slotsync_logic SOURCES test_slotsync_logic.c ../../components/slotsync/slotsync_logic.c)
 target_include_directories(test_slotsync_logic PRIVATE ${REPO_ROOT}/components/slotsync)
+
+# The unit record (its own flash sector): the reader, against the shared vector, and the vector is
+# exactly what tools/make_unit_vector.py makes (zlib's crc32).
+add_host_test(unit_logic SOURCES test_unit_logic.c ../../components/unitrec/unit_logic.c WITH_CJSON)
+target_compile_definitions(test_unit_logic PRIVATE VECTOR_PATH="${REPO_ROOT}/test/vectors/unit-record-1.bin")
+add_test(NAME unit_vector COMMAND python3 -B ${REPO_ROOT}/tools/make_unit_vector.py
+  --check ${REPO_ROOT}/test/vectors/unit-record-1.bin)
