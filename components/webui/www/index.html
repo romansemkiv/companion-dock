@@ -33,7 +33,7 @@
 html,body{margin:0;background:var(--bg);color:var(--fg)}
 body{font:14px/1.5 var(--sans);-webkit-font-smoothing:antialiased}
 a{color:var(--acc);text-decoration:none}a:hover{text-decoration:underline}
-code,.mono{font-family:var(--mono);font-size:.92em;font-variant-numeric:tabular-nums}
+code,.mono{font-family:var(--mono);font-size:max(.92em,12px);font-variant-numeric:tabular-nums}
 .dim{color:var(--dim)}.off{opacity:.5}fieldset{border:0;margin:0;padding:0;min-width:0}
 .ic{width:18px;height:18px;flex:none;fill:currentColor;vertical-align:middle}
 .ic.sm{width:15px;height:15px}.ic.lg{width:22px;height:22px}
@@ -62,7 +62,7 @@ header.top h1{margin:0;font-size:17px;font-weight:600;display:flex;gap:10px;alig
 .sg{position:relative;color:var(--mut)}.sg:hover{text-decoration:none;border-color:var(--line2)}.sg.rt{color:var(--fg);border-color:var(--acc)}
 .sg.x .ic{color:var(--dim)}.sg.x:before{content:'';position:absolute;left:8px;top:12px;width:19px;height:2px;background:var(--dim);box-shadow:0 0 0 1.5px var(--panel);transform:rotate(-45deg)}.sg.bad:before{background:var(--bad)}
 .dot.acc{background:var(--acc);box-shadow:0 0 0 3px var(--acc-soft)}.dot.ok{background:var(--ok);box-shadow:0 0 0 3px var(--ok-soft)}.dot.warn{background:var(--warn);box-shadow:0 0 0 3px var(--warn-soft)}.dot.bad{background:var(--bad);box-shadow:0 0 0 3px var(--bad-soft)}
-#menu{display:none}
+#menu{display:none;order:-1}   /* after the title in the markup, before it on screen: a button beside it, not a tile over it */
 #scrim{display:none}
 .wrap{padding:24px 28px 48px;max-width:1240px;width:100%}
 #view,.wrap,.panel,.pb{min-width:0}
@@ -239,8 +239,8 @@ pre{margin:0;background:var(--panel2);border:1px solid var(--line);border-radius
 <div id="scrim"></div>
 <main>
   <header class="top">
-    <button class="ghost icon" id="menu" type="button" aria-label="Menu" aria-controls="side" aria-expanded="false"><svg class="ic"><use href="#i-list"/></svg></button>
     <h1 id="title"></h1>
+    <button class="ghost icon" id="menu" type="button" aria-label="Menu" aria-controls="side" aria-expanded="false"><svg class="ic"><use href="#i-list"/></svg></button>
     <div class="chips" id="chips"></div>
     <button class="ghost icon" id="outbtn" type="button" hidden title="Sign out" aria-label="Sign out"><svg class="ic"><use href="#i-key"/></svg></button>
   </header>
