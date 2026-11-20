@@ -563,7 +563,8 @@ char *boxcfg_satellite_config_json(const box_config_t *c)
     return s;
 }
 
-/* A stored ledPin or keyPin that is usable on its own: an integer GPIO that may carry the light or the key. */
+/* A stored ledPin or keyPin that is usable on its own: an integer GPIO that may carry the light or the key. It must
+ * take exactly what get_feedback takes for the pin at load (claims false). */
 static bool stored_pin(const cJSON *root, const char *key, int *out)
 {
     const cJSON *it = cJSON_GetObjectItemCaseSensitive(root, key);
@@ -599,6 +600,7 @@ int boxcfg_from_json_lenient(box_config_t *c, const char *json, char *skipped, s
         return -1;
     }
     int bad = 0;
+    const int8_t led_was = c->led_pin, key_was = c->key_pin;
     bool led_clash, key_clash;
     stored_pin_clash(root, c, &led_clash, &key_clash);
     /* apSecured first: apPass is checked against it (8-63 only while secured), and the default is secured
@@ -639,6 +641,18 @@ int boxcfg_from_json_lenient(box_config_t *c, const char *json, char *skipped, s
                 bad++;
             }
         }
+    }
+    /* a pin stored twice (stored_pin_clash sees the first) may still put the two on one pin: as there, the light
+     * keeps the pin it had, or the key when that is the same pin. With no keyPin, boxcfg_stored_legacy moves the
+     * key off the light's pin. */
+    if (cJSON_GetObjectItemCaseSensitive(root, "keyPin") && c->led_pin == c->key_pin) {
+        const bool key = led_was == c->key_pin;
+        char err[64];
+        pin_clash(key, c->led_pin, err, sizeof err);
+        note_skipped(skipped, n, key ? "keyPin" : "ledPin", err);
+        if (key) c->key_pin = key_was;
+        else c->led_pin = led_was;
+        bad++;
     }
     cJSON_Delete(root);
     return bad;

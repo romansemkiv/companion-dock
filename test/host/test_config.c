@@ -794,6 +794,22 @@ static void test_lenient_pins_same(void)
         TEST_ASSERT_EQUAL_UINT8_MESSAGE(60, c.led_brightness, SAME[i].json);
         TEST_ASSERT_TRUE_MESSAGE(c.key_enabled, SAME[i].json);
     }
+    /* a pin stored twice: as above, the light keeps the pin it had (the key when that is the same pin) */
+    static const struct { const char *json; int bad; int8_t led, key; const char *skipped; } TWICE[] = {
+        {"{\"ledPin\":5,\"ledPin\":21,\"keyPin\":21}", 1, 23, 21, "ledPin: GPIO21 is the service key's pin"},
+        {"{\"ledPin\":5,\"keyPin\":21,\"ledPin\":21}", 1, 23, 21, "ledPin: GPIO21 is the service key's pin"},
+        {"{\"ledPin\":5,\"ledPin\":21,\"keyPin\":7}", 2, 23, 21, NULL},
+        {"{\"keyPin\":5,\"keyPin\":23}", 1, 23, 21, "keyPin: GPIO23 is the status light's pin"},
+        {"{\"keyPin\":5,\"keyPin\":23,\"ledPin\":22}", 0, 22, 23, ""},
+    };
+    for (size_t i = 0; i < sizeof TWICE / sizeof TWICE[0]; i++) {
+        box_config_t t = fresh();
+        char skipped[160];
+        TEST_ASSERT_EQUAL_INT_MESSAGE(TWICE[i].bad, boxcfg_from_json_lenient(&t, TWICE[i].json, skipped, sizeof skipped), TWICE[i].json);
+        if (TWICE[i].skipped) TEST_ASSERT_EQUAL_STRING_MESSAGE(TWICE[i].skipped, skipped, TWICE[i].json);
+        TEST_ASSERT_EQUAL_INT8_MESSAGE(TWICE[i].led, t.led_pin, TWICE[i].json);
+        TEST_ASSERT_EQUAL_INT8_MESSAGE(TWICE[i].key, t.key_pin, TWICE[i].json);
+    }
     /* an API write is refused as before, with the same words */
     box_config_t c = fresh();
     char err[96];
