@@ -1579,7 +1579,7 @@ static void test_box_screen(void)
     dui_box_t b = box_default();
     build(DUI_PAGE_BOX, &b);
     TEST_ASSERT_EQUAL_STRING("Name:CompanionBox-8D1C|Uptime:2h 14m / Version:0.1.0|Slot A:Running|Slot B:In sync|[Sync/In sync] / "
-                             "[Dimmer]|Bright:70%|[Brighter]|[Sound on]|[Flashes]|[Restart]",
+                             "[Dimmer]|Bright:70%|[Brighter]|[Sound on]|[Light]|[Restart]",
                              content(&S));
     TEST_ASSERT_EQUAL(DUI_ROLE_OK, find(&S, "Slot B", NULL)->role);
     TEST_ASSERT_EQUAL(DUI_A_DIMMER, button(&S, "Dimmer")->action);
@@ -1601,7 +1601,7 @@ static void test_box_screen(void)
     b.box.uptime_s = 59;
     build(DUI_PAGE_BOX, &b);
     TEST_ASSERT_EQUAL_STRING("Name:CompanionBox-8D1C|Uptime:59s / Version:0.1.0|Slot B:Running|Slot A:In sync|[Sync/In sync] / "
-                             "[Dimmer]|Bright:10%|[Brighter]|[Sound off]|[Flashes]|[Restart]",
+                             "[Dimmer]|Bright:10%|[Brighter]|[Sound off]|[Light]|[Restart]",
                              content(&S));
     t = button(&S, "Sound off");
     TEST_ASSERT_FALSE(t->flags & DUI_F_SELECTED);
@@ -1646,30 +1646,31 @@ static void test_wifi_use_button(void)
     TEST_ASSERT_NULL(maybe_button(&S, "Use"));
 }
 
-/* the Box screen's flashes toggle, beside Sound: selected while ledFlash is on; never locked. */
-static void test_box_flashes_toggle(void)
+/* the Box screen's status light toggle, beside Sound: selected while the light is on (ledEnabled); never locked. */
+static void test_box_light_toggle(void)
 {
     dui_box_t b = box_default();
-    b.flash = true;
+    b.light = true;
     build(DUI_PAGE_BOX, &b);
-    const dui_tile_t *t = button(&S, "Flashes"); /* one word: one line on every key; selected = on */
-    TEST_ASSERT_EQUAL(DUI_A_FLASH, t->action);
-    TEST_ASSERT_EQUAL(DUI_ICON_FLASH, t->icon);
+    const dui_tile_t *t = button(&S, "Light"); /* one word: one line on every key; selected = on */
+    TEST_ASSERT_EQUAL(DUI_A_LIGHT, t->action);
+    TEST_ASSERT_EQUAL(DUI_ICON_LIGHT, t->icon);
     TEST_ASSERT_TRUE(t->flags & DUI_F_SELECTED);
     TEST_ASSERT_EQUAL(0, t->hold_ms);
     /* beside Sound */
     int is = -1, it = -1;
     for (int i = 0; i < S.ntiles; i++) {
         if (S.tile[i].text && !strcmp(S.tile[i].text, "Sound on")) is = i;
-        if (S.tile[i].text && !strcmp(S.tile[i].text, "Flashes")) it = i;
+        if (S.tile[i].text && !strcmp(S.tile[i].text, "Light")) it = i;
     }
     TEST_ASSERT_EQUAL(is + 1, it);
-    b.flash = false;
+    b.light = false;
     b.locked = true;
     build(DUI_PAGE_BOX, &b);
-    t = button(&S, "Flashes");
+    t = button(&S, "Light");
     TEST_ASSERT_FALSE(t->flags & (DUI_F_SELECTED | DUI_F_LOCKED));
-    TEST_ASSERT_FALSE(dui_action_locked(DUI_A_FLASH));
+    TEST_ASSERT_FALSE(dui_action_locked(DUI_A_LIGHT));
+    TEST_ASSERT_NULL(maybe_button(&S, "Flashes")); /* ledFlash: the web page's only */
 }
 
 /* The other slot's word and the button per state: Sync now (no force) for differs, invalid and empty;
@@ -1708,7 +1709,7 @@ static void test_box_slot_buttons(void)
         b.box.pending = C[i].pending;
         build(DUI_PAGE_BOX, &b);
         char want[512], msg[16];
-        snprintf(want, sizeof want, "Name:CompanionBox-8D1C|Uptime:2h 14m / %s / [Dimmer]|Bright:70%%|[Brighter]|[Sound on]|[Flashes]|[Restart]",
+        snprintf(want, sizeof want, "Name:CompanionBox-8D1C|Uptime:2h 14m / %s / [Dimmer]|Bright:70%%|[Brighter]|[Sound on]|[Light]|[Restart]",
                  C[i].row);
         snprintf(msg, sizeof msg, "case %d", (int)i);
         TEST_ASSERT_EQUAL_STRING_MESSAGE(want, content(&S), msg);
@@ -2095,7 +2096,7 @@ static void test_every_screen_fits(void)
     boxes[4] = box_default();
     boxes[4].locked = true;
     boxes[4].box.slot = DUI_SLOT_DIFFERS;
-    boxes[4].flash = true;
+    boxes[4].light = true;
     boxes[5] = sat(DUI_SAT_TOO_OLD);
     strcpy(boxes[5].toast, "Restarting");
     boxes[6] = sat(DUI_SAT_RECON);
@@ -2667,7 +2668,7 @@ int main(void)
     RUN_TEST(test_box_screen);
     RUN_TEST(test_box_uptime);
     RUN_TEST(test_box_slot_buttons);
-    RUN_TEST(test_box_flashes_toggle);
+    RUN_TEST(test_box_light_toggle);
     RUN_TEST(test_wifi_use_button);
     RUN_TEST(test_wifi_toggle);
     RUN_TEST(test_network_keymap);

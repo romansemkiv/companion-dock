@@ -168,7 +168,7 @@ typedef struct {
     char wifi_main[33], wifi_backup[33]; /* the station networks' SSIDs ("" none) */
     uint8_t brightness;                  /* deckBrightness: applied while the box drives a deck */
     bool sound;                          /* speakerEnabled */
-    bool led_flash;                      /* ledFlash: the status light flashes on each event */
+    bool led_enabled;                    /* ledEnabled: the status light shows the status */
     bool locked;                         /* a settings password is set */
     bool companion_auto;                 /* companionAuto: Companion found by mDNS (Choose only then) */
     char companion_host[64];             /* companionHost: the manual address (Set IP's prefill when an IPv4) */

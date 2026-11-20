@@ -124,7 +124,7 @@ void surf_maint_box(dui_box_t *b, const surf_maint_in_t *in)
 
     b->brightness = in->brightness;
     b->sound = in->sound;
-    b->flash = in->flash;
+    b->light = in->light;
     b->locked = in->locked;
     b->ondemand = in->ondemand;
     b->connected = in->connected;

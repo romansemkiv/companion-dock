@@ -50,7 +50,6 @@ enum {
     DUI_A_RESTART,   // hold: restart the box; then home
     DUI_A_SYNC,      // Sync now (no force: never over a newer image)
     DUI_A_BOOT_OTHER, // hold: boot the other slot (restarts); then home
-    DUI_A_FLASH,     // the status light's flashes on / off (ledFlash)
     DUI_A_USE_MAIN,  // hold: use the main Wi-Fi network now
     DUI_A_USE_BACKUP, // hold: use the backup Wi-Fi network now
     DUI_A_ETH_DHCP,   // hold: Ethernet by DHCP (ethDhcp true)
@@ -62,7 +61,7 @@ enum {
     DUI_A_COMP_AUTO,  // Auto find (a manual Companion): companionAuto on again
     DUI_A_WIFI_OFF,   // hold: the Wi-Fi station off (wifiEnabled false; the setup hotspot stays)
     DUI_A_WIFI_ON,    // the Wi-Fi station on again: from the main network
-    DUI_A_LIGHT,      // the status light on / off (ledEnabled): the service key's (no deck button)
+    DUI_A_LIGHT,      // the status light on / off (ledEnabled): the Box screen's Light key and the service key's
     DUI_A_COUNT
 };
 
@@ -171,7 +170,7 @@ typedef struct {
     } box;
     uint8_t brightness;         // 10..100 %
     bool sound;                 // the speaker
-    bool flash;                 // the status light flashes on each event (ledFlash)
+    bool light;                 // the status light is on (ledEnabled)
     bool locked;                // a settings password is set
     bool ondemand;              // the maintenance screen opened on demand: a Close key on home
     bool connected;             // Companion drives this deck (the "Companion connected" home)

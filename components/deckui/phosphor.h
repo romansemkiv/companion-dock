@@ -53,7 +53,7 @@ enum {
     PH_LOCK, /* lock */
     PH_X, /* x */
     PH_BACKSPACE, /* backspace */
-    PH_LIGHTNING, /* lightning */
+    PH_LIGHTBULB, /* lightbulb */
     PH_PENCIL_SIMPLE, /* pencil-simple */
     PH_CIRCUITRY, /* circuitry */
     PH_MAGNIFYING_GLASS, /* magnifying-glass */
@@ -71,5 +71,5 @@ typedef struct {
 extern const int16_t ph_pts[];
 extern const uint16_t ph_end[];
 extern const ph_glyph_t ph_glyph[PH_COUNT];
-#define PH_NPTS 4580
-#define PH_NCONTOURS 135
+#define PH_NPTS 4767
+#define PH_NCONTOURS 137

@@ -34,7 +34,7 @@ GLYPHS = [
     ("ARROWS_CLOCKWISE", "arrows-clockwise"), ("TOGGLE_LEFT", "toggle-left"), ("TOGGLE_RIGHT", "toggle-right"),
     ("QR_CODE", "qr-code"), ("LIST_BULLETS", "list-bullets"), ("SUN_DIM", "sun-dim"), ("SUN", "sun"),
     ("SPEAKER_HIGH", "speaker-high"), ("SPEAKER_SLASH", "speaker-slash"), ("LOCK", "lock"), ("X", "x"),
-    ("BACKSPACE", "backspace"), ("LIGHTNING", "lightning"), ("PENCIL_SIMPLE", "pencil-simple"),
+    ("BACKSPACE", "backspace"), ("LIGHTBULB", "lightbulb"), ("PENCIL_SIMPLE", "pencil-simple"),
     ("CIRCUITRY", "circuitry"), ("MAGNIFYING_GLASS", "magnifying-glass"), ("WIFI_SLASH", "wifi-slash"),
     ("WEBHOOKS_LOGO", "webhooks-logo"),  # Companion
 ]

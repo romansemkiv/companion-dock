@@ -196,7 +196,7 @@ static void gather(snap_t *g, int64_t now)
         .wifi_backup = g->set.wifi_backup, .ap_shown = ap_shown, .ap_open = ap_open, .ap_ssid = g->ap_ssid,
         .ap_pass = g->ap_pass, .brightness = g->set.brightness, .sound = g->set.sound, .locked = g->set.locked,
         .ondemand = atomic_load(&surf.ondemand), .version = g->version, .uptime_s = (uint32_t)(now / 1000000),
-        .pending = pending_verify(now), .sel = sel, .companion_auto = g->set.companion_auto, .flash = g->set.led_flash,
+        .pending = pending_verify(now), .sel = sel, .companion_auto = g->set.companion_auto, .light = g->set.led_enabled,
         .companion_host = g->set.companion_host, .companion_port = g->set.companion_port, .deck_limit = (uint8_t)surf.limit,
         .too_old = st == SATC_TOO_OLD || (too_old_flag && !strcmp(too_old_host, g->host)), .live = live,
         .target_host = g->host, .companion_version = caps.companion_version, .comps = g->inst, .ncomps = ninst,

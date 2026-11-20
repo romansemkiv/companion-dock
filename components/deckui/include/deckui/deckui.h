@@ -91,7 +91,7 @@ enum {
     DUI_ICON_LOGO,    // the box's nine-dot logo (the web page's i-keys); no deck screen uses it now
     DUI_ICON_DEL,     // the PIN pad's delete (⌫)
     DUI_ICON_SAT,     // a satellite: Satellite mode (Lucide's satellite)
-    DUI_ICON_FLASH,   // a flash: the status light's flashes
+    DUI_ICON_LIGHT,   // a lightbulb: the status light
     DUI_ICON_EDIT,    // a pencil: Edit the static address
     DUI_ICON_COMPANION, // Companion: Phosphor's webhooks-logo
     DUI_ICON_CIRCUITRY, // Phosphor's Circuitry (MIT): a board, its traces and two pads: the Box menu button

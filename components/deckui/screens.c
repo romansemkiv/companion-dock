@@ -691,9 +691,9 @@ void dui_build_box(dui_screen_t *s, const dui_box_t *b)
     dui_button(s, DUI_ICON_SUN_HIGH, "Brighter", DUI_A_BRIGHTER);
     dui_tile_t *t = dui_button(s, b->sound ? DUI_ICON_SOUND : DUI_ICON_MUTE, b->sound ? "Sound on" : "Sound off", DUI_A_SOUND);
     if (b->sound) t->flags |= DUI_F_SELECTED;
-    /* ledFlash. One word, on one line on every key: the selected look says it is on */
-    t = dui_button(s, DUI_ICON_FLASH, "Flashes", DUI_A_FLASH);
-    if (b->flash) t->flags |= DUI_F_SELECTED;
+    /* the status light (ledEnabled). One word, on one line on every key: the selected look says it is on */
+    t = dui_button(s, DUI_ICON_LIGHT, "Light", DUI_A_LIGHT);
+    if (b->light) t->flags |= DUI_F_SELECTED;
     hold_button(s, b, DUI_ICON_RESTART, "Restart", DUI_A_RESTART, DUI_HOLD_RESTART_MS, "restarts", true);
 }
 

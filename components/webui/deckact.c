@@ -192,18 +192,11 @@ static void run(const da_item_t *it)
         call("Feedback.SetConfig", obj1("speakerEnabled", cJSON_CreateBool(on)), on ? "Sound on" : "Sound off", false);
         break;
     }
-    case DUI_A_LIGHT: { /* the status light on / off: the service key's (svcbtn) */
+    case DUI_A_LIGHT: { /* the status light on / off: the Box screen's Light key and the service key's (svcbtn) */
         webui_cfg_lock();
         const bool on = !webui_cfg()->led_enabled;
         webui_cfg_unlock();
         call("Feedback.SetConfig", obj1("ledEnabled", cJSON_CreateBool(on)), on ? "Light on" : "Light off", false);
-        break;
-    }
-    case DUI_A_FLASH: { /* the status light's flashes */
-        webui_cfg_lock();
-        const bool on = !webui_cfg()->led_flash;
-        webui_cfg_unlock();
-        call("Feedback.SetConfig", obj1("ledFlash", cJSON_CreateBool(on)), on ? "Flashes on" : "Flashes off", false);
         break;
     }
     case DUI_A_USE_MAIN:
@@ -372,7 +365,7 @@ void webui_deck_push_settings(void)
     snprintf(st.wifi_backup, sizeof st.wifi_backup, "%s", c->wifi_backup_ssid);
     st.brightness = c->deck_brightness;
     st.sound = c->speaker_enabled;
-    st.led_flash = c->led_flash;
+    st.led_enabled = c->led_enabled;
     st.companion_auto = c->companion_auto;
     snprintf(st.companion_host, sizeof st.companion_host, "%s", c->companion_host);
     st.companion_port = c->companion_port;

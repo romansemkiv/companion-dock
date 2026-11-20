@@ -29,7 +29,7 @@ typedef struct {
     const char *ap_ssid, *ap_pass; /* ap_ssid "": netmgr's */
     uint8_t brightness;           /* deckBrightness */
     bool sound, locked, ondemand;
-    bool flash;                   /* ledFlash */
+    bool light;                   /* ledEnabled: the status light */
     /* Ethernet's addressing: ethDhcp, the saved static set and the lease now (NULL: none) */
     bool eth_dhcp;
     const dui_ipset_t *eth_saved, *eth_lease;

@@ -115,7 +115,7 @@ static int ph_of(int icon, uint16_t flags)
     case DUI_ICON_LOCK: return PH_LOCK;
     case DUI_ICON_CLOSE: return PH_X;
     case DUI_ICON_DEL: return PH_BACKSPACE;
-    case DUI_ICON_FLASH: return PH_LIGHTNING;
+    case DUI_ICON_LIGHT: return PH_LIGHTBULB;
     case DUI_ICON_EDIT: return PH_PENCIL_SIMPLE;
     case DUI_ICON_CIRCUITRY: return PH_CIRCUITRY;
     case DUI_ICON_SEARCH: return PH_MAGNIFYING_GLASS;

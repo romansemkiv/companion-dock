@@ -462,9 +462,9 @@ satellite (Phosphor has none), drawn in Phosphor's stroke.
   web page) and while the firmware is pending verify or a copy waits behind an upload (*wait*); then *Boot
   other* (hold 2 s) over a newer image, *Dimmer* / *Brighter* (`deckBrightness`, default 70 %: the brightness of a deck
   while it shows the maintenance screens, the box's own or on demand over Companion, applied at once; closing
-  on demand gives Companion's last brightness back), *Sound on/off* (`speakerEnabled`), *Flashes*
-  (`ledFlash`, the status light's flashes: outlined while on, one word so it reads on one line on
-  every key), *Restart* (hold 2 s).
+  on demand gives Companion's last brightness back), *Sound on/off* (`speakerEnabled`), *Light*
+  (`ledEnabled`, the status light on or off, as the *Speaker & LED* page sets it: a lightbulb, outlined while on, one
+  word so it reads on one line on every key; its flashes, `ledFlash`, are the web page's only), *Restart* (hold 2 s).
 - **The Companion icon**: the Companion button shows Phosphor's webhooks logo, in the key's ink like every icon
   (white, cyan when selected, dimmed when locked). No Bitfocus artwork is used.
 - **Status icons**: the network and hotspot icons in the status row are buttons: a tap opens the

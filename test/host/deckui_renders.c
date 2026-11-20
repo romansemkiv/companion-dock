@@ -401,6 +401,7 @@ static dui_box_t real_box(void)
     b.box.other_valid = true;
     b.brightness = 70;
     b.sound = true;
+    b.light = true;
     return b;
 }
 
