@@ -23,7 +23,7 @@
 static const char *TAG = "notify";
 
 #define PERIOD_MS 1000
-#define STACK 3072
+#define STACK 4096 /* PSRAM: queues work; a full web server queue's warning (from the IDF) takes ~1 KB of it */
 
 static char *s_last; /* server task only: the last status pushed, without the self-changing fields */
 static atomic_bool s_queued;
