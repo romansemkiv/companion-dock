@@ -151,7 +151,17 @@ static bool get_int(const cJSON *root, const char *key, int lo, int hi, int *dst
     return true;
 }
 
-/* The speaker, the status light (components/feedback) and the service key (main/svcbtn.c). */
+/* "ledPin: GPIOn is the service key's pin" (key false) or "keyPin: GPIOn is the status light's pin". */
+static void pin_clash(bool key, int pin, char *err, size_t errlen)
+{
+    char msg[48];
+    snprintf(msg, sizeof msg, key ? "GPIO%d is the status light's pin" : "GPIO%d is the service key's pin", pin);
+    set_err(err, errlen, key ? "keyPin" : "ledPin", msg);
+}
+
+/* The speaker, the status light (components/feedback) and the service key (main/svcbtn.c). claims false: one field
+ * of the stored config (boxcfg_from_json_lenient, which checks the light's and the key's pins as a pair itself,
+ * once). */
 static bool get_feedback(const cJSON *root, box_config_t *t, bool claims, char *err, size_t errlen)
 {
     int vol = t->speaker_volume, pin = t->led_pin, bright = t->led_brightness, kpin = t->key_pin;
@@ -200,12 +210,10 @@ static bool get_feedback(const cJSON *root, box_config_t *t, bool claims, char *
         }
     }
     /* checked on the result: the light and the key on one pin would fight over it. The key named in the
-     * request is the one refused (the light when both or neither are). */
-    if (ok && pin == kpin) {
+     * request is the one refused (the light when both or neither are). At load: stored_pin_clash. */
+    if (ok && claims && pin == kpin) {
         const bool key = cJSON_GetObjectItemCaseSensitive(root, "keyPin") && !cJSON_GetObjectItemCaseSensitive(root, "ledPin");
-        char msg[48];
-        snprintf(msg, sizeof msg, key ? "GPIO%d is the status light's pin" : "GPIO%d is the service key's pin", pin);
-        set_err(err, errlen, key ? "keyPin" : "ledPin", msg);
+        pin_clash(key, pin, err, errlen);
         ok = false;
     }
     t->speaker_volume = (uint8_t)vol;
@@ -459,9 +467,9 @@ char *boxcfg_to_json(const box_config_t *c, bool include_secrets)
     cJSON_AddBoolToObject(o, "ledEnabled", c->led_enabled);
     cJSON_AddBoolToObject(o, "ledFlash", c->led_flash);
     cJSON_AddNumberToObject(o, "ledPin", c->led_pin);
+    cJSON_AddNumberToObject(o, "keyPin", c->key_pin); /* the two pins side by side */
     cJSON_AddNumberToObject(o, "ledBrightness", c->led_brightness);
     cJSON_AddBoolToObject(o, "keyEnabled", c->key_enabled);
-    cJSON_AddNumberToObject(o, "keyPin", c->key_pin);
     const char *ks = boxcfg_key_act_name(c->key_short), *kl = boxcfg_key_act_name(c->key_long);
     cJSON_AddStringToObject(o, "keyShort", ks ? ks : "menu");
     cJSON_AddStringToObject(o, "keyLong", kl ? kl : "find");
@@ -566,20 +574,20 @@ static bool stored_pin(const cJSON *root, const char *key, int *out)
     return true;
 }
 
-/* What the stored light's pin (key false) or key's pin (key true) must differ from at load: the other's pin as the
- * stored config has it, never a default it didn't choose (the key's moved to GPIO21 in 0.2.9, a free pin for the
- * light before). The other stored, usable and not the same pin: that one. No keyPin stored: the pin
- * boxcfg_stored_legacy gives the key. Else (the other skipped, or both on one pin): the other's pin as loaded so
- * far, so that one of them is skipped and the two still differ. */
-static int load_partner(const cJSON *root, const box_config_t *c, bool key)
+/* The light's and the key's pins as the stored config has them, checked once as a pair: which of the two (if
+ * any) is skipped because they are the same pin. Each is its stored one when that is usable, else the one *c has;
+ * with no keyPin stored, the key's is the pin boxcfg_stored_legacy then gives it (never a default the config didn't
+ * choose: the key's moved to GPIO21 in 0.2.9, a free pin for the light before). The same pin: the light's is
+ * skipped (as an API write refuses it), unless the pin it keeps is that one too; then the key's. */
+static void stored_pin_clash(const cJSON *root, const box_config_t *c, bool *led_out, bool *key_out)
 {
-    const int now = key ? c->led_pin : c->key_pin;
-    int mine = -1, theirs;
-    stored_pin(root, key ? "keyPin" : "ledPin", &mine);
-    if (!key && !cJSON_GetObjectItemCaseSensitive(root, "keyPin"))
-        return mine == BOXCFG_KEY_PIN_LEGACY ? now : BOXCFG_KEY_PIN_LEGACY;
-    if (stored_pin(root, key ? "ledPin" : "keyPin", &theirs) && theirs != mine) return theirs;
-    return now;
+    int led = c->led_pin, key = c->key_pin;
+    const bool led_stored = stored_pin(root, "ledPin", &led), key_stored = stored_pin(root, "keyPin", &key);
+    if (!cJSON_GetObjectItemCaseSensitive(root, "keyPin") && led != BOXCFG_KEY_PIN_LEGACY) key = BOXCFG_KEY_PIN_LEGACY;
+    *led_out = *key_out = false;
+    if (led != key) return;
+    if (led_stored && (c->led_pin != key || !key_stored)) *led_out = true;
+    else if (key_stored) *key_out = true;
 }
 
 int boxcfg_from_json_lenient(box_config_t *c, const char *json, char *skipped, size_t n)
@@ -591,6 +599,8 @@ int boxcfg_from_json_lenient(box_config_t *c, const char *json, char *skipped, s
         return -1;
     }
     int bad = 0;
+    bool led_clash, key_clash;
+    stored_pin_clash(root, c, &led_clash, &key_clash);
     /* apSecured first: apPass is checked against it (8-63 only while secured), and the default is secured
      *, so a stored open hotspot's short or empty password must find it off already. ethDhcp last:
      * false is checked against the addresses, which must be in place by then. */
@@ -604,12 +614,9 @@ int boxcfg_from_json_lenient(box_config_t *c, const char *json, char *skipped, s
                 bad++;
                 continue;
             }
-            /* the light's pin and the key's: each checked against the other's as stored (load_partner), and only
-             * that one pin taken */
+            /* each field on its own; the light's and the key's pins also as the pair stored_pin_clash checked */
             const bool led = !strcmp(it->string, "ledPin"), key = !strcmp(it->string, "keyPin");
             box_config_t t = *c;
-            if (led) t.key_pin = (int8_t)load_partner(root, c, false);
-            if (key) t.led_pin = (int8_t)load_partner(root, c, true);
             cJSON *one = cJSON_CreateObject();
             cJSON *dup = cJSON_Duplicate(it, true);
             char err[96] = "";
@@ -622,9 +629,11 @@ int boxcfg_from_json_lenient(box_config_t *c, const char *json, char *skipped, s
             }
             cJSON_Delete(dup);
             cJSON_Delete(one);
-            if (ok && led) c->led_pin = t.led_pin;
-            else if (ok && key) c->key_pin = t.key_pin;
-            else if (ok) *c = t;
+            if (ok && ((led && led_clash) || (key && key_clash))) {
+                pin_clash(key, led ? t.led_pin : t.key_pin, err, sizeof err);
+                ok = false;
+            }
+            if (ok) *c = t;
             if (!ok) {
                 note_skipped(skipped, n, it->string, err);
                 bad++;

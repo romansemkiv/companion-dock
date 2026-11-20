@@ -653,6 +653,164 @@ static void test_service_key(void)
     TEST_ASSERT_EQUAL_UINT8(9, v);
 }
 
+/* Every light and key pin pair this firmware can save (two different free pins, the key on or off) loads back
+ * whole after a restart, with nothing skipped: the pair is checked once, as stored, never a field in between
+ * against a pin half loaded (a light on GPIO21, the key's default, lost the fields between ledPin and keyPin). */
+static void test_lenient_pin_pairs(void)
+{
+    int pins[64];
+    const int n = boxcfg_led_pins(pins, 64);
+    TEST_ASSERT_EQUAL_INT(17, n);
+    int pairs = 0;
+    for (int a = 0; a < n; a++)
+        for (int b = 0; b < n; b++)
+            for (int on = 0; on < 2 && a != b; on++) {
+                box_config_t c = fresh();
+                c.led_enabled = true;
+                c.led_flash = false;
+                c.led_pin = (int8_t)pins[a];
+                c.led_brightness = 60;
+                c.key_enabled = on;
+                c.key_pin = (int8_t)pins[b];
+                c.key_short = BOXCFG_KEY_ACT_FIND;
+                c.key_long = BOXCFG_KEY_ACT_RESTART;
+                char *full = boxcfg_to_json(&c, true);
+                box_config_t r = fresh();
+                char skipped[160], msg[96];
+                snprintf(msg, sizeof msg, "light %d, key %d, %s", pins[a], pins[b], on ? "on" : "off");
+                TEST_ASSERT_EQUAL_INT_MESSAGE(0, boxcfg_from_json_lenient(&r, full, skipped, sizeof skipped), msg);
+                TEST_ASSERT_EQUAL_STRING_MESSAGE("", skipped, msg);
+                TEST_ASSERT_FALSE_MESSAGE(boxcfg_stored_legacy(&r, full), msg);
+                TEST_ASSERT_EQUAL_MEMORY_MESSAGE(&c, &r, sizeof c, msg);
+                /* stored side by side */
+                const char *lp = strstr(full, "\"ledPin\":"), *kp = strstr(full, "\"keyPin\":");
+                TEST_ASSERT_NOT_NULL(lp);
+                TEST_ASSERT_NOT_NULL(kp);
+                TEST_ASSERT_EQUAL_PTR_MESSAGE(strchr(lp, ',') + 1, kp, msg);
+                free(full);
+                pairs++;
+            }
+    TEST_ASSERT_EQUAL_INT(17 * 16 * 2, pairs);
+}
+
+/* json in the order boxcfg_to_json stored before the two pins were side by side: keyPin after keyEnabled. */
+static cJSON *stored_before(const char *json)
+{
+    cJSON *o = cJSON_Parse(json), *out = cJSON_CreateObject(), *it;
+    const cJSON *kp = cJSON_GetObjectItemCaseSensitive(o, "keyPin");
+    TEST_ASSERT_NOT_NULL(kp);
+    cJSON_ArrayForEach(it, o) {
+        if (it == kp) continue;
+        cJSON_AddItemToObject(out, it->string, cJSON_Duplicate(it, true));
+        if (!strcmp(it->string, "keyEnabled")) cJSON_AddItemToObject(out, "keyPin", cJSON_Duplicate(kp, true));
+    }
+    TEST_ASSERT_EQUAL_INT(cJSON_GetArraySize(o), cJSON_GetArraySize(out));
+    cJSON_Delete(o);
+    return out;
+}
+
+/* What firmware before this one stored: ledPin, then other keys, then keyPin. The fields in between load too. */
+static void test_lenient_pins_apart(void)
+{
+    static const char OLD[] = "{\"ledEnabled\":true,\"ledPin\":21,\"ledBrightness\":60,\"keyEnabled\":true,"
+                              "\"keyPin\":26,\"keyShort\":\"find\"}";
+    box_config_t c = fresh();
+    char skipped[160];
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, boxcfg_from_json_lenient(&c, OLD, skipped, sizeof skipped), skipped);
+    TEST_ASSERT_FALSE(boxcfg_stored_legacy(&c, OLD));
+    TEST_ASSERT_EQUAL_INT8(21, c.led_pin);
+    TEST_ASSERT_EQUAL_INT8(26, c.key_pin);
+    TEST_ASSERT_EQUAL_UINT8(60, c.led_brightness);
+    TEST_ASSERT_TRUE(c.key_enabled);
+    TEST_ASSERT_TRUE(c.led_enabled);
+    TEST_ASSERT_EQUAL_UINT8(BOXCFG_KEY_ACT_FIND, c.key_short);
+    /* a whole config stored in that order, the key on and off: loads whole, and stored again it is this
+     * firmware's (so the box stores it once, the same from then on) */
+    for (int on = 0; on < 2; on++) {
+        box_config_t w = fresh();
+        w.led_pin = 21;
+        w.key_pin = 26;
+        w.led_brightness = 60;
+        w.key_enabled = on;
+        char *now = boxcfg_to_json(&w, true);
+        cJSON *in_order = stored_before(now);
+        char *old = cJSON_PrintUnformatted(in_order);
+        TEST_ASSERT_NOT_NULL(strstr(old, on ? "\"ledPin\":21,\"ledBrightness\":60,\"keyEnabled\":true,\"keyPin\":26"
+                                             : "\"ledPin\":21,\"ledBrightness\":60,\"keyEnabled\":false,\"keyPin\":26"));
+        box_config_t r = fresh();
+        TEST_ASSERT_EQUAL_INT_MESSAGE(0, boxcfg_from_json_lenient(&r, old, skipped, sizeof skipped), skipped);
+        TEST_ASSERT_FALSE(boxcfg_stored_legacy(&r, old));
+        TEST_ASSERT_EQUAL_MEMORY(&w, &r, sizeof w);
+        char *again = boxcfg_to_json(&r, true);
+        TEST_ASSERT_EQUAL_STRING(now, again);
+        free(again);
+        free(old);
+        free(now);
+        cJSON_Delete(in_order);
+    }
+    /* from before the key's settings (no keyPin, no keyEnabled), the light on GPIO21: the fields after it load,
+     * and the key is on, on GPIO32, as it was */
+    static const char BEFORE[] = "{\"ledPin\":21,\"ledBrightness\":60,\"ledEnabled\":true,\"soundReady\":false}";
+    box_config_t b = fresh();
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, boxcfg_from_json_lenient(&b, BEFORE, skipped, sizeof skipped), skipped);
+    TEST_ASSERT_EQUAL_UINT8(60, b.led_brightness);
+    TEST_ASSERT_TRUE(b.led_enabled);
+    TEST_ASSERT_FALSE(b.sound_ready);
+    TEST_ASSERT_TRUE(boxcfg_stored_legacy(&b, BEFORE));
+    TEST_ASSERT_EQUAL_INT8(21, b.led_pin);
+    TEST_ASSERT_EQUAL_INT8(32, b.key_pin);
+    TEST_ASSERT_TRUE(b.key_enabled);
+    /* a 0.2.8 config (keyPin, no keyEnabled), the light on 21, keyPin after the fields between */
+    static const char K028[] = "{\"ledPin\":21,\"ledBrightness\":60,\"keyShort\":\"find\",\"keyPin\":32}";
+    box_config_t k = fresh();
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, boxcfg_from_json_lenient(&k, K028, skipped, sizeof skipped), skipped);
+    boxcfg_stored_legacy(&k, K028);
+    TEST_ASSERT_EQUAL_INT8(21, k.led_pin);
+    TEST_ASSERT_EQUAL_INT8(32, k.key_pin);
+    TEST_ASSERT_EQUAL_UINT8(60, k.led_brightness);
+    TEST_ASSERT_EQUAL_UINT8(BOXCFG_KEY_ACT_FIND, k.key_short);
+    TEST_ASSERT_TRUE(k.key_enabled);
+}
+
+/* Both on one pin as stored (never written by this firmware): the light's pin is skipped and keeps the one it had,
+ * or, when that is the same pin, the key's; in any key order. Every other field loads. */
+static void test_lenient_pins_same(void)
+{
+    static const struct { const char *json; int8_t led, key; const char *skipped; } SAME[] = {
+        {"{\"ledPin\":5,\"ledBrightness\":60,\"keyEnabled\":true,\"keyPin\":5}", 23, 5, "ledPin: GPIO5 is the service key's pin"},
+        {"{\"keyPin\":5,\"ledBrightness\":60,\"keyEnabled\":true,\"ledPin\":5}", 23, 5, "ledPin: GPIO5 is the service key's pin"},
+        {"{\"ledPin\":21,\"ledBrightness\":60,\"keyEnabled\":true,\"keyPin\":21}", 23, 21, "ledPin: GPIO21 is the service key's pin"},
+        {"{\"ledPin\":23,\"ledBrightness\":60,\"keyEnabled\":true,\"keyPin\":23}", 23, 21, "keyPin: GPIO23 is the status light's pin"},
+        {"{\"keyPin\":23,\"ledBrightness\":60,\"keyEnabled\":true,\"ledPin\":23}", 23, 21, "keyPin: GPIO23 is the status light's pin"},
+        {"{\"ledBrightness\":60,\"keyEnabled\":true,\"keyPin\":23}", 23, 21, "keyPin: GPIO23 is the status light's pin"},
+    };
+    for (size_t i = 0; i < sizeof SAME / sizeof SAME[0]; i++) {
+        box_config_t c = fresh();
+        char skipped[160];
+        TEST_ASSERT_EQUAL_INT_MESSAGE(1, boxcfg_from_json_lenient(&c, SAME[i].json, skipped, sizeof skipped), SAME[i].json);
+        TEST_ASSERT_EQUAL_STRING_MESSAGE(SAME[i].skipped, skipped, SAME[i].json);
+        TEST_ASSERT_EQUAL_INT8_MESSAGE(SAME[i].led, c.led_pin, SAME[i].json);
+        TEST_ASSERT_EQUAL_INT8_MESSAGE(SAME[i].key, c.key_pin, SAME[i].json);
+        TEST_ASSERT_EQUAL_UINT8_MESSAGE(60, c.led_brightness, SAME[i].json);
+        TEST_ASSERT_TRUE_MESSAGE(c.key_enabled, SAME[i].json);
+    }
+    /* an API write is refused as before, with the same words */
+    box_config_t c = fresh();
+    char err[96];
+    TEST_ASSERT_FALSE(boxcfg_from_json(&c, "{\"ledPin\":21}", err, sizeof err));
+    TEST_ASSERT_EQUAL_STRING("ledPin: GPIO21 is the service key's pin", err);
+    TEST_ASSERT_FALSE(boxcfg_from_json(&c, "{\"keyPin\":23}", err, sizeof err));
+    TEST_ASSERT_EQUAL_STRING("keyPin: GPIO23 is the status light's pin", err);
+    TEST_ASSERT_FALSE(boxcfg_from_json(&c, "{\"ledPin\":5,\"keyPin\":5}", err, sizeof err));
+    TEST_ASSERT_EQUAL_STRING("ledPin: GPIO5 is the service key's pin", err);
+    TEST_ASSERT_FALSE(boxcfg_from_json(&c, "{\"ledBrightness\":60,\"keyPin\":23}", err, sizeof err));
+    TEST_ASSERT_EQUAL_STRING("keyPin: GPIO23 is the status light's pin", err);
+    /* both moved in one write, to two different pins: taken */
+    TEST_ASSERT_TRUE_MESSAGE(boxcfg_from_json(&c, "{\"ledPin\":21,\"keyPin\":23}", err, sizeof err), err);
+    TEST_ASSERT_EQUAL_INT8(21, c.led_pin);
+    TEST_ASSERT_EQUAL_INT8(23, c.key_pin);
+}
+
 static const char *claim_22(int gpio) { return gpio == 22 ? "used by the test" : NULL; }
 
 /* another component's claim on header pins: refused for API writes and left out of the list, not at load */
@@ -1337,6 +1495,9 @@ int main(void)
     RUN_TEST(test_feedback_json);
     RUN_TEST(test_led_pins);
     RUN_TEST(test_service_key);
+    RUN_TEST(test_lenient_pin_pairs);
+    RUN_TEST(test_lenient_pins_apart);
+    RUN_TEST(test_lenient_pins_same);
     RUN_TEST(test_ap_secured_json);
     RUN_TEST(test_ap_pass_validated_only_when_secured);
     RUN_TEST(test_ap_old_stored_config_secured);
