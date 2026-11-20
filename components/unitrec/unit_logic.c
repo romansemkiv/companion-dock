@@ -36,6 +36,47 @@ static bool take(const cJSON *obj, const char *key, char *dst, size_t n)
     return true;
 }
 
+/* cJSON recurses once per level of nesting; the record itself is one level. */
+#define UNIT_DEPTH_MAX 4
+
+/* The payload's shape, checked before cJSON sees it: an object from its first byte to its last (no
+ * whitespace around it), nested at most UNIT_DEPTH_MAX deep, no control character inside a string and
+ * no \u0000 (cJSON would decode it into a NUL that cuts the string short). */
+static bool shape_ok(const uint8_t *p, size_t n)
+{
+    if (p[0] != '{' || p[n - 1] != '}') return false;
+    bool in_str = false;
+    int depth = 0;
+    for (size_t i = 0; i < n; i++) {
+        const uint8_t c = p[i];
+        if (in_str) {
+            if (c < 0x20) return false;
+            if (c == '"') {
+                in_str = false;
+            } else if (c == '\\') {
+                if (n - i > 5 && memcmp(p + i + 1, "u0000", 5) == 0) return false;
+                i++; /* the escaped character */
+            }
+        } else if (c == '"') {
+            in_str = true;
+        } else if (c == '{' || c == '[') {
+            if (++depth > UNIT_DEPTH_MAX) return false;
+        } else if (c == '}' || c == ']') {
+            depth--;
+        }
+    }
+    return true;
+}
+
+/* No name twice among obj's members (cJSON would read the first, a JSON.parse the last). */
+static bool names_unique(const cJSON *obj)
+{
+    for (const cJSON *a = obj->child; a; a = a->next)
+        for (const cJSON *b = a->next; b; b = b->next)
+            if (strcmp(a->string, b->string) == 0) return false;
+    return true;
+}
+
 static bool is_hex(char c) { return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F'); }
 
 static char lower(char c) { return (c >= 'A' && c <= 'Z') ? (char)(c - 'A' + 'a') : c; }
@@ -59,12 +100,12 @@ unit_status_t unit_parse(const uint8_t *sector, size_t len, const char *my_board
     const uint8_t *payload = sector + UNIT_HEADER_SIZE;
     const uint32_t crc = (uint32_t)sector[10] | ((uint32_t)sector[11] << 8) | ((uint32_t)sector[12] << 16) |
                          ((uint32_t)sector[13] << 24);
-    if (unit_crc32(payload, n) != crc || memchr(payload, '\0', n)) return UNIT_UNREADABLE;
+    if (unit_crc32(payload, n) != crc || memchr(payload, '\0', n) || !shape_ok(payload, n)) return UNIT_UNREADABLE;
 
     /* the JSON must take up the whole payload: nothing cut short, nothing after it */
     const char *end = NULL;
     cJSON *root = cJSON_ParseWithLengthOpts((const char *)payload, n, &end, false);
-    bool ok = cJSON_IsObject(root) && end == (const char *)payload + n;
+    bool ok = cJSON_IsObject(root) && end == (const char *)payload + n && names_unique(root);
     if (ok) {
         const cJSON *v = cJSON_GetObjectItemCaseSensitive(root, "v");
         ok = cJSON_IsNumber(v) && v->valuedouble == 1.0;

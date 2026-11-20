@@ -1,14 +1,17 @@
 /* The unit record: the box's own identity, kept in the last 4 KB flash sector (UNIT_ADDR), outside
  * every partition, so neither an update nor a fresh install (both write from 0x0 without a full
  * erase) reaches it. The firmware only reads it. Pure (no ESP-IDF header); host-tested in
- * test/host/test_unit_logic.c against test/vectors/unit-record-1.bin (tools/make_unit_vector.py).
+ * test/host/test_unit_logic.c against test/vectors/ (unit-record-1.bin, unit-payloads.json: made by
+ * tools/make_unit_vector.py).
  *
  * Layout (UNIT_SECTOR_SIZE bytes):
  *   0..7   magic "CDUNIT01" (ASCII)
  *   8..9   payload length, u16 little-endian, 1..UNIT_PAYLOAD_MAX
  *   10..13 CRC-32 of the payload, u32 little-endian (unit_crc32: zlib's crc32)
  *   14..15 zero (reserved, not checked)
- *   16..   payload: compact UTF-8 JSON
+ *   16..   payload: compact UTF-8 JSON: an object from its first byte to its last (no whitespace
+ *          around it), nested at most 4 deep, no member name twice at its top level, no \u0000
+ *          and no control character inside a string
  *   rest   0xFF
  * Payload keys: "v" (1), "board" (12 hex digits, the chip's MAC), "caseSn" (1..32), "caseType"
  * (1..24), "edition" (1..8), "at" (ISO-8601 UTC, 1..24), "fw" (the firmware version written with

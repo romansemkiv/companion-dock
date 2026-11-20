@@ -1,6 +1,8 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
+#include "cJSON.h"
 #include "unit_logic.h"
 #include "unity.h"
 
@@ -231,6 +233,56 @@ static void test_other_keys_ignored(void)
     TEST_ASSERT_EQUAL_STRING("CD-TEST-0001", u.case_sn);
 }
 
+static char *read_text(const char *path)
+{
+    FILE *f = fopen(path, "rb");
+    TEST_ASSERT_NOT_NULL_MESSAGE(f, path);
+    fseek(f, 0, SEEK_END);
+    long n = ftell(f);
+    fseek(f, 0, SEEK_SET);
+    char *txt = malloc((size_t)n + 1);
+    TEST_ASSERT_NOT_NULL(txt);
+    TEST_ASSERT_EQUAL(n, (long)fread(txt, 1, (size_t)n, f));
+    txt[n] = '\0';
+    fclose(f);
+    return txt;
+}
+
+static int nibble(char c) { return c <= '9' ? c - '0' : c - 'a' + 10; }
+
+/* test/vectors/unit-payloads.json: each payload under a correct header, read as the case says (the encoder's
+ * test reads the same cases) */
+static void test_shared_payloads(void)
+{
+    char *txt = read_text(PAYLOADS_PATH);
+    cJSON *root = cJSON_Parse(txt);
+    free(txt);
+    TEST_ASSERT_NOT_NULL(root);
+    TEST_ASSERT_EQUAL_STRING(VECTOR_BOARD, cJSON_GetObjectItem(root, "board")->valuestring);
+    const cJSON *cases = cJSON_GetObjectItem(root, "cases");
+    TEST_ASSERT_TRUE(cJSON_GetArraySize(cases) >= 30);
+    static char payload[UNIT_PAYLOAD_MAX];
+    const cJSON *c;
+    cJSON_ArrayForEach(c, cases)
+    {
+        const char *name = cJSON_GetObjectItem(c, "name")->valuestring;
+        const char *hex = cJSON_GetObjectItem(c, "hex")->valuestring;
+        const size_t n = strlen(hex) / 2;
+        TEST_ASSERT_TRUE_MESSAGE(n >= 1 && n <= UNIT_PAYLOAD_MAX, name);
+        for (size_t i = 0; i < n; i++) payload[i] = (char)(nibble(hex[2 * i]) << 4 | nibble(hex[2 * i + 1]));
+        make(payload, n);
+        const unit_status_t st = unit_parse(buf, sizeof buf, VECTOR_BOARD, &u);
+        if (strcmp(cJSON_GetObjectItem(c, "status")->valuestring, "ok") == 0) {
+            TEST_ASSERT_EQUAL_MESSAGE(UNIT_OK, st, name);
+            TEST_ASSERT_EQUAL_STRING_MESSAGE(cJSON_GetObjectItem(c, "caseSn")->valuestring, u.case_sn, name);
+        } else {
+            TEST_ASSERT_EQUAL_MESSAGE(UNIT_UNREADABLE, st, name);
+            TEST_ASSERT_EQUAL_MEMORY_MESSAGE(&zero, &u, sizeof u, name);
+        }
+    }
+    cJSON_Delete(root);
+}
+
 int main(void)
 {
     if (!load_vector()) {
@@ -252,5 +304,6 @@ int main(void)
     RUN_TEST(test_wrong_types_and_values_are_unreadable);
     RUN_TEST(test_too_long_is_refused_not_cut);
     RUN_TEST(test_other_keys_ignored);
+    RUN_TEST(test_shared_payloads);
     return UNITY_END();
 }
