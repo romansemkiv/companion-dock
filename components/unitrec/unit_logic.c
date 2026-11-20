@@ -124,3 +124,18 @@ unit_status_t unit_parse(const uint8_t *sector, size_t len, const char *my_board
     *out = u;
     return UNIT_OK;
 }
+
+void unit_json_add(cJSON *o, unit_status_t st, const unit_t *u)
+{
+    if (st == UNIT_NONE) return;
+    cJSON *un = cJSON_AddObjectToObject(o, "unit");
+    if (!un) return;
+    if (st == UNIT_OK) {
+        cJSON_AddStringToObject(un, "caseSn", u->case_sn);
+        cJSON_AddStringToObject(un, "caseType", u->case_type);
+        cJSON_AddStringToObject(un, "edition", u->edition);
+        cJSON_AddStringToObject(un, "at", u->at);
+    } else {
+        cJSON_AddStringToObject(un, "error", st == UNIT_OTHER_BOARD ? "other board" : "unreadable");
+    }
+}

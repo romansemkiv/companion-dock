@@ -47,3 +47,10 @@ uint32_t unit_crc32(const uint8_t *p, size_t n);
  * 12 hex digits (either case). out is zeroed, then filled only on UNIT_OK. A field missing, of the
  * wrong type or too long makes the record UNIT_UNREADABLE (never cut short). */
 unit_status_t unit_parse(const uint8_t *sector, size_t len, const char *my_board_hex, unit_t *out);
+
+struct cJSON;
+
+/* Device.GetInfo's "unit", added to o from a unit_parse result: UNIT_OK {caseSn, caseType, edition,
+ * at} from u; UNIT_OTHER_BOARD {error: "other board"}; UNIT_UNREADABLE {error: "unreadable"};
+ * UNIT_NONE nothing (no "unit" key). */
+void unit_json_add(struct cJSON *o, unit_status_t st, const unit_t *u);

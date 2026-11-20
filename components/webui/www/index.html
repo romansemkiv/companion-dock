@@ -675,8 +675,10 @@ async device(pg){
   const rst=h('div',{class:'bn bad bw',id:'rstc',hidden:true},ic('warning'),h('span',null,'Reset the box to default settings?'),
     btn('Reset now',act(factoryReset),'danger'),btn('Cancel',()=>{rst.hidden=true},'ghost'));
   const last=(S.sys||{}).lastReset||INFO.lastReset;   // Uptime (moved from Home), kept live by onSys
+  const un=INFO.unit&&INFO.unit.caseSn&&INFO.unit;   // the unit record, when the box has one of its own (Device.GetInfo.unit)
   show(h('div',{class:'grid'},panel('Status',h('dl',{class:'kv'},h('dt',null,'Running for'),h('dd',{id:'uptime'},fmtUp((S.sys||{}).uptime_s)),
-      last&&[h('dt',null,'Last start'),h('dd',null,last)]),null,'circuitry'),
+      last&&[h('dt',null,'Last start'),h('dd',null,last)],
+      un&&[h('dt',null,'Case SN'),h('dd',null,un.caseSn),h('dt',null,'Case type'),h('dd',null,un.caseType)]),null,'circuitry'),
     panel('Find my box',[h('p',{class:'note'},'The box beeps for 3 seconds and its status light blinks white for 30 seconds, whatever the Speaker & LED settings say.'),
       h('div',{class:'btns'},btn('Find my box',act(findBox),'','speaker'))],null,'speaker'),
     panel('Stream Decks',[h('p',{class:'note'},c.deckLimit===4?'Up to 4 Stream Decks (at your own risk: power for 2).':"Up to 2 Stream Decks: the box's power over Ethernet is sized for 2."),

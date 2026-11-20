@@ -365,6 +365,28 @@ async function smoke(file) {
     ctx.rpc = rpcPrev;
     ctx.h = hOrig;
   }
+  // the unit record (Device.GetInfo.unit): Case SN and Case type under the Device page's Status for a record of
+  // this box's own; nothing for another board's, an unreadable one or none
+  {
+    const hOrig = ctx.h;
+    const labels = [];
+    ctx.h = (tag, attrs, ...kids) => { for (const k of kids.flat(Infinity)) if (typeof k === 'string') labels.push(k); return hOrig(tag, attrs, ...kids); };
+    const device = async (unit) => {
+      labels.length = 0;
+      ctx.__unit = unit;
+      await vm.runInContext('(async()=>{INFO=Object.assign({},INFO,{unit:__unit});page="device";PG={};await PAGES.device(PG)})()', ctx);
+      return labels;
+    };
+    let l = await device({ caseSn: 'CD-TEST-0001', caseType: 'Standard', edition: 'standard', at: '2026-11-19T12:00:00Z' });
+    if (!l.includes('Case SN') || !l.includes('CD-TEST-0001') || !l.includes('Case type') || !l.includes('Standard'))
+      errs.push('the Device page does not show the unit record\'s Case SN and Case type');
+    for (const u of [{ error: 'other board' }, { error: 'unreadable' }, undefined]) {
+      l = await device(u);
+      if (l.includes('Case SN') || l.includes('Case type')) errs.push(`the Device page shows Case SN for unit ${JSON.stringify(u)}`);
+    }
+    vm.runInContext('delete INFO.unit', ctx);
+    ctx.h = hOrig;
+  }
   // "Let Companion adopt this box without the PIN" in the Box name and PIN panel, fed by companionAdopt (absent:
   // on), with its note; part of the panel's Save (a saveRow: off until something differs), sent by saveDevice as
   // Device.SetConfig {companionAdopt} only when it changed; nothing acts on the checkbox by itself

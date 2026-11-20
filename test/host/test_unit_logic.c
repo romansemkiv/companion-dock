@@ -283,6 +283,49 @@ static void test_shared_payloads(void)
     cJSON_Delete(root);
 }
 
+/* Device.GetInfo's "unit" from a parse's result */
+static cJSON *info_with(unit_status_t st, const unit_t *x)
+{
+    cJSON *o = cJSON_CreateObject();
+    unit_json_add(o, st, x);
+    return o;
+}
+
+static void test_json_none_adds_no_key(void)
+{
+    cJSON *o = info_with(UNIT_NONE, &zero);
+    TEST_ASSERT_NULL(o->child);
+    cJSON_Delete(o);
+}
+
+static void test_json_ok_has_the_four_fields(void)
+{
+    TEST_ASSERT_EQUAL(UNIT_OK, unit_parse(vec, sizeof vec, VECTOR_BOARD, &u));
+    cJSON *o = info_with(UNIT_OK, &u);
+    char *txt = cJSON_PrintUnformatted(o);
+    TEST_ASSERT_EQUAL_STRING("{\"unit\":{\"caseSn\":\"CD-TEST-0001\",\"caseType\":\"Standard\",\"edition\":\"standard\","
+                             "\"at\":\"2026-11-19T12:00:00Z\"}}",
+                             txt);
+    cJSON_free(txt);
+    cJSON_Delete(o);
+}
+
+static void expect_error(unit_status_t st, const char *msg)
+{
+    cJSON *o = info_with(st, &zero);
+    const cJSON *un = cJSON_GetObjectItemCaseSensitive(o, "unit");
+    TEST_ASSERT_TRUE(cJSON_IsObject(un));
+    TEST_ASSERT_EQUAL(1, cJSON_GetArraySize(un));
+    TEST_ASSERT_EQUAL_STRING(msg, cJSON_GetObjectItemCaseSensitive(un, "error")->valuestring);
+    cJSON_Delete(o);
+}
+
+static void test_json_errors(void)
+{
+    expect_error(UNIT_OTHER_BOARD, "other board");
+    expect_error(UNIT_UNREADABLE, "unreadable");
+}
+
 int main(void)
 {
     if (!load_vector()) {
@@ -305,5 +348,8 @@ int main(void)
     RUN_TEST(test_too_long_is_refused_not_cut);
     RUN_TEST(test_other_keys_ignored);
     RUN_TEST(test_shared_payloads);
+    RUN_TEST(test_json_none_adds_no_key);
+    RUN_TEST(test_json_ok_has_the_four_fields);
+    RUN_TEST(test_json_errors);
     return UNITY_END();
 }

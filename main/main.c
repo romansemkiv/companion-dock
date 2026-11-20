@@ -39,6 +39,7 @@
 #include "supervisor.h"
 #include "surfaces/surfaces.h"
 #include "svcbtn.h"
+#include "unitrec.h"
 #include "webui/webui.h"
 
 static const char *TAG = "main";
@@ -124,6 +125,7 @@ void app_main(void)
     /* the slot too: after an OTA the box may run ota_1, where idf.py app-flash (ota_0) has no effect */
     ESP_LOGI(TAG, "%s %s on %s", app->project_name, app->version, run ? run->label : "?");
     breadcrumb_boot(); /* the reset reason and the last deliberate restart's, then clears it */
+    unitrec_load();    /* the unit record, read once: Device.GetInfo reports it */
 
     nvs_start();
     stage("nvs");

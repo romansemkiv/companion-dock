@@ -6,7 +6,8 @@ idf_component_register(SRCS "web.c" "web_logic.c" "ws_table.c" "methods.c" "auth
                        REQUIRES boxconfig esp_common json netmgr surfaces
                        PRIV_REQUIRES rpc esp_http_server app_update esp_app_format nvs_flash esp_hw_support
                                      esp_system esp_timer esp_netif freertos log lwip heap discovery
-                                     satclient usbdeck c6fw elgdock breadcrumb feedback slotsync deckui esp_driver_tsens)
+                                     satclient usbdeck c6fw elgdock breadcrumb feedback slotsync deckui esp_driver_tsens
+                                     unitrec)
 
 # The page (www/index.html) is embedded gzip-compressed and served with Content-Encoding: gzip.
 # tools/pack_page.py strips the comments, indentation and

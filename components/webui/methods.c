@@ -50,6 +50,7 @@
 #include "slotsync/slotsync.h"
 #include "notify_logic.h"
 #include "surfaces/surfaces.h"
+#include "unitrec.h"
 #include "usbdeck/usbdeck.h"
 #include "web_logic.h"
 #include "webui/ext.h"
@@ -828,8 +829,10 @@ static const char *s_edition = "standard"; /* webui_set_edition */
 
 void webui_set_edition(const char *name) { s_edition = name ? name : "standard"; }
 
-/* Device.GetInfo -> {name, id, mac, model, hw, project, version, idf, build, edition, auth_en, lastReset}.
+/* Device.GetInfo -> {name, id, mac, model, hw, project, version, idf, build, edition, unit?, auth_en, lastReset}.
  * edition: "standard" unless a component named another (webui_set_edition).
+ * unit: the unit record read at start (unitrec.h), only when the sector holds one: {caseSn, caseType, edition, at},
+ * or {error: "other board"} / {error: "unreadable"} (unit_json_add).
  * lastReset: {reason: this start's reset reason ("power-on", "software restart", "panic", ...),
  * breadcrumb: what the last deliberate restart recorded ("mode switch", "OTA", ...; "" when none was
  * under way), summary: the line Sys.GetStatus.lastReset gives}. */
@@ -857,6 +860,9 @@ static cJSON *m_device_info(const cJSON *p, rpc_err_t *err)
     snprintf(b, sizeof b, "%s %s", d->date, d->time);
     cJSON_AddStringToObject(r, "build", b);
     cJSON_AddStringToObject(r, "edition", s_edition);
+    unit_t u;
+    const unit_status_t ust = unitrec_get(&u);
+    unit_json_add(r, ust, &u);
     cJSON_AddBoolToObject(r, "auth_en", auth_enabled());
     cJSON *lr = cJSON_AddObjectToObject(r, "lastReset");
     cJSON_AddStringToObject(lr, "reason", breadcrumb_reset_reason());
