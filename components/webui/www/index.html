@@ -88,7 +88,7 @@ header.top h1{margin:0;font-size:17px;font-weight:600;display:flex;gap:10px;alig
 .panel>.ph .act{margin-left:auto;display:flex;flex-wrap:wrap;justify-content:flex-end;gap:8px;align-items:center;min-width:0}
 .panel>.pb{padding:16px}
 /* 16 px all round: no margin under a panel's last box (nothing shown after it), nor under a banner closing it */
-.pb>:not(:has(~ :not([hidden],:empty))),.pb>:last-child>.bn:last-child,.nets:last-child{margin-bottom:0}.ph .note{margin:0}
+.pb>:not(:has(~ :not([hidden],:empty))),.pb>:last-child>.bn:last-child,:is(.nets,.scanst):last-child{margin-bottom:0}.ph .note{margin:0}
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:16px;margin-bottom:16px}
 .grid>.panel{margin-bottom:0}
 .note{color:var(--mut);font-size:13px;margin:0 0 12px}
@@ -181,6 +181,8 @@ td.empty{color:var(--mut);text-align:center;padding:18px;white-space:normal}
 .bn>span:not(.spin){min-width:0;overflow-wrap:anywhere}
 .bn.warn{background:var(--warn-soft);color:var(--warn)}.bn.bad{background:var(--bad-soft);color:var(--bad)}.bn.ok{background:var(--ok-soft);color:var(--ok)}.bn.acc{background:var(--acc-soft);color:var(--acc)}
 .bn .ic{margin-top:2px}.bn button{margin-left:auto;flex:none}.bn button+button{margin-left:0}
+/* in a panel, a banner under other content (a row of buttons too) stands 16 px from it */
+.pb>.bn:not(:first-child),.pb>:not(:first-child)>.bn:first-child{margin-top:16px}
 .bar{height:6px;background:var(--line);border-radius:3px;overflow:hidden;margin:10px 0 12px}.bar i{display:block;height:100%;background:var(--acc);width:0;transition:width .3s}
 .pfrow{display:grid;grid-template-columns:52px 1fr 62px;align-items:center;gap:10px}.pfrow .bar{margin:7px 0}.pfrow+.kv{margin-top:8px}.pfrow b{text-align:right;font:600 13px var(--mono)}
 .tscroll{overflow-x:auto}.ptab td,.ptab th{padding:6px 8px}.ptab td+td,.ptab th+th{text-align:right;font-family:var(--mono)}.ptab .low{color:var(--warn)}
@@ -670,7 +672,7 @@ async device(pg){
   const [c,a]=await Promise.all([rpc('Device.GetConfig'),rpc('Auth.GetStatus')]);if(pg!==PG)return;pg.cfg=c;pg.auth=a;
   const gk=[0,1].map(i=>{const k=CN.indexOf((c.gestureKeys||[])[i]);return k<0?[1,3][i]:k});   // absent: the default, top right and bottom right
   const text=h('textarea',{id:'msgtext',maxlength:160,rows:3,spellcheck:'false',placeholder:'Back in 5 minutes'});
-  const rst=h('div',{class:'bn bad',id:'rstc',hidden:true,style:'margin:14px 0 0'},ic('warning'),h('span',null,'Reset the box to default settings?'),
+  const rst=h('div',{class:'bn bad bw',id:'rstc',hidden:true},ic('warning'),h('span',null,'Reset the box to default settings?'),
     btn('Reset now',act(factoryReset),'danger'),btn('Cancel',()=>{rst.hidden=true},'ghost'));
   const last=(S.sys||{}).lastReset||INFO.lastReset;   // Uptime (moved from Home), kept live by onSys
   show(h('div',{class:'grid'},panel('Status',h('dl',{class:'kv'},h('dt',null,'Running for'),h('dd',{id:'uptime'},fmtUp((S.sys||{}).uptime_s)),
@@ -836,7 +838,7 @@ function renderCList(){
 LIVE.companion=()=>{
   const s=S.sys;if(!s)return;
   const cfg=PG.cfg||{},mb=$('#modebn');
-  if(mb)fill(mb,cfg.mode&&cfg.mode!==s.mode?h('div',{class:'bn warn',style:'margin:0'},ic('warning'),
+  if(mb)fill(mb,cfg.mode&&cfg.mode!==s.mode?h('div',{class:'bn warn bw'},ic('warning'),
     h('span',null,`Saved as ${cfg.mode==='dock'?'Network Dock':'Satellite'}, but the box still runs in ${s.mode==='dock'?'Network Dock':'Satellite'} mode until it restarts.`),btn('Restart now',act(restartBox),'ghost')):null);
   const ds=$('#docks');
   if(ds){const docks=(s.dock||[]).filter(d=>d.listening||d.serial),ip=boxIp(s);
