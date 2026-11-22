@@ -345,6 +345,7 @@ static int connect_to(const char *host, uint16_t port, uint32_t seen)
     }
     int fd = socket(res->ai_family, res->ai_socktype, 0);
     if (fd < 0) {
+        ESP_LOGW(TAG, "socket failed (errno %d)", errno);
         freeaddrinfo(res);
         return -1;
     }
