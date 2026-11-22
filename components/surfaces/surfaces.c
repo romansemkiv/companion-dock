@@ -1754,20 +1754,34 @@ static TickType_t task_wait(void)
     return wait;
 }
 
+static void handle_event(const surf_ev_t *ev)
+{
+    switch (ev->kind) {
+    case EV_ATTACHED: handle_attached(ev); break;
+    case EV_DETACHED: handle_detached(ev); break;
+    case EV_RESTORED: handle_restored(ev); break;
+    case EV_POKE: atomic_store(&surf.poke_pending, false); break;
+    case EV_INPUT: maintui_input(ev->slot, ev->gen, &ev->in); break;
+    case EV_PIN: maintui_pin_result(ev->slot, ev->gen, ev->pin_result, ev->wait_s); break;
+    }
+}
+
 static void surf_task(void *arg)
 {
     (void)arg;
     surf_ev_t ev;
     for (;;) {
         if (xQueueReceive(surf.evq, &ev, task_wait()) == pdTRUE) {
-            switch (ev.kind) {
-            case EV_ATTACHED: handle_attached(&ev); break;
-            case EV_DETACHED: handle_detached(&ev); break;
-            case EV_RESTORED: handle_restored(&ev); break;
-            case EV_POKE: atomic_store(&surf.poke_pending, false); break;
-            case EV_INPUT: maintui_input(ev.slot, ev.gen, &ev.in); break;
-            case EV_PIN: maintui_pin_result(ev.slot, ev.gen, ev.pin_result, ev.wait_s); break;
-            }
+            handle_event(&ev);
+            /* ... and the decks' input queued behind it, before the pass. A hold is timed by the passes
+             * (dui_nav_tick): with a pass between every two events, a key-up waiting in a long queue let the hold
+             * fire (Restart, the mode, Save) after the finger was lifted. Input after input only: any other event
+             * (a deck attached or gone, a PIN's answer) gets its pass first, as it always did, and so does anything
+             * that asked for a new look at the screens (snap_dirty: the box menu closed on a deck, a deck changed
+             * hands). At most a queue's worth, so a spinning dial never keeps the pass away. */
+            for (int n = 0; ev.kind == EV_INPUT && n < EVQ_DEPTH && !atomic_load(&surf.snap_dirty) &&
+                            xQueueReceive(surf.evq, &ev, 0) == pdTRUE; n++)
+                handle_event(&ev);
         }
         const int64_t now = esp_timer_get_time();
         s_corner_due_us = corner_step(now); /* before the screens: a gesture may open one */
