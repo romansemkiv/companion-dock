@@ -19,7 +19,8 @@
  * - DUI_NAV_IDLE_MS without a press: home (on demand: close too);
  * - home turns its pages by itself while untouched, every 3 s (2 s with more than 3 pages,
  *   sui_page_us), until a press; again after DUI_NAV_IDLE_MS without one;
- * - the screen changing under a press (a new page, a new screen, or the key's tile changed): the press
+ * - the screen changing under a press (a new page, a new screen, or the key's tile changed; a choice of a
+ *   Companion: also when the key came to stand for another one, the list having moved): the press
  *   does nothing until its release; a key-down within DUI_NAV_SETTLE_MS of a change the person didn't
  *   make (the home's own paging, the idle return, on demand opening) is ignored until its release;
  * - every press clicks; a finished hold confirms; a
@@ -73,6 +74,7 @@ typedef struct {
         bool locked;     // a locked button: its release opens the PIN pad
         uint8_t kind;    // its tile when it went down
         uint16_t action, hold_ms, flags;
+        uint32_t pick;   // a choice (DUI_A_PICK*): the Companion it stood for (its name and address); else 0
         int64_t at;      // when it went down
     } held;
     int64_t hint_until[DUI_KEYS_MAX]; // per key: its hold hint shows until then (0: none)

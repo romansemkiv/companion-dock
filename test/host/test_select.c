@@ -169,6 +169,29 @@ static void test_posted_host_compares_without_case(void)
     TEST_ASSERT_EQUAL_STRING("Companion.local", c.companion_host);
 }
 
+/* a.b.c.d as the box holds it: the same order for the addresses, the box's own and its mask */
+#define IP4(a, b, c, d) ((uint32_t)(a) | (uint32_t)(b) << 8 | (uint32_t)(c) << 16 | (uint32_t)(d) << 24)
+
+/* A Companion PC with several addresses (a VPN, a virtual adapter): the one the box can reach, on its own subnet */
+static void test_pick_addr_prefers_the_boxes_subnet(void)
+{
+    const uint32_t addrs[] = {IP4(172, 29, 0, 1), IP4(192, 168, 1, 20), IP4(192, 168, 1, 21)};
+    TEST_ASSERT_EQUAL(1, discovery_pick_addr(addrs, 3, IP4(192, 168, 1, 50), IP4(255, 255, 255, 0)));
+    TEST_ASSERT_EQUAL(0, discovery_pick_addr(addrs, 3, IP4(172, 29, 5, 9), IP4(255, 255, 0, 0)));
+    TEST_ASSERT_EQUAL(0, discovery_pick_addr(addrs, 1, IP4(192, 168, 1, 50), IP4(255, 255, 255, 0)));
+}
+
+/* None on the box's subnet (a routed Companion), or the subnet not known: the first, as before */
+static void test_pick_addr_falls_back_to_the_first(void)
+{
+    const uint32_t addrs[] = {IP4(172, 29, 0, 1), IP4(192, 168, 1, 20)};
+    TEST_ASSERT_EQUAL(0, discovery_pick_addr(addrs, 2, IP4(10, 0, 0, 5), IP4(255, 255, 255, 0)));
+    TEST_ASSERT_EQUAL(0, discovery_pick_addr(addrs, 2, 0, 0));
+    TEST_ASSERT_EQUAL(0, discovery_pick_addr(addrs, 2, IP4(192, 168, 1, 50), 0));
+    TEST_ASSERT_EQUAL(0, discovery_pick_addr(addrs, 2, 0, IP4(255, 255, 255, 0)));
+    TEST_ASSERT_EQUAL(-1, discovery_pick_addr(addrs, 0, IP4(192, 168, 1, 50), IP4(255, 255, 255, 0)));
+}
+
 int main(void)
 {
     UNITY_BEGIN();
@@ -184,5 +207,7 @@ int main(void)
     RUN_TEST(test_posted_host_without_port_takes_the_instance_port);
     RUN_TEST(test_posted_host_without_a_match_stays_manual);
     RUN_TEST(test_posted_host_compares_without_case);
+    RUN_TEST(test_pick_addr_prefers_the_boxes_subnet);
+    RUN_TEST(test_pick_addr_falls_back_to_the_first);
     return UNITY_END();
 }

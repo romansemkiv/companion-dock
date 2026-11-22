@@ -51,12 +51,6 @@ int cora_feed(cora_parser_t *p, const uint8_t *data, size_t n, size_t *used, cor
 {
     size_t i = 0;
     while (i < n) {
-        if (p->skip) { /* the rest of an oversize payload */
-            const size_t k = p->skip < n - i ? p->skip : n - i;
-            p->skip -= (uint32_t)k;
-            i += k;
-            continue;
-        }
         if (p->hdr_have < CORA_HDR_LEN) {
             const uint8_t b = data[i++];
             if (p->hdr_have < sizeof cora_magic && b != cora_magic[p->hdr_have]) {
@@ -73,11 +67,11 @@ int cora_feed(cora_parser_t *p, const uint8_t *data, size_t n, size_t *used, cor
             if (p->hdr_have < CORA_HDR_LEN) continue;
             p->len = rd32(p->hdr + 12);
             p->have = 0;
-            if (p->len > p->cap) {
-                p->skip = p->len;
+            if (p->len > p->cap) { /* up to 4 GiB: skipping it would swallow all the host sends after it */
                 p->oversize++;
                 p->hdr_have = 0;
-                continue;
+                *used = i;
+                return -1;
             }
             if (p->len == 0) {
                 emit(p, out);

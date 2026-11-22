@@ -58,11 +58,12 @@ add_host_test(deckproto_parse SOURCES test_deckproto_parse.c
 add_host_test(imgproc SOURCES test_imgproc.c
   ../../components/imgproc/transform.c ../../components/imgproc/bmp.c)
 
-# lodepng (third party, zlib licence) built as the firmware builds it: the decoder only, without -Werror
+# lodepng (third party, zlib licence) built as the firmware builds it: the decoder only, without -Werror; its
+# memory through test_png.c's allocators, which note the largest block asked for
 add_library(lodepng STATIC ${REPO_ROOT}/components/imgproc/lodepng/lodepng.c)
 target_include_directories(lodepng PUBLIC ${REPO_ROOT}/components/imgproc/lodepng)
 target_compile_definitions(lodepng PUBLIC LODEPNG_NO_COMPILE_ENCODER LODEPNG_NO_COMPILE_DISK LODEPNG_NO_COMPILE_CPP
-  LODEPNG_NO_COMPILE_ANCILLARY_CHUNKS LODEPNG_NO_COMPILE_ERROR_TEXT)
+  LODEPNG_NO_COMPILE_ANCILLARY_CHUNKS LODEPNG_NO_COMPILE_ERROR_TEXT LODEPNG_NO_COMPILE_ALLOCATORS)
 add_host_test(png SOURCES test_png.c ../../components/imgproc/png.c)
 target_link_libraries(test_png PRIVATE lodepng)
 target_compile_definitions(test_png PRIVATE PNG_FIXTURES="${CMAKE_CURRENT_SOURCE_DIR}/fixtures/png")

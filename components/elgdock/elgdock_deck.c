@@ -392,7 +392,13 @@ static void deck_session(dock_t *k, int fd, const char *peer, uint8_t *buf, uint
             cora_msg_t m;
             const int got = cora_feed(&p, chunk + at, (size_t)n - at, &used, &m);
             at += used;
-            if (got) go = deck_handle(k, d, fd, &deck, &m);
+            if (got < 0) { /* no report is that long (RX_CAP): not followed, the host connects again */
+                ESP_LOGW(TAG, "dock %d: %s announced a message of %u bytes (%d at most): connection ended", k->k, peer,
+                         (unsigned)p.len, RX_CAP);
+                go = false;
+            } else if (got) {
+                go = deck_handle(k, d, fd, &deck, &m);
+            }
         }
     }
 
