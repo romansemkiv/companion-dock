@@ -8,7 +8,21 @@
 #include "imgproc/png.h"
 #include "unity.h"
 
-void setUp(void) {}
+/* lodepng's memory, through here (LODEPNG_NO_COMPILE_ALLOCATORS): the largest block it asked for. */
+static size_t s_alloc_max;
+void *lodepng_malloc(size_t size)
+{
+    if (size > s_alloc_max) s_alloc_max = size;
+    return malloc(size);
+}
+void *lodepng_realloc(void *ptr, size_t size)
+{
+    if (size > s_alloc_max) s_alloc_max = size;
+    return realloc(ptr, size);
+}
+void lodepng_free(void *ptr) { free(ptr); }
+
+void setUp(void) { s_alloc_max = 0; }
 void tearDown(void) {}
 
 static uint8_t *load(const char *name, const char *ext, size_t *len)
@@ -47,6 +61,22 @@ static void test_every_colour_type(void)
     const char *const names[] = {"rgb8", "rgba8_opaque", "rgba8_alpha", "grey8", "grey_alpha", "grey16",
                                  "bw1", "palette8", "palette4", "palette_trns"};
     for (size_t i = 0; i < sizeof names / sizeof names[0]; i++) check(names[i], 16, 16);
+}
+
+/* Adam7 interlaced 16-bit RGBA: the most scanline bytes an image of its size has (a filter byte per row of each
+ * of the seven passes): the cap on what is inflated takes it */
+static void test_interlaced_16bit(void) { check("rgba16_adam7", 16, 16); }
+
+/* A 16 x 16 header over data that inflates to 8 MB: refused, and no more memory taken than a 16 x 16 image needs */
+static void test_overinflating_refused(void)
+{
+    size_t plen;
+    uint8_t *png = load("bomb16", "png", &plen);
+    uint8_t out[16 * 16 * 3];
+    TEST_ASSERT_FALSE(img_png_decode_rgb(png, plen, 16, 16, out));
+    TEST_ASSERT_TRUE_MESSAGE(s_alloc_max > 0, "the allocator under test isn't lodepng's");
+    TEST_ASSERT_LESS_THAN_size_t(16 * 1024, s_alloc_max);
+    free(png);
 }
 
 static void test_button_sized(void) { check("button96", 96, 96); }
@@ -102,6 +132,8 @@ int main(void)
 {
     UNITY_BEGIN();
     RUN_TEST(test_every_colour_type);
+    RUN_TEST(test_interlaced_16bit);
+    RUN_TEST(test_overinflating_refused);
     RUN_TEST(test_button_sized);
     RUN_TEST(test_wrong_size_refused);
     RUN_TEST(test_damaged_refused);
