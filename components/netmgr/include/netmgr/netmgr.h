@@ -40,6 +40,15 @@ bool netpolicy_sta_changed(const box_config_t *a, const box_config_t *b);
  * retries or fails over; the hotspot runs on its own settings, and a scan brings the station up just for it. */
 bool netpolicy_sta_on(const box_config_t *c);
 
+/* A Wi-Fi apply that failed (a request the C6 was too busy for, no memory) left the radio stopped: netmgr tries it
+ * again by itself every NETPOLICY_WIFI_RETRY_MS, or a Wi-Fi-only box would stay off the network until someone
+ * saved the settings again, which it can't be reached for. What a round does: dirty: a failed apply waits;
+ * c6_ready: the C6 answers (lost, Wi-Fi is off until the next start: NONE); scanning: a scan owns the radio
+ * (LATER: the next round, not on top of it). NONE ends the rounds. */
+#define NETPOLICY_WIFI_RETRY_MS 30000
+typedef enum { NETPOLICY_RETRY_NONE, NETPOLICY_RETRY_LATER, NETPOLICY_RETRY_NOW } netpolicy_retry_t;
+netpolicy_retry_t netpolicy_wifi_retry(bool dirty, bool c6_ready, bool scanning);
+
 /* The hotspot's address, octet by octet: the one place it is set (netmgr_priv.h's NETMGR_AP_IP). */
 #define NETMGR_AP_OCTETS 192, 168, 4, 1
 

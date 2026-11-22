@@ -220,6 +220,21 @@ static void test_station_off_decisions(void)
     TEST_ASSERT_EQUAL_INT(WIFISCAN_RUN, wifiscan_decide(false, false, 0, 0)); /* a scan still runs */
 }
 
+/* a failed Wi-Fi apply is tried again by netmgr itself, while it waits and the C6 answers */
+static void test_wifi_retry(void)
+{
+    TEST_ASSERT_EQUAL_INT(NETPOLICY_RETRY_NOW, netpolicy_wifi_retry(true, true, false));
+    /* a scan owns the radio: not on top of it, the next round */
+    TEST_ASSERT_EQUAL_INT(NETPOLICY_RETRY_LATER, netpolicy_wifi_retry(true, true, true));
+    /* applied meanwhile (a settings save, the hotspot force): the retries end */
+    TEST_ASSERT_EQUAL_INT(NETPOLICY_RETRY_NONE, netpolicy_wifi_retry(false, true, false));
+    TEST_ASSERT_EQUAL_INT(NETPOLICY_RETRY_NONE, netpolicy_wifi_retry(false, true, true));
+    /* the C6 lost: Wi-Fi is off until the next start, nothing to try */
+    TEST_ASSERT_EQUAL_INT(NETPOLICY_RETRY_NONE, netpolicy_wifi_retry(true, false, false));
+    TEST_ASSERT_EQUAL_INT(NETPOLICY_RETRY_NONE, netpolicy_wifi_retry(true, false, true));
+    TEST_ASSERT_TRUE(NETPOLICY_WIFI_RETRY_MS >= 30000 && NETPOLICY_WIFI_RETRY_MS <= 60000);
+}
+
 int main(void)
 {
     UNITY_BEGIN();
@@ -240,5 +255,6 @@ int main(void)
     RUN_TEST(test_sta_changed);
     RUN_TEST(test_wifi_enabled_changed);
     RUN_TEST(test_station_off_decisions);
+    RUN_TEST(test_wifi_retry);
     return UNITY_END();
 }

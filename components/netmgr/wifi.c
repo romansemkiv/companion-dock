@@ -11,6 +11,9 @@
  *   window, the hotspot force).
  * - The box config in our NVS is the only source of truth: the driver's own
  *   storage is RAM only.
+ * - A request the C6 doesn't answer (c6_silent) is the last one of its sequence (the apply, a scan's
+ *   begin and end; C6_RPC): the C6 is lost (c6_lost) and the sequence returns, so s_cfg_lock and the
+ *   supervisor's netmgr_apply wait for one 5 s timeout at most, never the 10 s of the task watchdog.
  * - The backup network is wifi_failover.c's: this file feeds it the station's events and applies
  *   nothing it decides itself. */
 #include <stdatomic.h>
@@ -180,6 +183,42 @@ static esp_netif_t *sta_netif_create(const char *hostname)
     return nif;
 }
 
+/* A request the C6 didn't answer: ESP-Hosted gives ESP_FAIL after its RPC timeout
+ * (CONFIG_ESP_HOSTED_HOST_RPC_TIMEOUT_MS, 5 s) or its link wait (5 s); the C6's own answers keep their codes, and a
+ * request that couldn't even be queued fails at once (ESP_FAIL too, but quick: not this). Every further request would
+ * wait as long, and netmgr_apply's callers include the supervisor, which is on the 10 s task watchdog (panic): two
+ * silent requests in a row would restart the box, which a C6 that stops answering must never do (hosted.c). The apply
+ * stops at the first one instead and the C6 is lost, as at a transport failure (netmgr_hosted_lost). t0: when the
+ * request was made. */
+#define C6_SILENT_US (4 * 1000000LL) /* under ESP-Hosted's 5 s waits, far over any answer (milliseconds) */
+static bool c6_silent(esp_err_t e, int64_t t0)
+{
+    return (e == ESP_FAIL || e == ESP_ERR_TIMEOUT) && esp_timer_get_time() - t0 >= C6_SILENT_US;
+}
+
+/* The same for every other request of the sequences in this file that hold s_cfg_lock (the apply, and a scan's
+ * begin, results and end): a silent one is the last one made. C6_RPC makes the request and sets *gone when it went
+ * unanswered (it never clears it); the sequence then calls c6_lost and returns without another request, so it
+ * holds the lock for one wait (5 s), not one per request. c6_lost: netmgr_wifi_radio_lost (through hosted.c) puts
+ * this file's state, a scan under way included, back to "off"; nothing is left for the caller to undo. */
+#define C6_RPC(call, gone)                                                                                             \
+    ({                                                                                                                 \
+        const int64_t rpc_t0_ = esp_timer_get_time();                                                                  \
+        const esp_err_t rpc_e_ = (call);                                                                               \
+        if (c6_silent(rpc_e_, rpc_t0_)) *(gone) = true;                                                                \
+        rpc_e_;                                                                                                        \
+    })
+
+static void c6_lost(void)
+{
+    /* not tried again: Wi-Fi is off until the next start (netmgr_radio_lost resets this file's state), the box goes
+     * on over Ethernet, and without a network the supervisor restarts it, which resets the C6 */
+    netmgr_hosted_lost("the C6 stopped answering (a Wi-Fi request timed out): Wi-Fi is off until the next start");
+    /* once more, for the case hosted.c had lost it already (a transport failure during this sequence: that reset
+     * came before what the sequence set since, a scan's s_scan_active say). No request, safe to repeat. */
+    netmgr_wifi_radio_lost();
+}
+
 /* Each step runs once; a failed step is retried on the next call. */
 static esp_err_t wifi_init_once(const char *hostname)
 {
@@ -225,9 +264,15 @@ static esp_err_t wifi_init_once(const char *hostname)
     }
     if (!s_inited) {
         wifi_init_config_t wcfg = WIFI_INIT_CONFIG_DEFAULT();
-        ESP_RETURN_ON_ERROR(esp_wifi_init(&wcfg), TAG, "esp_wifi_init");
+        bool gone = false;
+        esp_err_t e = C6_RPC(esp_wifi_init(&wcfg), &gone);
         /* The box config in our NVS is the only source of truth. */
-        esp_wifi_set_storage(WIFI_STORAGE_RAM);
+        if (e == ESP_OK) (void)C6_RPC(esp_wifi_set_storage(WIFI_STORAGE_RAM), &gone);
+        if (gone) {
+            c6_lost();
+            return e != ESP_OK ? e : ESP_FAIL;
+        }
+        ESP_RETURN_ON_ERROR(e, TAG, "esp_wifi_init");
         s_inited = true;
     }
     return ESP_OK;
@@ -254,17 +299,11 @@ static esp_err_t config_ap(const box_config_t *cfg, const char *ssid)
     return esp_wifi_set_config(WIFI_IF_AP, &wc);
 }
 
-/* A request the C6 didn't answer: ESP-Hosted gives ESP_FAIL after its RPC timeout
- * (CONFIG_ESP_HOSTED_HOST_RPC_TIMEOUT_MS, 5 s) or its link wait (5 s); the C6's own answers keep their codes, and a
- * request that couldn't even be queued fails at once (ESP_FAIL too, but quick: not this). Every further request would
- * wait as long, and netmgr_apply's callers include the supervisor, which is on the 10 s task watchdog (panic): two
- * silent requests in a row would restart the box, which a C6 that stops answering must never do (hosted.c). The apply
- * stops at the first one instead and the C6 is lost, as at a transport failure (netmgr_hosted_lost). t0: when the
- * request was made. */
-#define C6_SILENT_US (4 * 1000000LL) /* under ESP-Hosted's 5 s waits, far over any answer (milliseconds) */
-static bool c6_silent(esp_err_t e, int64_t t0)
+/* netmgr_wifi_apply's way out after a request the C6 didn't answer (e: what it gave). */
+static esp_err_t apply_gone(esp_err_t e)
 {
-    return (e == ESP_FAIL || e == ESP_ERR_TIMEOUT) && esp_timer_get_time() - t0 >= C6_SILENT_US;
+    c6_lost();
+    return e;
 }
 
 esp_err_t netmgr_wifi_apply(const box_config_t *cfg, const char *ap_ssid, const char *hostname, bool sta_same,
@@ -303,9 +342,7 @@ esp_err_t netmgr_wifi_apply(const box_config_t *cfg, const char *ap_ssid, const 
     }
     if (silent != ESP_OK) {
         s_sta_connected = false;
-        /* not tried again: Wi-Fi is off until the next start (netmgr_radio_lost resets this file's state), the box goes
-         * on over Ethernet, and without a network the supervisor restarts it, which resets the C6 */
-        netmgr_hosted_lost("the C6 stopped answering (a Wi-Fi request timed out): Wi-Fi is off until the next start");
+        c6_lost();
         return silent;
     }
 
@@ -317,23 +354,31 @@ esp_err_t netmgr_wifi_apply(const box_config_t *cfg, const char *ap_ssid, const 
         return ESP_OK;
     }
 
-    ESP_RETURN_ON_ERROR(esp_wifi_set_mode(ap && sta ? WIFI_MODE_APSTA : ap ? WIFI_MODE_AP : WIFI_MODE_STA), TAG,
-                        "set mode");
+    /* from here every request through C6_RPC: one the C6 doesn't answer ends the apply (apply_gone) */
+    bool gone = false;
+    esp_err_t e = C6_RPC(esp_wifi_set_mode(ap && sta ? WIFI_MODE_APSTA : ap ? WIFI_MODE_AP : WIFI_MODE_STA), &gone);
+    if (gone) return apply_gone(e);
+    ESP_RETURN_ON_ERROR(e, TAG, "set mode");
     if (ap) {
-        esp_err_t e = config_ap(cfg, ap_ssid);
+        e = C6_RPC(config_ap(cfg, ap_ssid), &gone);
+        if (gone) return apply_gone(e);
         if (e != ESP_OK) {
             /* Never start a soft-AP on whatever config the C6 had before. */
             ESP_LOGE(TAG, "ap: config rejected (%s), hotspot off", esp_err_to_name(e));
             ap = false;
             if (!sta) return e;
-            ESP_RETURN_ON_ERROR(esp_wifi_set_mode(WIFI_MODE_STA), TAG, "set mode");
+            e = C6_RPC(esp_wifi_set_mode(WIFI_MODE_STA), &gone);
+            if (gone) return apply_gone(e);
+            ESP_RETURN_ON_ERROR(e, TAG, "set mode");
         }
     }
     const bool has_backup = cfg->wifi_backup_ssid[0] != '\0';
     const int net = has_backup ? start_net : 0;
     if (sta) {
         netmgr_wfg_set_networks(cfg);
-        ESP_RETURN_ON_ERROR(netmgr_wfg_config_net(net), TAG, "sta config");
+        e = C6_RPC(netmgr_wfg_config_net(net), &gone); /* one request: the station's config */
+        if (gone) return apply_gone(e);
+        ESP_RETURN_ON_ERROR(e, TAG, "sta config");
     }
 
     s_sta_wanted = sta;
@@ -341,7 +386,8 @@ esp_err_t netmgr_wifi_apply(const box_config_t *cfg, const char *ap_ssid, const 
      * connects it */
     if (sta) netmgr_wfg_start(has_backup, net);
     if (sta && net) ESP_LOGI(TAG, "sta: the hotspot changed: staying on the backup network");
-    esp_err_t e = esp_wifi_start();
+    e = C6_RPC(esp_wifi_start(), &gone);
+    if (gone) return apply_gone(e); /* which also takes back s_sta_wanted and the failover's start */
     if (e != ESP_OK) {
         s_sta_wanted = false;
         netmgr_wfg_stop();
@@ -383,12 +429,19 @@ _Static_assert((int)WIFI_AUTH_OPEN == WIFISCAN_AUTH_OPEN && (int)WIFI_AUTH_WEP =
 static void scan_restore(void)
 {
     esp_err_t e = ESP_OK;
+    bool gone = false;
     if (s_scan_temp) {
-        e = esp_wifi_stop();
-        esp_err_t m = esp_wifi_set_mode(s_scan_prev);
-        if (e == ESP_OK) e = m;
+        e = C6_RPC(esp_wifi_stop(), &gone);
+        if (!gone) {
+            esp_err_t m = C6_RPC(esp_wifi_set_mode(s_scan_prev), &gone);
+            if (e == ESP_OK) e = m;
+        }
     } else if (s_scan_prev == WIFI_MODE_AP) {
-        e = esp_wifi_set_mode(WIFI_MODE_AP);
+        e = C6_RPC(esp_wifi_set_mode(WIFI_MODE_AP), &gone);
+    }
+    if (gone) { /* no mode to put back: Wi-Fi is off, and the scan's state with it */
+        c6_lost();
+        return;
     }
     if (e != ESP_OK) ESP_LOGW(TAG, "scan: putting the radio mode back failed: %s", esp_err_to_name(e));
     s_scan_started = false;
@@ -406,9 +459,11 @@ esp_err_t netmgr_wifi_scan_begin(void)
     s_scan_active = true; /* from here the station's connect waits */
     s_scan_started = false;
     s_scan_prev = WIFI_MODE_NULL;
-    esp_err_t e = esp_wifi_get_mode(&s_scan_prev);
+    bool gone = false; /* a request the C6 didn't answer: no further one, not even to put the mode back */
+    esp_err_t e = C6_RPC(esp_wifi_get_mode(&s_scan_prev), &gone);
     if (e != ESP_OK) {
         s_scan_active = false;
+        if (gone) c6_lost();
         return e;
     }
     netmgr_wfg_scan_started();
@@ -416,26 +471,28 @@ esp_err_t netmgr_wifi_scan_begin(void)
      * the radio is not running), or let the hotspot-only radio scan as well. */
     s_scan_temp = !s_running;
     if (s_scan_temp) {
-        e = esp_wifi_set_mode(WIFI_MODE_STA);
-        if (e == ESP_OK) e = esp_wifi_start();
+        e = C6_RPC(esp_wifi_set_mode(WIFI_MODE_STA), &gone);
+        if (e == ESP_OK) e = C6_RPC(esp_wifi_start(), &gone);
     } else if (s_scan_prev == WIFI_MODE_AP) {
-        e = esp_wifi_set_mode(WIFI_MODE_APSTA);
+        e = C6_RPC(esp_wifi_set_mode(WIFI_MODE_APSTA), &gone);
     }
     if (e == ESP_OK) {
         const wifi_scan_config_t sc = {.show_hidden = false};
-        e = esp_wifi_scan_start(&sc, false); /* WIFI_EVENT_SCAN_DONE says when */
+        e = C6_RPC(esp_wifi_scan_start(&sc, false), &gone); /* WIFI_EVENT_SCAN_DONE says when */
     }
-    if (e != ESP_OK) scan_restore();
+    if (gone) c6_lost(); /* ends the scan's state here (s_scan_active) and in netmgr.c (netmgr_scan_cancelled) */
+    else if (e != ESP_OK) scan_restore();
     else s_scan_started = true; /* only now can a SCAN_DONE be ours */
     return e;
 }
 
-/* The records of the finished scan, tidy. Frees the driver's list on any failure. */
-static esp_err_t scan_collect(wifiscan_ap_t *out, size_t *n)
+/* The records of the finished scan, tidy. Frees the driver's list on any failure, unless the failure is the C6
+ * not answering (*gone, C6_RPC): no further request then, the caller gives the C6 up. */
+static esp_err_t scan_collect(wifiscan_ap_t *out, size_t *n, bool *gone)
 {
     uint16_t cnt = 0;
-    if (esp_wifi_scan_get_ap_num(&cnt) != ESP_OK) { /* the count unknown: a failure, the last list kept */
-        esp_wifi_clear_ap_list();
+    if (C6_RPC(esp_wifi_scan_get_ap_num(&cnt), gone) != ESP_OK) { /* the count unknown: a failure, the last list kept */
+        if (!*gone) (void)C6_RPC(esp_wifi_clear_ap_list(), gone);
         return ESP_FAIL;
     }
     if (cnt > WIFISCAN_RAW_MAX) cnt = WIFISCAN_RAW_MAX;
@@ -443,11 +500,12 @@ static esp_err_t scan_collect(wifiscan_ap_t *out, size_t *n)
     wifiscan_ap_t *tidy = calloc(cnt ? cnt : 1, sizeof *tidy);
     esp_err_t e = ESP_OK;
     /* no network found is an empty list, not a failure: ESP-Hosted refuses a read of 0 records (ESP_ERR_INVALID_ARG) */
-    if (!recs || !tidy || (cnt > 0 && esp_wifi_scan_get_ap_records(&cnt, recs) != ESP_OK)) {
-        esp_wifi_clear_ap_list(); /* frees the driver's copy of the results */
+    if (!recs || !tidy || (cnt > 0 && C6_RPC(esp_wifi_scan_get_ap_records(&cnt, recs), gone) != ESP_OK)) {
+        if (!*gone) (void)C6_RPC(esp_wifi_clear_ap_list(), gone); /* frees the driver's copy of the results */
         e = recs && tidy ? ESP_FAIL : ESP_ERR_NO_MEM;
     } else {
-        if (cnt == 0) esp_wifi_clear_ap_list(); /* nothing read: the driver's (empty) list freed as a read would */
+        /* nothing read: the driver's (empty) list freed as a read would */
+        if (cnt == 0) (void)C6_RPC(esp_wifi_clear_ap_list(), gone);
         for (uint16_t i = 0; i < cnt; i++) {
             /* the driver's name need not end in a NUL when it is 32 bytes long */
             memcpy(tidy[i].ssid, recs[i].ssid, strnlen((const char *)recs[i].ssid, sizeof recs[i].ssid));
@@ -469,12 +527,17 @@ esp_err_t netmgr_wifi_scan_finish(bool timed_out, wifiscan_ap_t *out, size_t *n)
     *n = 0;
     if (!s_scan_active) return ESP_ERR_INVALID_STATE; /* netmgr_wifi_apply cancelled it and owns the radio now */
     esp_err_t e;
+    bool gone = false;
     if (timed_out) {
-        esp_wifi_scan_stop();
-        esp_wifi_clear_ap_list();
+        (void)C6_RPC(esp_wifi_scan_stop(), &gone);
+        if (!gone) (void)C6_RPC(esp_wifi_clear_ap_list(), &gone);
         e = ESP_ERR_TIMEOUT;
     } else {
-        e = scan_collect(out, n);
+        e = scan_collect(out, n, &gone);
+    }
+    if (gone) { /* not the radio's mode either (scan_restore): Wi-Fi is off, the scan cancelled (netmgr_scan_cancelled) */
+        c6_lost();
+        return e != ESP_OK ? e : ESP_FAIL;
     }
     scan_restore();
     return e;

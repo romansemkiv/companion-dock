@@ -45,3 +45,9 @@ bool netpolicy_sta_changed(const box_config_t *a, const box_config_t *b)
 }
 
 bool netpolicy_sta_on(const box_config_t *c) { return c->wifi_enabled && c->wifi_ssid[0] != '\0'; }
+
+netpolicy_retry_t netpolicy_wifi_retry(bool dirty, bool c6_ready, bool scanning)
+{
+    if (!dirty || !c6_ready) return NETPOLICY_RETRY_NONE;
+    return scanning ? NETPOLICY_RETRY_LATER : NETPOLICY_RETRY_NOW;
+}
