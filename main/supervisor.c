@@ -310,10 +310,18 @@ static void ota_check(void)
         }
         vTaskDelay(pdMS_TO_TICKS(200)); /* let the log line out */
         breadcrumb_note(BC_WHY_OTA_ROLLBACK); /* the call below restarts inside IDF */
-        esp_ota_mark_app_invalid_rollback_and_reboot(); /* restarts; returns only without a fallback */
+        const esp_err_t rb = esp_ota_mark_app_invalid_rollback_and_reboot(); /* restarts; returns only without a fallback */
         if (reset) supervisor_cfg_unlock(); /* no fallback: webui's restart task erases and restarts on its own */
         breadcrumb_clear();
-        ESP_LOGE(TAG, "no previous image to roll back to: staying on this one");
+        if (rb != ESP_ERR_OTA_ROLLBACK_FAILED) { /* otadata not written: the bootloader rolls back at the next start */
+            ESP_LOGE(TAG, "rolling back failed: %s; staying on this image, still unconfirmed", esp_err_to_name(rb));
+            return;
+        }
+        /* nothing to fall back to: left pending, this image would refuse uploads, never get its recovery copy and be
+         * dropped by the bootloader at the next start, with no other image to start */
+        const esp_err_t ce = esp_ota_mark_app_valid_cancel_rollback();
+        if (ce == ESP_OK) ESP_LOGE(TAG, "no previous image to roll back to: staying on this one, now confirmed");
+        else ESP_LOGE(TAG, "no previous image to roll back to, and confirming this one failed: %s", esp_err_to_name(ce));
         return;
     }
     esp_err_t e = esp_ota_mark_app_valid_cancel_rollback();
