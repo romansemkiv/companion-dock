@@ -470,6 +470,12 @@ char *boxcfg_to_json(const box_config_t *c, bool include_secrets)
         cJSON_AddItemToArray(keys, cJSON_CreateString(boxcfg_corner_name(c->gesture_keys[i])));
     cJSON_AddNumberToObject(o, "gestureTaps", c->gesture_taps);
     cJSON_AddNumberToObject(o, "gestureHoldSeconds", c->gesture_hold_s);
+    /* an add that found no memory left its key out: stored like that, the next start would fill the key with its
+     * default (the Wi-Fi password, a static address gone). All of KEYS, or nothing. */
+    if (cJSON_GetArraySize(o) != (int)(sizeof KEYS / sizeof KEYS[0]) || cJSON_GetArraySize(keys) != 2) {
+        cJSON_Delete(o);
+        return NULL;
+    }
     char *s = cJSON_PrintUnformatted(o);
     cJSON_Delete(o);
     return s;

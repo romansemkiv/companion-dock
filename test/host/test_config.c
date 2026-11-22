@@ -1204,6 +1204,42 @@ static void test_from_cjson_matches_print_and_parse(void)
     cJSON_Delete(arr);
 }
 
+/* One allocation failing while the JSON is built must not yield a JSON without that key: stored, the next start
+ * would fill it with its default (a lost Wi-Fi password, a lost static address). NULL instead. */
+static int s_alloc_n, s_alloc_fail_at;
+static void *failing_malloc(size_t n) { return ++s_alloc_n == s_alloc_fail_at ? NULL : malloc(n); }
+
+static void test_to_json_is_whole_or_null_when_memory_runs_out(void)
+{
+    box_config_t c = fresh();
+    strcpy(c.wifi_ssid, "net");
+    strcpy(c.wifi_pass, "wifisecret");
+    char *whole = boxcfg_to_json(&c, true);
+    TEST_ASSERT_NOT_NULL(whole);
+    cJSON_Hooks hooks = {.malloc_fn = failing_malloc, .free_fn = free};
+    cJSON_InitHooks(&hooks);
+    int nulls = 0;
+    for (s_alloc_fail_at = 1;; s_alloc_fail_at++) {
+        s_alloc_n = 0;
+        char *s = boxcfg_to_json(&c, true);
+        const bool failed = s_alloc_n >= s_alloc_fail_at; /* that allocation was reached */
+        if (s) {
+            const bool same = strcmp(whole, s) == 0;
+            free(s);
+            if (!same) {
+                cJSON_InitHooks(NULL);
+                TEST_FAIL_MESSAGE("a JSON with a key missing");
+            }
+        } else {
+            nulls++;
+        }
+        if (!failed) break; /* past the last allocation: every one has failed once */
+    }
+    cJSON_InitHooks(NULL);
+    free(whole);
+    TEST_ASSERT_TRUE(nulls > 40); /* one per key at least */
+}
+
 int main(void)
 {
     UNITY_BEGIN();
@@ -1251,5 +1287,6 @@ int main(void)
     RUN_TEST(test_setconfig_near_integers);
     RUN_TEST(test_same_target);
     RUN_TEST(test_hostname);
+    RUN_TEST(test_to_json_is_whole_or_null_when_memory_runs_out);
     return UNITY_END();
 }
