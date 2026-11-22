@@ -600,6 +600,13 @@ static esp_err_t h_ws(httpd_req_t *req)
         return ESP_OK;
     }
     if (f.len == 0) return ESP_OK;
+    /* a PONG nobody asked for is allowed (RFC 6455, 5.5.3), a browser's keepalive: its payload (125 bytes at most,
+     * as any control frame's) is read and dropped */
+    if (f.type == HTTPD_WS_TYPE_PONG && f.len <= 125) {
+        uint8_t pong[125];
+        f.payload = pong;
+        return httpd_ws_recv_frame(req, &f, sizeof pong);
+    }
     /* the payload is still in the socket: returning without reading it would make httpd parse it as
      * the next frame's header, so anything else closes the socket */
     if (f.type != HTTPD_WS_TYPE_TEXT || f.len > WS_FRAME_MAX) {
