@@ -11,7 +11,7 @@
 
 #define USBDECK_TAG "usbdeck"
 #define USBDECK_MAX 6
-#define USBDECK_MSG_FS_ON_HUB "A full-speed device on a hub can't be used — plug it straight into the box"
+#define USBDECK_MSG_FS_ON_HUB "A full-speed device on a hub can't be used — plug it straight into the dock"
 
 /* ---- usb_host_task.c ---- */
 

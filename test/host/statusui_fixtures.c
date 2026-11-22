@@ -104,7 +104,7 @@ void fx_screen_looking(sui_content_t *c, const char *ip, const char *target,
     } else {
         add_status(c, &u, SUI_STATE_WAIT, "Finding Companion");
     }
-    add_label(c, &u, "Box IP");
+    add_label(c, &u, "Dock IP");
     add_line(c, &u, SUI_GROUP_MAIN, "A", "%s", s_or_empty(ip));
     add_hotspot(c, &u, ap_ssid, ap_pass);
 }

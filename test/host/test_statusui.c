@@ -304,7 +304,7 @@ static void test_layout_page_break_at_line_end(void)
     fx_screen_looking(&e, "192.168.100.200", NULL, "CompanionDock-ABCD", "abcdefghjk");
     sui_layout(3, 2, 80, &e, &L);
     TEST_ASSERT_EQUAL_INT(5, L.pages);
-    TEST_ASSERT_EQUAL_STRING("Finding|Companion\nBox|IP", page_text(&L, &e, 3, 2, 0));
+    TEST_ASSERT_EQUAL_STRING("Finding|Companion\nDock|IP", page_text(&L, &e, 3, 2, 0));
     TEST_ASSERT_EQUAL_STRING("Finding|Companion\n192|168", page_text(&L, &e, 3, 2, 1)); /* 2 + 2 */
     TEST_ASSERT_EQUAL_STRING("Finding|Companion\n100|200", page_text(&L, &e, 3, 2, 2));
     TEST_ASSERT_EQUAL_STRING("Finding|Companion\nWiFi|Companion|Dock-ABCD", page_text(&L, &e, 3, 2, 3));
@@ -973,7 +973,7 @@ static void test_layout_keep_with_next(void)
     fx_screen_looking(&c, "192.168.8.225", NULL, "CompanionDock-ABCD", "abcdefghjk");
     sui_layout(5, 3, 72, &c, &L); /* MK.2: the hotspot name and password on one page, at the bottom */
     TEST_ASSERT_EQUAL_INT(2, L.pages);
-    TEST_ASSERT_EQUAL_STRING("Finding|Companion\nBox|IP\n192|168|8|225", page_text(&L, &c, 5, 3, 0));
+    TEST_ASSERT_EQUAL_STRING("Finding|Companion\nDock|IP\n192|168|8|225", page_text(&L, &c, 5, 3, 0));
     TEST_ASSERT_EQUAL_STRING("Finding|Companion\nWiFi|Companion|Dock-ABCD\nPass|abcde|fghjk", page_text(&L, &c, 5, 3, 1));
 
     /* every screen that shows the hotspot marks its WiFi line */
@@ -1101,11 +1101,11 @@ static void test_roles_per_screen(void)
     fx_screen_no_network(&c, "192.168.4.1", NULL, NULL);
     TEST_ASSERT_EQUAL_STRING("No:S network:S Plug:L in:L network:L", roles_text(&c, 8, 4, 96));
     fx_screen_looking(&c, "192.168.8.225", NULL, NULL, NULL);
-    TEST_ASSERT_EQUAL_STRING("Finding:S Companion:S Box:L IP:L 192:A 168:A 8:A 225:A", roles_text(&c, 8, 4, 96));
+    TEST_ASSERT_EQUAL_STRING("Finding:S Companion:S Dock:L IP:L 192:A 168:A 8:A 225:A", roles_text(&c, 8, 4, 96));
     fx_screen_looking(&c, "192.168.8.225", "companion.local", NULL, NULL);
-    TEST_ASSERT_EQUAL_STRING("Connecting:S companion.:V local:V Box:L IP:L 192:A 168:A 8:A 225:A", roles_text(&c, 8, 4, 96));
+    TEST_ASSERT_EQUAL_STRING("Connecting:S companion.:V local:V Dock:L IP:L 192:A 168:A 8:A 225:A", roles_text(&c, 8, 4, 96));
     fx_screen_looking(&c, "192.168.8.225", "192.168.8.10", NULL, NULL); /* an address: its octets in accent */
-    TEST_ASSERT_EQUAL_STRING("Connecting:S 192:A 168:A 8:A 10:A Box:L IP:L 192:A 168:A 8:A 225:A", roles_text(&c, 8, 4, 96));
+    TEST_ASSERT_EQUAL_STRING("Connecting:S 192:A 168:A 8:A 10:A Dock:L IP:L 192:A 168:A 8:A 225:A", roles_text(&c, 8, 4, 96));
     fx_screen_choose(&c, "192.168.8.225", NULL, NULL);
     TEST_ASSERT_EQUAL_STRING("Choose:S Companion:S Web:L page:L 192:A 168:A 8:A 225:A", roles_text(&c, 8, 4, 96));
     fx_screen_too_old(&c, "4.2.0", NULL, NULL);
@@ -1282,9 +1282,9 @@ static void test_screen_word_counts(void)
     fx_screen_no_network(&c[n++], "192.168.4.1", NULL, NULL);                        /* No network, Plug in network */
     fx_screen_no_network(&c[n++], "192.168.4.1", "CompanionDock-ABCD", "abcdefghjk"); /* + Setup page, WiFi, Pass */
     fx_screen_no_network(&c[n++], "192.168.4.1", "CompanionDock-ABCD", NULL);         /* + Setup page, WiFi, No password */
-    fx_screen_looking(&c[n++], "192.168.8.225", NULL, NULL, NULL);                   /* Finding Companion, Box IP */
+    fx_screen_looking(&c[n++], "192.168.8.225", NULL, NULL, NULL);                   /* Finding Companion, Dock IP */
     fx_screen_looking(&c[n++], "192.168.8.225", NULL, "CompanionDock-ABCD", "p");     /* + WiFi, Pass */
-    fx_screen_looking(&c[n++], "192.168.8.225", "192.168.8.10", NULL, NULL);         /* Connecting, Box IP */
+    fx_screen_looking(&c[n++], "192.168.8.225", "192.168.8.10", NULL, NULL);         /* Connecting, Dock IP */
     fx_screen_choose(&c[n++], "192.168.8.225", NULL, NULL);                          /* Choose Companion, Web page */
     fx_screen_too_old(&c[n++], "4.2.0", NULL, NULL);                                 /* Companion too old, Needs, Has */
     sui_screen_reconnecting(&c[n++], NULL);                                           /* Reconnecting */
@@ -1337,7 +1337,7 @@ static void test_zones_per_screen(void)
     fx_screen_looking(&c, "192.168.8.225", NULL, "S", NULL);
     TEST_ASSERT_EQUAL_STRING("SMMVV", zones_of(&c));
     TEST_ASSERT_EQUAL_STRING("Finding Companion", c.lines[0]);
-    TEST_ASSERT_EQUAL_STRING("Box IP", c.lines[1]);
+    TEST_ASSERT_EQUAL_STRING("Dock IP", c.lines[1]);
     TEST_ASSERT_EQUAL_STRING("192.168.8.225", c.lines[2]);
     TEST_ASSERT_EQUAL_STRING("No password", c.lines[4]);
     fx_screen_looking(&c, "192.168.8.225", "companion.local", "S", "P");
@@ -1505,12 +1505,12 @@ static void test_value_groups_together(void)
     TEST_ASSERT_EQUAL_STRING("Waiting|for|Companion\n192|168", page_text(&L, &c, 3, 2, 1));
     TEST_ASSERT_EQUAL_STRING("Waiting|for|Companion\n8|225", page_text(&L, &c, 3, 2, 2));
     TEST_ASSERT_EQUAL_STRING("Waiting|for|Companion\nport|5343", page_text(&L, &c, 3, 2, 3));
-    /* a label line goes with its value line when they fit on a page together: "Box IP" and the IP */
+    /* a label line goes with its value line when they fit on a page together: "Dock IP" and the IP */
     fx_screen_looking(&c, "192.168.8.225", "192.168.8.10", NULL, NULL);
     sui_layout(5, 3, 72, &c, &L);
     TEST_ASSERT_EQUAL_INT(2, L.pages);
     TEST_ASSERT_EQUAL_STRING("Connecting\n192|168|8|10\n", page_text(&L, &c, 5, 3, 0));
-    TEST_ASSERT_EQUAL_STRING("Connecting\nBox|IP\n192|168|8|225", page_text(&L, &c, 5, 3, 1));
+    TEST_ASSERT_EQUAL_STRING("Connecting\nDock|IP\n192|168|8|225", page_text(&L, &c, 5, 3, 1));
     fx_screen_no_network(&c, "192.168.4.1", NULL, NULL);
     TEST_ASSERT_EQUAL_HEX8(0, c.keep_next);
     fx_screen_no_network(&c, "192.168.4.1", "S", NULL);
@@ -1958,7 +1958,7 @@ static void test_screen_hotspot_open(void)
     fx_screen_looking(&c, "192.168.8.225", NULL, "CompanionDock-ABCD", NULL);
     sui_layout(5, 3, 72, &c, &L); /* MK.2 */
     TEST_ASSERT_EQUAL_INT(2, L.pages);
-    TEST_ASSERT_EQUAL_STRING("Finding|Companion\nBox|IP\n192|168|8|225", page_text(&L, &c, 5, 3, 0));
+    TEST_ASSERT_EQUAL_STRING("Finding|Companion\nDock|IP\n192|168|8|225", page_text(&L, &c, 5, 3, 0));
     TEST_ASSERT_EQUAL_STRING("Finding|Companion\n\nWiFi|Companion|Dock-ABCD|No|password", page_text(&L, &c, 5, 3, 1));
     fx_screen_no_network(&c, "192.168.4.1", "CompanionDock-ABCD", NULL);
     sui_layout(3, 2, 80, &c, &L); /* Mini: one row under the status */

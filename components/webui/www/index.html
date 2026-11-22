@@ -257,7 +257,7 @@ pre{margin:0;background:var(--panel2);border:1px solid var(--line);border-radius
    markup. */
 const $=s=>document.querySelector(s), V=()=>$('#view');
 const AP_IP='192.168.4.1', DOCK_PORT=5343;
-const HINT="Stream Deck Mini or Pedal not showing up on a hub? Plug it straight into the box's USB port.";
+const HINT="Stream Deck Mini or Pedal not showing up on a hub? Plug it straight into the dock's USB port.";
 let ws=null, rid=1, pend={}, S={sys:null,at:0,key:''}, INFO={}, page='home', PG={}, RS=false, loginP=null, TOK='', OK=0, BACK=false;
 
 /* ---------- DOM building (data only ever becomes text nodes or attribute values) ---------- */
@@ -314,10 +314,10 @@ const bytes=s=>new TextEncoder().encode(s).length;   // the box counts UTF-8 byt
 function fmtUp(s){s=Math.max(0,Math.floor(s||0));const d=Math.floor(s/86400),hr=Math.floor(s%86400/3600),m=Math.floor(s%3600/60);
   return d?`${d} d ${hr} h`:hr?`${hr} h ${m} m`:m?`${m} m`:`${s} s`}
 const shortVer=v=>String(v||'').split('+')[0];
-const KEYS={boxName:'Box name',companionHost:'Address',companionPort:'Port',ethIp:'IP address',ethMask:'Subnet mask',ethGw:'Gateway',ethDns:'DNS',wifiSsid:'Network name',wifiPass:'Password',wifiBackupSsid:'Backup network name',wifiBackupPass:'Backup password',apPass:'Hotspot password',
+const KEYS={boxName:'Dock name',companionHost:'Address',companionPort:'Port',ethIp:'IP address',ethMask:'Subnet mask',ethGw:'Gateway',ethDns:'DNS',wifiSsid:'Network name',wifiPass:'Password',wifiBackupSsid:'Backup network name',wifiBackupPass:'Backup password',apPass:'Hotspot password',
   speakerVolume:'Volume',ledPin:'Data pin',ledBrightness:'Brightness'};
 function errText(e){let m=String((e&&e.message)||e||'failed');const k=/^(\w+): /.exec(m);if(k&&KEYS[k[1]])m=KEYS[k[1]]+': '+m.slice(k[0].length);
-  if(m==='Failed to fetch'||m==='Load failed'||m==='NetworkError when attempting to fetch resource.')m='the box is not reachable';
+  if(m==='Failed to fetch'||m==='Load failed'||m==='NetworkError when attempting to fetch resource.')m='the dock is not reachable';
   return m.charAt(0).toUpperCase()+m.slice(1)}
 
 /* ---------- theme, toast ---------- */
@@ -348,7 +348,7 @@ function wsOpen(){
 function post(f,ms){const c=new AbortController(),t=setTimeout(()=>c.abort(),ms);
   return fetch('rpc',{method:'POST',headers:authHdr({'Content-Type':'application/json'}),body:JSON.stringify(f),signal:c.signal})
     .then(async r=>{const m=await r.json().catch(()=>({}));if(!r.ok&&!m.error)throw {message:m.message||'HTTP '+r.status};return m})
-    .catch(e=>{throw e&&e.name==='AbortError'?{message:'no answer from the box'}:e}).finally(()=>clearTimeout(t))}
+    .catch(e=>{throw e&&e.name==='AbortError'?{message:'no answer from the dock'}:e}).finally(()=>clearTimeout(t))}
 /* opt: {http: plain HTTP only, timeout: ms} */
 function rpc(method,params,opt={}){
   const f={id:rid++,src:'webui',method,params:params||{}};if(TOK)f.token=TOK;
@@ -358,7 +358,7 @@ function rpc(method,params,opt={}){
       return login().then(ok=>{if(ok)return rpc(method,params,Object.assign({},opt,{retried:true}));throw m.error});
     throw m.error};
   if(!opt.http&&ws&&ws.readyState===1){ws.send(JSON.stringify(f));
-    return new Promise(res=>{pend[f.id]=res;setTimeout(()=>{if(pend[f.id]){delete pend[f.id];res({error:{code:-1,message:'no answer from the box'}})}},ms)}).then(done)}
+    return new Promise(res=>{pend[f.id]=res;setTimeout(()=>{if(pend[f.id]){delete pend[f.id];res({error:{code:-1,message:'no answer from the dock'}})}},ms)}).then(done)}
   return post(f,ms).then(done);
 }
 /* every action's call: a toast for errors (and okMsg for success) */
@@ -389,7 +389,7 @@ function loginDialog(st){return new Promise(res=>{
     h('div',{class:'mb'},h('label',{class:'f'},h('span',null,st.pin===false?'Settings password':'Settings PIN'),pw),h('label',{class:'sw'},keep,'Keep me signed in on this browser'),err),
     h('div',{class:'mf'},go));
   fill(el,h('div',{class:'scrim'}),h('div',{class:'box',role:'dialog','aria-modal':'true','aria-labelledby':'lgt'},
-    h('div',{class:'mh'},h('div',{class:'mi'},ic('key')),h('h3',{id:'lgt'},'Sign in to '+(INFO.name||(S.sys&&S.sys.name)||'the box'))),form));
+    h('div',{class:'mh'},h('div',{class:'mi'},ic('key')),h('h3',{id:'lgt'},'Sign in to '+(INFO.name||(S.sys&&S.sys.name)||'the dock'))),form));
   modalOpen();el.hidden=false;pw.focus();if(st.locked_s)wait(st.locked_s);
 })}
 async function signOut(){try{if(TOK)await rpc('Auth.Logout',{token:TOK})}catch(_){}setTok('');location.reload()}
@@ -427,12 +427,12 @@ async function restartFlow(act,msg){
   while(Date.now()-t0<wait){
     await sleep(1500);
     try{st=await rpc('Sys.GetStatus',{},{http:true,timeout:4000});if(st&&back(st))break;st=null}
-    catch(_){if(!gone){gone=true;banner('acc','Restarting. The box is offline for a few seconds; this page reconnects by itself.',true)}}
+    catch(_){if(!gone){gone=true;banner('acc','Restarting. The dock is offline for a few seconds; this page reconnects by itself.',true)}}
   }
-  if(!st){RS=false;banner('bad',`The box isn't back after ${Math.round(wait/60000)} minutes. It may have a new address, or it is still starting: this page keeps trying by itself.`);return false}
+  if(!st){RS=false;banner('bad',`The dock isn't back after ${Math.round(wait/60000)} minutes. It may have a new address, or it is still starting: this page keeps trying by itself.`);return false}
   onSys(st);RS=false;   // after onSys: it would take the uptime drop for a restart of its own
   try{await loadInfo()}catch(_){}
-  banner('ok','The box is back.');$('#rsbn')._h=setTimeout(()=>banner(),5000);
+  banner('ok','The dock is back.');$('#rsbn')._h=setTimeout(()=>banner(),5000);
   go();return true;
 }
 
@@ -499,12 +499,12 @@ function conn(s){
 }
 const hostPort=c=>c.host?c.host+':'+c.port:'';
 /* the address Companion uses for the box (the uplink's), else the one this page came from */
-const boxIp=s=>(s.net&&s.net.ip)||(location.hostname!==AP_IP?location.hostname:"the box's IP");
+const boxIp=s=>(s.net&&s.net.ip)||(location.hostname!==AP_IP?location.hostname:"the dock's IP");
 function renderChips(){
   const s=S.sys,c=[];
   if(s){const st=conn(s),n=s.net||{},ago=Math.round((Date.now()-S.at)/1000);
     /* the 10 s poll failed twice: what the page shows may be out of date */
-    if(ago>25&&!RS)c.push(h('span',{class:'chip',title:`Last answer ${ago} s ago. What this page shows may be out of date.`},dot(''),'No answer from the box'));
+    if(ago>25&&!RS)c.push(h('span',{class:'chip',title:`Last answer ${ago} s ago. What this page shows may be out of date.`},dot(''),'No answer from the dock'));
     else c.push(h('span',{class:'chip'},dot(st.k==='nonet'&&location.hostname===AP_IP?'acc':st.cls),st.chip));   // first contact: accent
     c.push(signs(n))}
   fill($('#chips'),c);
@@ -593,7 +593,7 @@ const via=()=>{const s=S.sys||{},n=s.net||{},hn=location.hostname;return hn===AP
 const PAGES={
 async home(){
   fill(V(),h('div',{id:'hbn'}),h('section',{class:'panel'},h('div',{class:'chain',id:'chain'},[1,2,3].map(()=>h('div',{class:'hop'}))),h('div',{id:'probs'})),
-    panel('Stream Decks',[h('div',{class:'scroll'},h('table',{class:'dtab',role:'table','aria-label':'Stream Decks'},h('thead',null,h('tr',null,['Model','Serial','Firmware','USB','In Companion','Box menu'].map(t=>h('th',null,t)))),h('tbody',{id:'decks',role:'rowgroup'}))),
+    panel('Stream Decks',[h('div',{class:'scroll'},h('table',{class:'dtab',role:'table','aria-label':'Stream Decks'},h('thead',null,h('tr',null,['Model','Serial','Firmware','USB','In Companion','Dock menu'].map(t=>h('th',null,t)))),h('tbody',{id:'decks',role:'rowgroup'}))),
       h('div',{class:'hint'},HINT)],h('span',{id:'deckpill'}),'keys'));
 },
 async companion(pg){
@@ -601,12 +601,12 @@ async companion(pg){
   const [cfg,list]=await Promise.all([rpc('Companion.GetConfig'),dock?[]:rpc('Companion.List').catch(()=>[])]);
   if(pg!==PG)return;pg.cfg=cfg;pg.list=list;
   const conn_=panel('Connection',[choice('smode',cfg.mode,[
-      ['satellite','Satellite',"Companion finds the box and adds every deck by itself.",'satellite'],
-      ['dock','Network Dock',`The default. Companion connects to the box as a remote surface, port ${DOCK_PORT}, and drives the decks with its own Stream Deck support.`,'dock']],'Connection mode'),
+      ['satellite','Satellite',"Companion finds this Companion Dock and adds every deck by itself.",'satellite'],
+      ['dock','Network Dock',`The default. Companion connects to this Companion Dock as a remote surface, port ${DOCK_PORT}, and drives the decks with its own Stream Deck support.`,'dock']],'Connection mode'),
     h('div',{class:'btns',id:'modego',hidden:true},btn('',act(()=>switchMode(radio('smode'))))),h('div',{id:'modebn'})],null,'plug');
   conn_.addEventListener('change',()=>{const v=radio('smode');$('#modego').hidden=v===pg.cfg.mode;$('#modego button').textContent=`Switch to ${v==='dock'?'Network Dock':'Satellite'} and restart…`});
   if(dock){
-    show(conn_,panel('Network Docks',[h('p',{class:'note'},"Each deck has its own dock. Add each one in Companion once; Companion reconnects by itself after that, and the deck keeps its pages."),h('div',{id:'docks'})],h('span',{id:'dockpill'}),'keys'));
+    show(conn_,panel('Network Docks',[h('p',{class:'note'},"Each deck has its own Network Dock. Add each one in Companion once; Companion reconnects by itself after that, and the deck keeps its pages."),h('div',{id:'docks'})],h('span',{id:'dockpill'}),'keys'));
   }else{
     const auto=cfg.companionAuto;
     const find=panel('Find Companion',[choice('cfind',auto?'auto':'manual',[['auto','Find automatically','Uses the Companion it finds on the network and keeps using it.'],['manual','Enter address','For Companion on another subnet.']],'How to find Companion'),
@@ -633,7 +633,7 @@ async wifi(pg){
   /* four cards: the state, the networks in range, the primary network, the backup network. Wi-Fi off: all but the
      first dimmed and disabled (a disabled fieldset: every field and button in it, Save too whatever dirt() says);
      Turn Wi-Fi on stays */
-  show(panel('Wi-Fi',[h('p',{class:'note'},'For places without a network cable. Power the box from its USB-C port.'),h('div',{id:'wfst',class:'kvw'}),
+  show(panel('Wi-Fi',[h('p',{class:'note'},'For places without a network cable. Power the dock from its USB-C port.'),h('div',{id:'wfst',class:'kvw'}),
     h('div',{class:'btns'},btn(off?'Turn Wi-Fi on':'Turn Wi-Fi off',act(()=>setWifiOn(!!off)),'ghost','wifi-high',{'data-k':'wifion'}),off&&h('span',{class:'note'},'Wi-Fi is off. The setup hotspot stays on if it is enabled.'))],h('span',{id:'wfpill'}),'wifi-high'),
   panel('Networks in range',h('fieldset',{class:off,disabled:!!off},h('p',{class:'note'},'Scan once, then make a network the primary or the backup. A hidden network: type its name in the card below.'),
     h('div',{class:'btns',style:'margin:-4px 0 14px'},btn(scanLabel(),act(scanWifi),'ghost','wifi-high',{id:'wfscanb'})),h('div',{id:'wfscan'},scanFresh()?scanView(SCAN):null)),null,'wifi-high'),
@@ -641,7 +641,7 @@ async wifi(pg){
     fld('ssid','Network name',c.wifiSsid,'text',{autocomplete:'off',spellcheck:'false',maxlength:32,placeholder:'Studio Wi-Fi'}),
     pfld('wpass',c.wifiHasPass?'New password':'Password','',{autocomplete:'new-password',placeholder:c.wifiHasPass?'Leave empty to keep the saved one':''}),
     saveRow(saveWifi,c.wifiHasPass&&btn('Forget password',act(()=>forgetWifiPass('main')),'ghost','trash'),useBtn('main',c.wifiSsid))),h('span',{id:'wmpill'}),'wifi-high'),
-  panel('Backup network',h('fieldset',{class:off,disabled:!!off},h('p',{class:'note'},'The box joins this one when it cannot join the network above for 30 seconds, and stays on it while it works. Leave the name empty for no backup. It is only used while the network above has a name.'),h('div',{id:'wbst',class:'kvw'}),
+  panel('Backup network',h('fieldset',{class:off,disabled:!!off},h('p',{class:'note'},'The dock joins this one when it cannot join the network above for 30 seconds, and stays on it while it works. Leave the name empty for no backup. It is only used while the network above has a name.'),h('div',{id:'wbst',class:'kvw'}),
     fld('bssid','Network name',c.wifiBackupSsid,'text',{autocomplete:'off',spellcheck:'false',maxlength:32,placeholder:'Phone-Hotspot'}),
     pfld('bpass',c.wifiBackupHasPass?'New password':'Password','',{autocomplete:'new-password',placeholder:c.wifiBackupHasPass?'Leave empty to keep the saved one':''}),
     saveRow(saveWifiBackup,c.wifiBackupHasPass&&btn('Forget password',act(()=>forgetWifiPass('backup')),'ghost','trash'),useBtn('backup',c.wifiSsid&&c.wifiBackupSsid))),h('span',{id:'wbpill'}),'wifi-high'));
@@ -663,7 +663,7 @@ async firmware(pg){
     h('label',{class:'f'},h('span',null,'New firmware file (.bin)'),file),
     h('div',{class:'bar',id:'fwprog',hidden:true},h('i')),h('div',{id:'fwmsg'}),
     h('div',{class:'btns'},go_,btn('Restart',act(restartBox),'ghost','arrow-clockwise')),
-    h('p',{class:'note',style:'margin:12px 0 0'},"If the new firmware doesn't start properly, the box goes back to the previous one by itself.")],null,'cloud-arrow-down'),
+    h('p',{class:'note',style:'margin:12px 0 0'},"If the new firmware doesn't start properly, the dock goes back to the previous one by itself.")],null,'cloud-arrow-down'),
     panel('Firmware slots',h('div',{id:'slots'}),null,'floppy-disk'));
   renderSlots();   // read again when the slots change (rev.slots)
   pg.tick=setInterval(()=>{const e=$('#fwpvt'),fw=(S.sys||{}).firmware||{};if(e&&fw.pending_verify)e.textContent=pvText(fw,boxUp())},1000);
@@ -672,19 +672,19 @@ async device(pg){
   const [c,a]=await Promise.all([rpc('Device.GetConfig'),rpc('Auth.GetStatus')]);if(pg!==PG)return;pg.cfg=c;pg.auth=a;
   const gk=[0,1].map(i=>{const k=CN.indexOf((c.gestureKeys||[])[i]);return k<0?[1,3][i]:k});   // absent: the default, top right and bottom right
   const text=h('textarea',{id:'msgtext',maxlength:160,rows:3,spellcheck:'false',placeholder:'Back in 5 minutes'});
-  const rst=h('div',{class:'bn bad bw',id:'rstc',hidden:true},ic('warning'),h('span',null,'Reset the box to default settings?'),
+  const rst=h('div',{class:'bn bad bw',id:'rstc',hidden:true},ic('warning'),h('span',null,'Reset the dock to default settings?'),
     btn('Reset now',act(factoryReset),'danger'),btn('Cancel',()=>{rst.hidden=true},'ghost'));
   const last=(S.sys||{}).lastReset||INFO.lastReset;   // Uptime (moved from Home), kept live by onSys
   const un=INFO.unit&&INFO.unit.caseSn&&INFO.unit;   // the unit record, when the box has one of its own (Device.GetInfo.unit)
   show(h('div',{class:'grid'},panel('Status',h('dl',{class:'kv'},h('dt',null,'Running for'),h('dd',{id:'uptime'},fmtUp((S.sys||{}).uptime_s)),
       last&&[h('dt',null,'Last start'),h('dd',null,last)],
       un&&[h('dt',null,'Case SN'),h('dd',null,un.caseSn),h('dt',null,'Case type'),h('dd',null,un.caseType)]),null,'circuitry'),
-    panel('Find my box',[h('p',{class:'note'},'The box beeps for 3 seconds and its status light blinks white for 30 seconds, whatever the Speaker & LED settings say.'),
-      h('div',{class:'btns'},btn('Find my box',act(findBox),'','speaker'))],null,'speaker'),
-    panel('Stream Decks',[h('p',{class:'note'},c.deckLimit===4?'Up to 4 Stream Decks (at your own risk: power for 2).':"Up to 2 Stream Decks: the box's power over Ethernet is sized for 2."),
+    panel('Find my dock',[h('p',{class:'note'},'The dock beeps for 3 seconds and its status light blinks white for 30 seconds, whatever the Speaker & LED settings say.'),
+      h('div',{class:'btns'},btn('Find my dock',act(findBox),'','speaker'))],null,'speaker'),
+    panel('Stream Decks',[h('p',{class:'note'},c.deckLimit===4?'Up to 4 Stream Decks (at your own risk: power for 2).':"Up to 2 Stream Decks: the dock's power over Ethernet is sized for 2."),
       h('div',{class:'btns'},btn(c.deckLimit===4?'Back to 2 decks…':'Allow up to 4 decks…',act(()=>setDecks(c.deckLimit===4?2:4)),'ghost',c.deckLimit===4?null:'warning',{id:'dlim'}))],null,'plug')),
-    panel('Box menu gesture',[h('p',{class:'note'},"The taps reach Companion too: pick keys you don't use there."),
-      chk('gon','Open the box menu from the keys',c.gestureEnabled!==false),
+    panel('Dock menu gesture',[h('p',{class:'note'},"The taps reach Companion too: pick keys you don't use there."),
+      chk('gon','Open the dock menu from the keys',c.gestureEnabled!==false),
       h('div',{class:'cols'},pick('gk1','Tap',CNR,gk[0]),pick('gtaps','Taps',[[1,'Once'],[2,'Twice'],[3,'3 times']],c.gestureTaps||1),
         pick('gk2','Then hold it with',CNR,gk[1]),pick('ghold','For',[2,3,5].map(s=>[s,s+' s']),c.gestureHoldSeconds||2)),
       saveRow(saveGesture)],null,'keys'),
@@ -694,13 +694,13 @@ async device(pg){
       fld('msgsec','Seconds (0 keeps it until you clear it)',10,'number',{min:0,max:3600,step:1}),
       h('p',{class:'note',id:'msgst',role:'status'}),
       h('div',{class:'btns'},btn('Show',act(showMsg),'','play'),btn('Clear',act(clearMsg),'ghost','x'))],null,'keys'),
-    panel('Box name and PIN',[fld('bname','Box name',c.boxName,'text',{maxlength:32,autocomplete:'off',spellcheck:'false'}),
+    panel('Dock name and PIN',[fld('bname','Dock name',c.boxName,'text',{maxlength:32,autocomplete:'off',spellcheck:'false'}),
       a.auth_en&&fld('pwold',a.pin?'Current PIN':'Current password','','password',Object.assign({autocomplete:'current-password',maxlength:64},a.pin?NUM:{})),
       h('div',{class:'cols'},fld('pwnew',a.auth_en?'New PIN (optional)':'Settings PIN (optional)','','password',Object.assign({autocomplete:'new-password',placeholder:a.auth_en?'Unchanged':'Off'},NUM)),
         fld('pwrep','Repeat it','','password',Object.assign({autocomplete:'new-password'},NUM))),
       h('p',{class:'note'},a.auth_en&&!a.pin?'Set a PIN to unlock the decks with it; the old password still signs in here until then.':'4 to 8 digits; it also unlocks the decks\' locked keys.'),
-      chk('cadopt','Let Companion adopt this box without the PIN',c.companionAdopt!==false),
-      h('p',{class:'note'},"Companion's Surfaces → Discover can point this box at itself. Turn off to require the PIN for that too."),
+      chk('cadopt','Let Companion adopt this dock without the PIN',c.companionAdopt!==false),
+      h('p',{class:'note'},"Companion's Surfaces → Discover can point this dock at itself. Turn off to require the PIN for that too."),
       saveRow(saveDevice,a.auth_en&&btn(a.pin?'Remove PIN':'Remove password',act(removePass),'ghost','trash'))],
       a.auth_en?pill('ok',a.pin?'PIN on':'Password on'):pill('','No PIN'),'key')),
     panel('Factory reset',[h('p',{class:'note'},'All settings go back to defaults, including Wi-Fi and the hotspot, which gets a new random password (shown on the decks). Decks keep their pages in Companion. Holding the service key for 10 seconds does the same.'),
@@ -727,7 +727,7 @@ async feedback(pg){
     panel('Status light',[chk('ledon','Show the status on the light',c.ledEnabled),chk('ledfl','Flash with each event (key clicks too)',c.ledFlash),
       h('label',{class:'f'},h('span',null,'Data pin'),sel),pct(range('ledbri',c.ledBrightness,1),'Brightness'),
       kv(LIGHT.map(([col,l,m])=>[m,[h('span',{class:'dot',style:'box-shadow:0 0 0 1px var(--line2);background:'+col}),l]])),
-      h('p',{class:'note'},'One WS2812B NeoPixel: 5 V (a NeoKey\'s: 3V3), GND and its data input on this pin. Find my box blinks it also when it is off.'),saveRow(saveLight)],null,'sun'),
+      h('p',{class:'note'},'One WS2812B NeoPixel: 5 V (a NeoKey\'s: 3V3), GND and its data input on this pin. Find my dock blinks it also when it is off.'),saveRow(saveLight)],null,'sun'),
     panel('Service key',[chk('keyon','Service key on',c.keyEnabled),h('label',{class:'f'},h('span',null,'Pin'),pinSel('keypin',c.keyPin,c.ledPin)),
       pick('keyshort','Short press',KEY_ACTS.slice(0,5),c.keyShort),pick('keylong','Long press (held 3 s)',KEY_ACTS,c.keyLong),
       h('div',{id:'keyst',class:'kvw'}),
@@ -770,21 +770,21 @@ function chain(s,ap){   // ap: this page came over the hotspot (no uplink there:
   const L=(icon,name,cls,word,sub,fix,why)=>({icon,name,cls,word,sub,fix:fix||null,why:why||null});
   const net=on?L('network','Network','ok',n.route==='eth'?'Ethernet':'Wi-Fi',[n.route==='wifi'&&n.sta_ssid,n.ip].filter(Boolean).join(' · '))
     :L('network','Network',ap?'acc':'bad','Offline',(n.eth_link?'':'Ethernet cable not connected. ')+(n.wifi_connected?'':'Wi-Fi is not connected.'),
-      null,'No network. The box is running its setup hotspot only.');   // its fixes: the banner's
+      null,'No network. The dock is running its setup hotspot only.');   // its fixes: the banner's
   let comp;
   const C=(...a)=>L('companion','Companion',...a);
   if(!on)comp=C('','Waiting','needs the network');
   else if(dock){const k=docks.filter(d=>d.companion);
     comp=!decks.length?C('','Waiting','waits for a deck')   // no port is open, nothing to add yet
-      :k.length?C('ok','Connected',k[0].peer?'from '+k[0].peer:plural(k.length,'dock','docks')+' in use')
-      :C('warn','Waiting','add the box in Companion',['Show how','companion'],'Network Dock mode: add the box in Companion under Surfaces → Remote.')}
+      :k.length?C('ok','Connected',k[0].peer?'from '+k[0].peer:plural(k.length,'Network Dock','Network Docks')+' in use')
+      :C('warn','Waiting','add it in Companion',['Show how','companion'],'Network Dock mode: add this Companion Dock in Companion under Surfaces → Remote.')}
   else if(c.state==='connected')comp=C('ok','Connected',hostPort(c)+(c.version?' · '+shortVer(c.version):''));
   else if(c.state==='too_old')comp=C('bad','Too old',`${shortVer(c.version)} at ${hostPort(c)}`,null,
-    'Companion is older than 5.0, so the box refuses to connect. Update Companion; the box checks again every 30 seconds.');
+    'Companion is older than 5.0, so the dock refuses to connect. Update Companion; the dock checks again every 30 seconds.');
   else if(c.selection==='ambiguous')comp=C('warn','Choose',`${c.instances} found`,['Choose one','companion'],
-    "More than one Companion answers. The box won't pick one by itself.");
+    "More than one Companion answers. The dock won't pick one by itself.");
   else comp=C('warn','Looking',c.auto?'not found yet':'trying '+hostPort(c),['Find Companion','companion'],c.auto
-    ?"The box is on the network but hasn't found Companion yet. Companion 5.0+ announces itself; on another subnet, enter its address."
+    ?"The dock is on the network but hasn't found Companion yet. Companion 5.0+ announces itself; on another subnet, enter its address."
     :'No answer from Companion yet: check its address and that it runs.');
   const inC=d=>!!drives(s,d);
   const m=decks.filter(inC).length,nd=plural(decks.length,'deck','decks'),D=(...a)=>L('keys','Decks',...a);
@@ -792,10 +792,10 @@ function chain(s,ap){   // ap: this page came over the hotspot (no uplink there:
   const dk=ig?D('warn',nd,plural(ig,'deck','decks')+' over the limit',!room&&lim<4&&['Open Device','device'],room   // room again, still ignored
       ?`${xd?xd.model:'A deck'} is over the limit: unplug it and plug it back in.`:`Deck limit reached (${lim}). Unplug one${lim<4?', or allow up to 4 on Device':''}.`)
     :!on?D('',decks.length?nd:'No deck',decks.length?'wait for the network':'none plugged in')   // not yet
-    :!decks.length?D('warn','No deck','none plugged in',null,dock?NODECK:"No Stream Deck connected. Plug one into the box's USB port.")
+    :!decks.length?D('warn','No deck','none plugged in',null,dock?NODECK:"No Stream Deck connected. Plug one into the dock's USB port.")
     :m===decks.length?D('ok',nd,`${m} of ${m} in Companion`)
     :m||comp.cls==='ok'?D('warn',nd,`${m} of ${decks.length} in Companion`,dock&&['Show how','companion'],
-      `${plural(decks.length-m,'deck is','decks are')} not in Companion yet: add each dock in Companion under Surfaces → Remote.`)
+      `${plural(decks.length-m,'deck is','decks are')} not in Companion yet: add each Network Dock in Companion under Surfaces → Remote.`)
     :D('',nd,'not in Companion yet');
   const links=[net,comp,dk];
   return {links,first:links.find(l=>/bad|warn|acc/.test(l.cls))||null,ready:links.every(l=>l.cls==='ok'),sum:`${nd} in Companion over ${net.word}`};
@@ -808,7 +808,7 @@ LIVE.home=()=>{
   const goBtn=(l,p,cls)=>btn(l,()=>{location.hash=p},cls==null?'ghost':cls);
   const nf=[goBtn('Set up Wi-Fi','wifi',''),goBtn('Open Ethernet','ethernet')],p=s.problems||[];   // the network's two fixes
   const om=decks.filter(d=>d.menu);   // the decks the box menu is open on
-  keepFocus($('#hbn'),()=>fill($('#hbn'),om.length?mtBanner(om):setup?h('div',{class:'bn acc setup'},ic('info'),h('span',null,h('b',null,'Step 1: connect the box to the venue network'),
+  keepFocus($('#hbn'),()=>fill($('#hbn'),om.length?mtBanner(om):setup?h('div',{class:'bn acc setup'},ic('info'),h('span',null,h('b',null,'Step 1: connect the dock to the venue network'),
       'Plug in an Ethernet cable, or join a Wi-Fi network. Companion and the decks come next.'),nf)
     :ch.first?h('div',{class:'bn bw '+ch.first.cls},ic('warning'),h('span',null,ch.first.why),ch.first.icon==='network'&&nf)
     :ch.ready&&h('div',{class:'ready',role:'status'},dot('ok'),h('b',null,'Ready'),h('span',null,ch.sum+(p.length?' · '+plural(p.length,'recent problem','recent problems'):'')))));
@@ -817,20 +817,20 @@ LIVE.home=()=>{
   const o=$('#probs details');   // the decks' and USB's recent problems (newest first): folded under the chain
   fill($('#probs'),!p.length?null:h('details',{class:'probs',open:!!(o&&o.open)},h('summary',null,plural(p.length,'recent problem','recent problems')),
     h('ul',{class:'plist'},p.map(x=>h('li',null,ic('warning','sm'),h('span',null,x))))));
-  const inComp=d=>{const k=drives(s,d);return d.ignored?'Over the limit':!k?'Not yet':s.mode==='dock'?`Dock ${k.dock+1}, connected`:d.device_id};
+  const inComp=d=>{const k=drives(s,d);return d.ignored?'Over the limit':!k?'Not yet':s.mode==='dock'?`Network Dock ${k.dock+1}, connected`:d.device_id};
   fill($('#deckpill'),pill(decks.length?'ok':'',decks.length+' connected'));
   const usb=d=>(d.high_speed?'High speed':'Full speed')+', '+(d.hub_depth?'hub port '+d.port:'direct'),td=(c,...k)=>h('td',{class:c,role:'cell'},...k);   // roles: rows stacked on a phone stay a table
   keepFocus($('#decks'),()=>fill($('#decks'),decks.length?decks.map(d=>{const k=inComp(d),y=!d.ignored&&k!=='Not yet';   // the pill and the line under it: phones
     return h('tr',{role:'row'},td('dm',h('span',null,d.model),pill(y?'ok':d.ignored?'warn':'',y?(s.mode==='dock'?k.split(',')[0]:'In Companion'):k)),
       td('mono',d.serial),td('mono',d.fw),td(null,usb(d)),td('mono',k),td('dsub mono',d.serial+' · '+d.fw+' · '+usb(d)),td('dmt',d.screen&&h('span',{class:'mtc'},mtCell(d))))})
-    :h('tr',null,h('td',{class:'empty',colspan:6},"No Stream Deck connected. Plug one into the box's USB port."))));
+    :h('tr',null,h('td',{class:'empty',colspan:6},"No Stream Deck connected. Plug one into the dock's USB port."))));
 };
 
 /* ---------- Companion ---------- */
 function renderCList(){
   const el=$('#clist');if(!el)return;
   const s=S.sys||{},c=s.companion||{},list=PG.list||[],keep=radio('cpick');
-  if(!list.length){fill(el,h('div',{class:'hint',style:'margin:0 0 14px'},(s.net||{}).route==='none'?'Companions appear here once the box is on a network.'
+  if(!list.length){fill(el,h('div',{class:'hint',style:'margin:0 0 14px'},(s.net||{}).route==='none'?'Companions appear here once the dock is on a network.'
     :'No Companion found yet. Companion 5.0+ announces itself automatically; on another subnet, enter its address.'));return}
   const inUse=x=>c.state==='connected'&&c.host===x.host&&c.port===x.port;
   const sel=list.some(x=>x.id===keep)?keep:(list.find(x=>x.pinned)||list.find(inUse)||{}).id;
@@ -841,13 +841,13 @@ LIVE.companion=()=>{
   const s=S.sys;if(!s)return;
   const cfg=PG.cfg||{},mb=$('#modebn');
   if(mb)fill(mb,cfg.mode&&cfg.mode!==s.mode?h('div',{class:'bn warn bw'},ic('warning'),
-    h('span',null,`Saved as ${cfg.mode==='dock'?'Network Dock':'Satellite'}, but the box still runs in ${s.mode==='dock'?'Network Dock':'Satellite'} mode until it restarts.`),btn('Restart now',act(restartBox),'ghost')):null);
+    h('span',null,`Saved as ${cfg.mode==='dock'?'Network Dock':'Satellite'}, but this Companion Dock still runs in ${s.mode==='dock'?'Network Dock':'Satellite'} mode until it restarts.`),btn('Restart now',act(restartBox),'ghost')):null);
   const ds=$('#docks');
   if(ds){const docks=(s.dock||[]).filter(d=>d.listening||d.serial),ip=boxIp(s);
     fill($('#dockpill'),pill(docks.some(d=>d.companion)?'ok':'warn',docks.filter(d=>d.companion).length+' connected'));
     fill(ds,docks.length?docks.map(d=>h('div',{class:'dock'},
-      h('div',{class:'dockh'},h('b',null,`Dock ${d.dock+1}`),d.companion?pill('ok','Companion connected'):pill('','Companion not connected'),d.companion&&d.peer&&h('span',{class:'mono dim'},'from '+d.peer)),
-      h('div',null,d.serial?[d.model||'Stream Deck',' ',h('span',{class:'mono dim'},d.serial)]:h('span',{class:'dim'},'No deck on this dock yet')),
+      h('div',{class:'dockh'},h('b',null,`Network Dock ${d.dock+1}`),d.companion?pill('ok','Companion connected'):pill('','Companion not connected'),d.companion&&d.peer&&h('span',{class:'mono dim'},'from '+d.peer)),
+      h('div',null,d.serial?[d.model||'Stream Deck',' ',h('span',{class:'mono dim'},d.serial)]:h('span',{class:'dim'},'No deck on this Network Dock yet')),
       h('div',{class:'addto'},'Add in Companion → Surfaces → Remote → Add Remote Surface → ',h('b',{class:'mono'},ip),' port ',h('b',{class:'mono'},String(d.port)))))
       :h('p',{class:'note',style:'margin:0'},docksEmpty(s)));
   }
@@ -869,12 +869,12 @@ async function saveComp(){
     const host=gv('chost').trim(),port=Number(gv('cport'));
     if(!host)return bad('chost',"Enter Companion's address");
     if(!Number.isInteger(port)||port<1||port>65535)return bad('cport','A whole number 1-65535');
-    await call('Companion.SetConfig',{companionAuto:false,companionHost:host,companionPort:port},`Saved. The box connects to ${host}:${port} now.`);
+    await call('Companion.SetConfig',{companionAuto:false,companionHost:host,companionPort:port},`Saved. The dock connects to ${host}:${port} now.`);
   }else{
     const id=radio('cpick');
     if(!id&&(pg.list||[]).length>1)return toast('Pick one of the Companions found',true);
-    if(id&&id!==pg.cfg.companionPinId)await call('Companion.Choose',{id},'Saved. The box uses this Companion from now on.');
-    else await call('Companion.SetConfig',{companionAuto:true},'Saved. The box finds Companion by itself.');
+    if(id&&id!==pg.cfg.companionPinId)await call('Companion.Choose',{id},'Saved. The dock uses this Companion from now on.');
+    else await call('Companion.SetConfig',{companionAuto:true},'Saved. The dock finds Companion by itself.');
   }
   try{pg.cfg=await rpc('Companion.GetConfig')}catch(_){}
   refreshStatus();
@@ -882,13 +882,13 @@ async function saveComp(){
 async function switchMode(to){
   const pg=PG,name=to==='dock'?'Network Dock':'Satellite',back=()=>{const r=pg===PG&&document.querySelector(`input[name="smode"][value="${pg.cfg.mode}"]`);if(r){r.checked=true;$('#modego').hidden=true}};
   const ok=await confirmAction({title:`Switch to ${name} mode?`,icon:'arrow-clockwise',ok:'Switch and restart',body:[
-    P(B('The box restarts'),', so the decks go dark for about 5 seconds.'),
-    to==='dock'?P('Then add the box in Companion: Surfaces → Remote → Add Remote Surface, address ',C(boxIp(S.sys||{})),', port ',C(String(DOCK_PORT)),'. Each further deck gets the next dock and its own port; the Companion page lists them.')
-      :P('Then Companion finds the box by itself again. You can remove its remote surfaces from Companion\'s Surfaces page.')]});
+    P(B('This Companion Dock restarts'),', so the decks go dark for about 5 seconds.'),
+    to==='dock'?P('Then add this Companion Dock in Companion: Surfaces → Remote → Add Remote Surface, address ',C(boxIp(S.sys||{})),', port ',C(String(DOCK_PORT)),'. Each further deck gets the next Network Dock and its own port; the Companion page lists them.')
+      :P('Then Companion finds the dock by itself again. You can remove its remote surfaces from Companion\'s Surfaces page.')]});
   if(!ok)return back();
   let r;try{r=await rpc('Companion.SetConfig',{mode:to})}catch(e){back();return toast(errText(e),true)}
   pg.cfg.mode=to;
-  if(r&&r.restarting)return restartFlow(null,`Switching to ${name} mode. The box restarts…`);
+  if(r&&r.restarting)return restartFlow(null,`Switching to ${name} mode. This Companion Dock restarts…`);
   if(pg!==PG)return toast('Saved');
   if(r&&r.restart_required)return LIVE.companion();   // saved, but the restart couldn't start: the banner offers it
   toast('Saved');go();
@@ -904,7 +904,7 @@ async function saveEth(){
   if(!p.ethDhcp){Object.assign(p,{ethIp:gv('ip').trim(),ethMask:gv('mask').trim(),ethGw:gv('gw').trim(),ethDns:gv('dns').trim()});
     for(const [k,i] of [['ethIp','ip'],['ethMask','mask'],['ethGw','gw']])if(!quad(p[k]))return bad(i,'Four numbers 0-255, like 192.168.1.10');
     if(p.ethDns&&!quad(p.ethDns))return bad('dns','Four numbers 0-255, or leave it empty')}
-  if(via()==='eth'&&!await confirmAction({title:'Change the Ethernet address?',body:[P("This page reaches the box over Ethernet, so it may lose the connection."),
+  if(via()==='eth'&&!await confirmAction({title:'Change the Ethernet address?',body:[P("This page reaches the dock over Ethernet, so it may lose the connection."),
     P(p.ethDhcp?'Find the new address on the decks or in your router.':['Open ',C('http://'+p.ethIp+'/'),' afterwards.'])],ok:'Save'}))return;
   await call('Eth.SetConfig',p,'Saved. Applied without a restart.');
 }
@@ -959,12 +959,12 @@ async function assignNet(n,who,pass){
   const bk=who==='backup';
   if(n.auth!=='open'&&(pass.length<8||bytes(pass)>63))return bad('scanpass',PASS863);
   const p=bk?{wifiBackupSsid:n.ssid,wifiBackupPass:pass}:{wifiSsid:n.ssid,wifiPass:pass};
-  if(via()==='wifi'&&!await confirmAction({title:bk?'Change the backup network?':'Change the Wi-Fi network?',body:P('This page reaches the box over Wi-Fi, so it may lose the connection.'),ok:'Save'}))return;
+  if(via()==='wifi'&&!await confirmAction({title:bk?'Change the backup network?':'Change the Wi-Fi network?',body:P('This page reaches the dock over Wi-Fi, so it may lose the connection.'),ok:'Save'}))return;
   await call('Wifi.SetConfig',p,bk?(PG.cfg||{}).wifiSsid?`Saved. ${n.ssid} is the backup network.`:`Saved. ${n.ssid} is the backup; it is used once a primary network is set.`
-    :`Saved. The box joins ${n.ssid} now.`);
+    :`Saved. The dock joins ${n.ssid} now.`);
   refreshStatus()}   // the page is drawn again from the new settings (rev.cfg): the list shows the new slots
 /* Wifi.Scan answers: {scanning} while the box is still scanning, else the list or why it failed -> the state scanView draws */
-const scanOutcome=r=>r.scanning?{error:'the box did not finish in time'}:r.error?{error:r.error}:{results:r.results||[]};
+const scanOutcome=r=>r.scanning?{error:'the dock did not finish in time'}:r.error?{error:r.error}:{results:r.results||[]};
 const scanLabel=()=>scanFresh()&&!SCAN.busy?'Scan again':'Scan for networks';
 /* the list and the button's label, on the Wi-Fi page only (a scan left running never draws over another page) */
 const drawScan=()=>{if(page!=='wifi')return;const o=$('#wfscan'),b=$('#wfscanb');if(o)fill(o,scanFresh()?scanView(SCAN):null);if(b)b.lastChild.textContent=scanLabel()};
@@ -989,7 +989,7 @@ function perfDraw(r,last,ms){
   fill($('#pfmem'),kv([...mem('Internal',r.heap.internal),...mem('PSRAM',r.heap.psram)]));
   const e=r.eth,le=last&&last.eth,n=(k,warn)=>{const v=e[k],s=v.toLocaleString('en')+(le&&ms>0?` (${Math.round(Math.max(0,v-le[k])*1000/ms).toLocaleString('en')}/s)`:'');
     return warn&&v?pill('bad',s):s};
-  fill($('#pfeth'),e?kv([['To the box',n('unicast')],['Broadcast, multicast',n('multi')],['Dropped: no use',n('unwanted')],['Dropped: over budget',n('rate')],
+  fill($('#pfeth'),e?kv([['To the dock',n('unicast')],['Broadcast, multicast',n('multi')],['Dropped: no use',n('unwanted')],['Dropped: over budget',n('rate')],
     ['Lost: no buffer',n('lostBuf',1)],['Lost: FIFO full',n('lostFifo',1)],
     ['Broadcast storms',e.storm?[pill('warn','Blocked now'),' ',String(e.storms)]:String(e.storms||0)]]):h('p',{class:'note'},'Ethernet is not running.'));
   perfTasks(r.tasks)}
@@ -1015,13 +1015,13 @@ async function saveWifi(){
   const ssid=gv('ssid').trim(),pass=gv('wpass'),p={wifiSsid:ssid};
   if(bytes(ssid)>32)return bad('ssid',NAME32);
   if(pass){if(pass.length<8||bytes(pass)>63)return bad('wpass',PASS863);p.wifiPass=pass}
-  if(via()==='wifi'&&!await confirmAction({title:'Change the Wi-Fi network?',body:P('This page reaches the box over Wi-Fi, so it may lose the connection.'),ok:'Save'}))return;
-  await call('Wifi.SetConfig',p,ssid?'Saved. The box joins this network now.':'Saved. Wi-Fi is off.');refreshStatus();
+  if(via()==='wifi'&&!await confirmAction({title:'Change the Wi-Fi network?',body:P('This page reaches the dock over Wi-Fi, so it may lose the connection.'),ok:'Save'}))return;
+  await call('Wifi.SetConfig',p,ssid?'Saved. The dock joins this network now.':'Saved. Wi-Fi is off.');refreshStatus();
 }
 /* the station on or off, a button of its own (a switch never acts by itself); the hotspot keeps its own settings */
 async function setWifiOn(on){
-  if(!on&&via()==='wifi'&&!await confirmAction({title:'Turn Wi-Fi off?',body:P('This page reaches the box over Wi-Fi: it loses the connection. The setup hotspot stays on if it is enabled.'),ok:'Turn off'}))return;
-  try{await call('Wifi.SetConfig',{wifiEnabled:on},on?'Wi-Fi on: the box joins the primary network.':'Wi-Fi off. The setup hotspot stays on if it is enabled.')}catch(_){}
+  if(!on&&via()==='wifi'&&!await confirmAction({title:'Turn Wi-Fi off?',body:P('This page reaches the dock over Wi-Fi: it loses the connection. The setup hotspot stays on if it is enabled.'),ok:'Turn off'}))return;
+  try{await call('Wifi.SetConfig',{wifiEnabled:on},on?'Wi-Fi on: the dock joins the primary network.':'Wi-Fi off. The setup hotspot stays on if it is enabled.')}catch(_){}
   refreshStatus();
 }
 /* the backup pair: the name empty means no backup; a missing password keeps the saved one */
@@ -1029,16 +1029,16 @@ async function saveWifiBackup(){
   const ssid=gv('bssid').trim(),pass=gv('bpass'),p={wifiBackupSsid:ssid};
   if(bytes(ssid)>32)return bad('bssid',NAME32);
   if(pass){if(pass.length<8||bytes(pass)>63)return bad('bpass',PASS863);p.wifiBackupPass=pass}
-  if(via()==='wifi'&&!await confirmAction({title:'Change the backup network?',body:P('This page reaches the box over Wi-Fi, so it may lose the connection.'),ok:'Save'}))return;
-  await call('Wifi.SetConfig',p,ssid?'Saved. The box uses it when the primary network is out of reach.':'Saved. No backup network.');refreshStatus();
+  if(via()==='wifi'&&!await confirmAction({title:'Change the backup network?',body:P('This page reaches the dock over Wi-Fi, so it may lose the connection.'),ok:'Save'}))return;
+  await call('Wifi.SetConfig',p,ssid?'Saved. The dock uses it when the primary network is out of reach.':'Saved. No backup network.');refreshStatus();
 }
 /* join that network now; it stays the one in use while it works */
 /* shown for the network not in use, kept up to date by LIVE.wifi (the status arrives later, and changes) */
 const useBtn=(net,set)=>set&&btn('Use this network',act(async()=>{
-  if(await confirmAction({title:'Use this network now?',body:P('Wi-Fi drops for a moment while the box switches.'),ok:'Use it'}))await call('Wifi.Use',{net},'Switching.')}),'ghost','wifi-high',{id:'use-'+net,hidden:((S.sys||{}).net||{}).sta_net===net});
+  if(await confirmAction({title:'Use this network now?',body:P('Wi-Fi drops for a moment while the dock switches.'),ok:'Use it'}))await call('Wifi.Use',{net},'Switching.')}),'ghost','wifi-high',{id:'use-'+net,hidden:((S.sys||{}).net||{}).sta_net===net});
 async function forgetWifiPass(who='main'){
   const bk=who==='backup';
-  if(!await confirmAction({title:bk?'Forget the backup password?':'Forget the Wi-Fi password?',body:P('The box then joins the network without a password, as an open network.'),ok:'Forget it'}))return;
+  if(!await confirmAction({title:bk?'Forget the backup password?':'Forget the Wi-Fi password?',body:P('The dock then joins the network without a password, as an open network.'),ok:'Forget it'}))return;
   await call('Wifi.SetConfig',bk?{wifiBackupPass:''}:{wifiPass:''},'Password forgotten.');refreshStatus();
 }
 /* the hotspot: a password unless it is switched off; saved settings in, one line out */
@@ -1051,14 +1051,14 @@ LIVE.ap=()=>{const n=(S.sys||{}).net||{},c=PG.cfg||{},on=$('#apon');if(!on)retur
   $('#apnote').textContent=on.checked?($('#apsec').checked?'The name and password also show on the decks whenever Companion isn\'t using them.'
       :'Open: anyone in range can join it and open this page. For an install, set a settings password on the Device page, or switch the hotspot password on. The name shows on the decks whenever Companion isn\'t using them.')
     :n.ap_forced?'Hotspot off in the settings, but on for 15 minutes now (RESET pressed three times, or the service button held 5 s).'
-    :'Hotspot off. If the box ever becomes unreachable, press RESET three times in a row to turn the hotspot on for 15 minutes.'};
+    :'Hotspot off. If the dock ever becomes unreachable, press RESET three times in a row to turn the hotspot on for 15 minutes.'};
 async function saveAp(){
   const p={apEnabled:gv('apon'),apSecured:gv('apsec')};
   if(p.apSecured)p.apPass=gv('appass');   // off: the saved password stays as it is, unused
   if(apPassProblem(p))return bad('appass',PASS863);
   const c=PG.cfg,off=!p.apEnabled&&c.apEnabled,rejoin=p.apSecured!==!!c.apSecured||p.apSecured&&p.apPass!==c.apPass;
   if(via()==='ap'&&(off||rejoin)&&!await confirmAction({title:'Change the hotspot?',ok:'Save',
-    body:P('This page reaches the box through its hotspot. ',off?'Turning it off disconnects this device.'
+    body:P('This page reaches the dock through its hotspot. ',off?'Turning it off disconnects this device.'
       :p.apSecured?'Join the hotspot again with the new password.':'Join the hotspot again: it is open now, with no password.')}))return;
   await call('Ap.SetConfig',p,'Saved. Applied without a restart.');Object.assign(c,p);LIVE.ap();
 }
@@ -1066,7 +1066,7 @@ async function saveAp(){
 /* ---------- Firmware ---------- */
 LIVE.firmware=()=>{const s=S.sys||{},fw=s.firmware||{},c6=s.c6||{};if(!$('#fwst'))return;
   fill($('#fwst'),kv([['Running',fw.version||INFO.version],
-    ['Wi-Fi chip',c6.running?['ESP-Hosted '+c6.running,c6.carried&&c6.carried!==c6.running?pill('warn','box carries '+c6.carried):pill('ok','Up to date')]:pill('bad','not answering')]]));
+    ['Wi-Fi chip',c6.running?['ESP-Hosted '+c6.running,c6.carried&&c6.carried!==c6.running?pill('warn','dock carries '+c6.carried):pill('ok','Up to date')]:pill('bad','not answering')]]));
   fill($('#fwpv'),fw.pending_verify?h('div',{class:'bn warn'},ic('warning'),h('span',{id:'fwpvt'},pvText(fw,boxUp()))):null)};
 /* The OTA self-check's countdown. firmware.check_at_s (the next check) and rollback_at_s (the check that goes back to the
    previous firmware if they keep failing) are the box's uptime seconds; check_failed, what the last check found. up: the
@@ -1079,20 +1079,20 @@ function pvText(fw,up){
   if(!fw.check_failed)return next>0?`This firmware is new: it checks itself in ${clock(next)}. Uploading works once it has passed; a restart asked for now waits for it.`
     :'This firmware is new and is checking itself now…';
   return `The firmware's last self-check found: ${fw.check_failed}. `+(fw.rollback_at_s<=fw.check_at_s
-    ?`The next check (${when}) is the last: if it fails too, the box goes back to the previous firmware.`
-    :`Next check ${when}. If the checks still fail in ${clock(fw.rollback_at_s-up)}, the box goes back to the previous firmware.`)}
+    ?`The next check (${when}) is the last: if it fails too, the dock goes back to the previous firmware.`
+    :`Next check ${when}. If the checks still fail in ${clock(fw.rollback_at_s-up)}, the dock goes back to the previous firmware.`)}
 /* the recovery slot: both app slots and Ota.GetStatus.sync */
-const SYNC={in_sync:['ok','In sync',"The other slot holds a copy of this firmware: if this slot's image gets damaged, the box starts the copy. (A fault in the firmware itself isn't covered: the copy is the same firmware.)"],
-  syncing:['','Syncing','Copying this firmware into the other slot. The box works on as usual.'],
-  differs:['warn','Differs','The other slot holds an older firmware. The box replaces it with a copy of this one.'],
-  other_newer:['warn','Other slot newer',"The other slot holds a firmware built at the same time as this one or later (written over USB?). The box never overwrites it by itself: boot it, or sync to replace it."],
-  empty:['warn','Empty','The other slot holds no firmware. The box puts a copy of this one there.'],
-  invalid:['bad','Invalid','The other slot holds a firmware that failed (an update that went back). The box replaces it with a copy of this one.'],
-  waiting:['','Waiting','The box makes the copy 10 minutes after start, not while new firmware checks itself or an upload runs, and an hour after a failed try.']};
+const SYNC={in_sync:['ok','In sync',"The other slot holds a copy of this firmware: if this slot's image gets damaged, the dock starts the copy. (A fault in the firmware itself isn't covered: the copy is the same firmware.)"],
+  syncing:['','Syncing','Copying this firmware into the other slot. The dock works on as usual.'],
+  differs:['warn','Differs','The other slot holds an older firmware. The dock replaces it with a copy of this one.'],
+  other_newer:['warn','Other slot newer',"The other slot holds a firmware built at the same time as this one or later (written over USB?). The dock never overwrites it by itself: boot it, or sync to replace it."],
+  empty:['warn','Empty','The other slot holds no firmware. The dock puts a copy of this one there.'],
+  invalid:['bad','Invalid','The other slot holds a firmware that failed (an update that went back). The dock replaces it with a copy of this one.'],
+  waiting:['','Waiting','The dock makes the copy 10 minutes after start, not while new firmware checks itself or an upload runs, and an hour after a failed try.']};
 /* another project's firmware: replaced by the sync, never booted from here */
 function slotsView(o){const y=o.sync||{},x=y.other||{},fw=(S.sys||{}).firmware||{},sy=y.state==='syncing',pct=(y.pct||0)+' %';
   const foreign=!!x.foreign||(!!x.project&&!!fw.project&&x.project!==fw.project),[cls,label,note]=foreign?['bad',x.project?'Other project':'Unknown firmware',
-    `The other slot holds ${x.project?`another project's firmware (${x.project})`:'a firmware without an app descriptor (another or unknown project)'}. It can't be started from here; the box replaces it with a copy of this one.`]:SYNC[y.state]||SYNC.waiting;
+    `The other slot holds ${x.project?`another project's firmware (${x.project})`:'a firmware without an app descriptor (another or unknown project)'}. It can't be started from here; the dock replaces it with a copy of this one.`]:SYNC[y.state]||SYNC.waiting;
   const boot=!!x.valid&&!foreign&&!o.pending_verify&&!sy;
   return [kv([[(o.running||'?')+' (running)',[o.version||INFO.version||'—',fw.build&&h('span',{class:'dim'},fw.build)]],
       [x.label||'Other slot',x.version?[foreign&&x.project,x.version,h('span',{class:'dim'},x.date+' '+x.time)]:'—'],
@@ -1109,8 +1109,8 @@ async function syncNow(){const y=(PG.ota||{}).sync||{},x=y.other||{},force=y.sta
     P(B(x.label),` holds ${x.version||'a firmware'}, built ${x.date} ${x.time}: newer than the running one.`),P('Sync overwrites it with a copy of the running firmware.')]}))return;
   await call('Ota.Sync',force?{force}:{},'Sync started.');pollSlots(PG).catch(()=>{})}
 async function bootOther(){const x=((PG.ota||{}).sync||{}).other||{};
-  if(await confirmAction({title:'Boot the other slot?',icon:'play',ok:'Boot and restart',body:[P('The box restarts into ',B(x.label),` (${x.version||'?'}), a few seconds offline.`),
-    P("It checks itself like an update: if it doesn't start properly, the box goes back to this firmware.")]}))
+  if(await confirmAction({title:'Boot the other slot?',icon:'play',ok:'Boot and restart',body:[P('The dock restarts into ',B(x.label),` (${x.version||'?'}), a few seconds offline.`),
+    P("It checks itself like an update: if it doesn't start properly, the dock goes back to this firmware.")]}))
     await restartFlow(()=>rpc('Ota.BootOther'),'Restarting into the other slot…')}
 function fwMsg(kind,msg){fill($('#fwmsg'),msg?h('div',{class:'bn '+kind},ic(kind==='ok'?'check-circle':kind==='acc'?'info':'warning'),h('span',null,msg)):null)}
 async function upload(){
@@ -1118,7 +1118,7 @@ async function upload(){
   const o=PG.ota||{};
   if(!await confirmAction({title:'Install new firmware?',icon:'cloud-arrow-down',kind:'info',ok:'Upload and restart',body:[
     P(B(f.name),` (${(f.size/1048576).toFixed(2)} MB) is written to the spare slot${o.next?' ('+o.next+')':''}; the running firmware stays untouched until the new one is complete and checked.`),
-    P("Then the box restarts into it, a few seconds offline. If the new firmware doesn't start properly, the box goes back to the previous one by itself.")]}))return;
+    P("Then the dock restarts into it, a few seconds offline. If the new firmware doesn't start properly, the dock goes back to the previous one by itself.")]}))return;
   /* signed in first (rpc signs in on a 401): one refused halfway through the image only shows a dropped connection;
      and not while another upload is being written */
   let st;try{st=await rpc('Ota.GetStatus')}catch(e){fwMsg('bad','Upload not started: '+errText(e));return}
@@ -1129,21 +1129,21 @@ async function upload(){
     x.upload.onprogress=e=>{if(!e.lengthComputable)return;const p=Math.round(e.loaded*100/e.total);fillb.style.width=p+'%';fwMsg('acc',p<100?`Uploading… ${p}%`:'Checking the image…')};
     x.onload=()=>{let m={};try{m=JSON.parse(x.responseText)}catch(_){}res({status:x.status,m})};
     x.onerror=()=>res({status:0,m:{message:'the connection dropped during the upload'}});x.send(f)});
-  if(r.status===200){fillb.style.width='100%';fwMsg('ok',`Firmware ${r.m.version||''} installed. The box restarts into it.`);
-    return restartFlow(null,`Installing firmware ${r.m.version||''}. The box restarts…`)}
+  if(r.status===200){fillb.style.width='100%';fwMsg('ok',`Firmware ${r.m.version||''} installed. The dock restarts into it.`);
+    return restartFlow(null,`Installing firmware ${r.m.version||''}. The dock restarts…`)}
   bar.hidden=true;
   if(r.status===401){fwMsg('warn','Sign in, then upload again.');return login()}
   const why=(r.status?'Upload refused: ':'Upload failed: ')+errText(r.m.message||('HTTP '+r.status));fwMsg('bad',why);toast(why,true);
 }
 async function restartBox(){
-  if(await confirmAction({title:'Restart the box?',icon:'arrow-clockwise',ok:'Restart now',body:P('The decks go dark for about 5 seconds; this page reconnects by itself.')}))
-    await restartFlow(()=>rpc('Device.Restart'),'Restarting. The box is back in a few seconds…');
+  if(await confirmAction({title:'Restart the dock?',icon:'arrow-clockwise',ok:'Restart now',body:P('The decks go dark for about 5 seconds; this page reconnects by itself.')}))
+    await restartFlow(()=>rpc('Device.Restart'),'Restarting. The dock is back in a few seconds…');
 }
 
 /* ---------- Device ---------- */
 async function saveDevice(){
   const pg=PG,a=pg.auth,name=gv('bname').trim(),pw=gv('pwnew'),old=a.auth_en?gv('pwold'):'';
-  if(!name)return bad('bname','Enter a box name');
+  if(!name)return bad('bname','Enter a dock name');
   if(bytes(name)>32)return bad('bname',NAME32);
   /* one typo here locks the user out: the new password twice, then a warning */
   if(pw!==gv('pwrep')){$('#pwnew').value=$('#pwrep').value='';return bad('pwnew','The two PINs differ. Type the new one in both fields again.')}
@@ -1152,7 +1152,7 @@ async function saveDevice(){
     if(a.auth_en&&!old)return bad('pwold','Enter the current '+(a.pin?'PIN':'password')+' first');
     if(!await confirmAction({title:a.auth_en?'Change the settings PIN?':'Set a settings PIN?',icon:'key',kind:'info',ok:a.auth_en?'Change PIN':'Set PIN',body:[
       P(a.auth_en?'Every other browser is signed out and needs the new PIN.':'This page then asks for it before it shows or changes anything, and the decks ask for it before their locked keys work.'),
-      P(B('Keep it somewhere safe.'),' Without it, nobody can sign in here, and the factory reset on this page is locked as well. The only way back is the service key, while it is switched on (Speaker & LED page: off by default, on the pin set there, GPIO21 on a new box): hold it for 10 seconds for a factory reset, which erases every setting.')]}))return;
+      P(B('Keep it somewhere safe.'),' Without it, nobody can sign in here, and the factory reset on this page is locked as well. The only way back is the service key, while it is switched on (Speaker & LED page: off by default, on the pin set there, GPIO21 on a new dock): hold it for 10 seconds for a factory reset, which erases every setting.')]}))return;
   }
   let did=false;const u={},ad=gv('cadopt');
   if(name!==pg.cfg.boxName)u.boxName=name;
@@ -1194,14 +1194,14 @@ async function showMsg(){
    Companion drives that deck. The banner names the decks it is open on and closes them all. */
 const drives=(s,d)=>{if(d.ignored)return null;if(s.mode==='dock'){const k=(s.dock||[]).find(x=>x.serial===d.serial);return k&&k.companion?k:null}
   return (s.companion||{}).state==='connected'};
-const mtBanner=o=>h('div',{class:'bn acc bw'},ic('keys'),h('span',null,o.length>1?`Box menu open on ${o.length} decks. Companion gets each deck back when you close its menu.`
-    :`Box menu open on ${o[0].model}. Companion gets the deck back when you close it.`),
+const mtBanner=o=>h('div',{class:'bn acc bw'},ic('keys'),h('span',null,o.length>1?`Dock menu open on ${o.length} decks. Companion gets each deck back when you close its menu.`
+    :`Dock menu open on ${o[0].model}. Companion gets the deck back when you close it.`),
   btn(o.length>1?'Close all':'Close menu',act(()=>mtToggle(false)),'ghost',null,{'data-k':'mtall'}));
-const mtCell=d=>d.menu?[pill('acc','Box menu'),btn('Close menu',act(()=>mtToggle(false,d)),'ghost sm',null,{'data-k':'mt'+d.serial,'aria-label':'Close the box menu on '+d.model})]
-  :btn('Show box menu',act(()=>mtToggle(true,d)),'ghost sm',null,{'data-k':'mt'+d.serial,'aria-label':'Show the box menu on '+d.model});
+const mtCell=d=>d.menu?[pill('acc','Dock menu'),btn('Close menu',act(()=>mtToggle(false,d)),'ghost sm',null,{'data-k':'mt'+d.serial,'aria-label':'Close the dock menu on '+d.model})]
+  :btn('Show dock menu',act(()=>mtToggle(true,d)),'ghost sm',null,{'data-k':'mt'+d.serial,'aria-label':'Show the dock menu on '+d.model});
 async function mtToggle(on,d){const s=S.sys||{};   // d: that deck's row; none: every deck (the banner)
-  if(on&&drives(s,d)&&!await confirmAction({title:`Show the box menu on ${d.model}?`,ok:'Show the box menu',icon:'keys',
-    body:[P('Companion loses ',B(d.model),' until you close the menu, or after 60 s without a press: its keys show the box menu instead.')]}))return;
+  if(on&&drives(s,d)&&!await confirmAction({title:`Show the dock menu on ${d.model}?`,ok:'Show the dock menu',icon:'keys',
+    body:[P('Companion loses ',B(d.model),' until you close the menu, or after 60 s without a press: its keys show the dock menu instead.')]}))return;
   await call('Deck.ShowMaintenance',d?{on,serial:d.serial}:{on});await refreshStatus();
   const b=$(`[data-k="mt${d?d.serial:'all'}"]`)||$('#decks button');   // redrawn: focus on its new self (the banner gone: a deck's button)
   if(b&&document.activeElement===document.body&&!$('#app').inert)b.focus()}
@@ -1209,16 +1209,16 @@ async function clearMsg(){const m=await call('Deck.ClearMessage',{},'Cleared.');
 /* the deck limit, 2 (what the box's PoE is sized for) or 4 at the user's risk; it restarts the box */
 async function setDecks(n){
   if(!await confirmAction(n===4?{title:'Allow up to 4 Stream Decks?',kind:'danger',ok:'Allow 4 and restart',no:'Keep 2',body:[
-    P('The box powers its USB port from Power over Ethernet, which is sized for 2 Stream Decks. With more, the decks can drop out or the box can restart. A powered USB hub gives the extra decks their own power.'),
-    P(B('You enable this at your own risk.'),' The box restarts.')]}
-    :{title:'Back to 2 Stream Decks?',icon:'arrow-clockwise',ok:'Use 2 and restart',body:[P(B('The box restarts.'),' A third or fourth deck is then ignored.')]}))return;
+    P('The dock powers its USB port from Power over Ethernet, which is sized for 2 Stream Decks. With more, the decks can drop out or the dock can restart. A powered USB hub gives the extra decks their own power.'),
+    P(B('You enable this at your own risk.'),' The dock restarts.')]}
+    :{title:'Back to 2 Stream Decks?',icon:'arrow-clockwise',ok:'Use 2 and restart',body:[P(B('The dock restarts.'),' A third or fourth deck is then ignored.')]}))return;
   const r=await call('Device.SetConfig',{deckLimit:n});
-  if(r&&r.restarting)return restartFlow(null,`Up to ${n} Stream Decks. The box restarts…`);
+  if(r&&r.restarting)return restartFlow(null,`Up to ${n} Stream Decks. The dock restarts…`);
   toast('Saved');go()}
 async function factoryReset(){$('#rstc').hidden=true;await restartFlow(()=>rpc('Device.FactoryReset'),'Factory reset. Restarting with default settings…')}
 
 /* ---------- Speaker & LED ---------- */
-const LIGHT=[['#fff','White, fast blink','Find my box'],['#a0f','Purple, fast blink','Firmware update'],['#f04','Red and purple','Deck problem'],
+const LIGHT=[['#fff','White, fast blink','Find my dock'],['#a0f','Purple, fast blink','Firmware update'],['#f04','Red and purple','Deck problem'],
   ['#f00','Red, slow blink','No network'],['#08f','Blue, slow blink','Setup hotspot'],['#fa0','Amber, slow blink','No Companion'],['#0c4','Green','Connected'],['#aaa','White, dim','Starting']];
 async function saveSpeaker(){
   const p={speakerEnabled:gv('spkon'),speakerVolume:Number(gv('spkvol')),soundReady:gv('sready'),soundConnected:gv('sconn'),
@@ -1228,11 +1228,11 @@ async function saveSpeaker(){
 async function saveLight(){
   const c=PG.cfg,p={ledEnabled:gv('ledon'),ledFlash:gv('ledfl'),ledPin:Number(gv('ledpin')),ledBrightness:Number(gv('ledbri'))};
   if(p.ledPin!==c.ledPin&&!await confirmAction({title:`Move the status light to GPIO${p.ledPin}?`,ok:'Move it',body:[
-    P('The box drives that pin from now on: connect nothing to it but the light\'s data input.'),P('Move the data wire over from GPIO',String(c.ledPin),'.')]}))return;
+    P('The dock drives that pin from now on: connect nothing to it but the light\'s data input.'),P('Move the data wire over from GPIO',String(c.ledPin),'.')]}))return;
   await call('Feedback.SetConfig',p,'Saved. Applied at once.');Object.assign(c,p);
 }
 /* the service key's actions, a press each (restart: the long press only) */
-const KEY_ACTS=[['menu','Open or close the box menu'],['find','Find my box'],['sound','Sound on / off'],['light','Status light on / off'],['none','Nothing'],['restart','Restart the box']];
+const KEY_ACTS=[['menu','Open or close the dock menu'],['find','Find my dock'],['sound','Sound on / off'],['light','Status light on / off'],['none','Nothing'],['restart','Restart the dock']];
 /* the service key: a move asks first (rewire), and so does turning it off (its 10 s factory reset goes with it) */
 async function saveKey(){
   const c=PG.cfg,p={keyEnabled:gv('keyon'),keyPin:Number(gv('keypin')),keyShort:gv('keyshort'),keyLong:gv('keylong')};
@@ -1253,7 +1253,7 @@ async function testSound(event){
   if(n)toast(n,r.speaker!=='starting');else if(!vol)toast('The volume is 0: only the light flashes',true);
 }
 async function findBox(){
-  const r=await call('Device.Identify',{},'The box beeps, and its light blinks white for 30 seconds.'),n=r&&spkNote(r.speaker);
+  const r=await call('Device.Identify',{},'The dock beeps, and its light blinks white for 30 seconds.'),n=r&&spkNote(r.speaker);
   if(n)toast('The light blinks. '+n,r.speaker!=='starting');
 }
 

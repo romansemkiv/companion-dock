@@ -325,7 +325,7 @@ static void test_plan_menu_key(void)
     /* a menu row: the four buttons along the bottom, no Menu key */
     plan(PID_M32, fx_home, &b);
     TEST_ASSERT_EQUAL(-1, L.menu_col);
-    TEST_ASSERT_EQUAL_STRING("[Network]|[Companion]|[Hotspot]|[Box]|.|.|.|.", row_text(0, 3));
+    TEST_ASSERT_EQUAL_STRING("[Network]|[Companion]|[Hotspot]|[Dock]|.|.|.|.", row_text(0, 3));
     TEST_ASSERT_EQUAL(FX_ACT_NETWORK, at(0, 0, 3)->action);
     TEST_ASSERT_EQUAL(DUI_STATE_WAIT, at(0, 1, 3)->state); /* Companion's state dot */
     TEST_ASSERT_EQUAL(DUI_STATE_OK, at(0, 2, 3)->state);   /* the hotspot is on */
@@ -344,7 +344,7 @@ static void test_plan_mini_full_grid(void)
     TEST_ASSERT_EQUAL(2, L.content_rows);
     TEST_ASSERT_EQUAL_STRING("[<Network]|(Ethernet)|No cable", row_text(0, 0));
     plan(PID_MINI, fx_menu, &b);
-    TEST_ASSERT_EQUAL_STRING("[<Menu]|[Network]|[Companion]\n[Hotspot]|[Box]|.", page_text(0));
+    TEST_ASSERT_EQUAL_STRING("[<Menu]|[Network]|[Companion]\n[Hotspot]|[Dock]|.", page_text(0));
     plan(PID_MK2, fx_network, &b);
     TEST_ASSERT_FALSE(L.full);
     TEST_ASSERT_EQUAL(1, L.status_rows);
@@ -360,11 +360,11 @@ static void test_flow_optional_step(void)
 {
     fx_box_t b = fx_box_default(); /* "1 Add" + 4 octets + port: 6 tiles */
     plan(PID_M32, fx_home, &b);    /* 8 a row: kept */
-    TEST_ASSERT_EQUAL_STRING("#1 Add|Box IP:192|168|8|225|Port:5343|.|.", row_text(0, 1));
+    TEST_ASSERT_EQUAL_STRING("#1 Add|Dock IP:192|168|8|225|Port:5343|.|.", row_text(0, 1));
     plan(PID_MK2, fx_home, &b); /* 5 a row, the address on two keys: 4 tiles, kept */
-    TEST_ASSERT_EQUAL_STRING("#1 Add|Box IP:192.168.|:8.225|Port:5343|.", row_text(0, 1));
+    TEST_ASSERT_EQUAL_STRING("#1 Add|Dock IP:192.168.|:8.225|Port:5343|.", row_text(0, 1));
     plan(PID_MINI, fx_home, &b); /* 3 a row: the step goes, the address and its port stay together */
-    TEST_ASSERT_EQUAL_STRING("Box IP:192.168.|:8.225|Port:5343", row_text(0, 1));
+    TEST_ASSERT_EQUAL_STRING("Dock IP:192.168.|:8.225|Port:5343", row_text(0, 1));
     b.scen = FX_NONET; /* "1 Join" + the name and the password, each on one key */
     plan(PID_MK2, fx_home, &b);
     TEST_ASSERT_EQUAL_STRING("#1 Join|Hotspot:CompanionDock-8D1C|Password:k7m2p9xq|.|.", row_text(0, 1));
@@ -436,11 +436,11 @@ static void test_flow_group_starts_new_page_and_pager(void)
     fx_box_t b = fx_box_default();
     plan(PID_MK2, fx_home, &b);
     TEST_ASSERT_EQUAL(2, L.pages);
-    TEST_ASSERT_EQUAL_STRING("[Network]|[Companion]|[Hotspot]|[Box]|>", row_text(0, 2));
+    TEST_ASSERT_EQUAL_STRING("[Network]|[Companion]|[Hotspot]|[Dock]|>", row_text(0, 2));
     b.ap = false;
     plan(PID_MK2, fx_home, &b);
     TEST_ASSERT_EQUAL(1, L.pages);
-    TEST_ASSERT_EQUAL_STRING("[Network]|[Companion]|[Hotspot]|[Box]|.", row_text(0, 2));
+    TEST_ASSERT_EQUAL_STRING("[Network]|[Companion]|[Hotspot]|[Dock]|.", row_text(0, 2));
     /* hardware pagers reserve no key */
     b.ap = true;
     plan(PID_NEO, fx_network, &b);
@@ -475,16 +475,16 @@ static void test_flow_octets(void)
 {
     fx_box_t b = fx_box_default();
     plan(PID_M32, fx_home, &b);
-    TEST_ASSERT_EQUAL_STRING("#1 Add|Box IP:192|168|8|225|Port:5343|.|.", row_text(0, 1));
+    TEST_ASSERT_EQUAL_STRING("#1 Add|Dock IP:192|168|8|225|Port:5343|.|.", row_text(0, 1));
     /* the small decks: one key, its port beside it */
     plan(PID_NEO, fx_home, &b);
-    TEST_ASSERT_EQUAL_STRING("#1 Add|Box IP:192.168.8.225|Port:5343|.\nHotspot:CompanionDock-8D1C|Password:k7m2p9xq|.|[Menu]",
+    TEST_ASSERT_EQUAL_STRING("#1 Add|Dock IP:192.168.8.225|Port:5343|.\nHotspot:CompanionDock-8D1C|Password:k7m2p9xq|.|[Menu]",
                              page_text(0));
     plan(PID_PLUS, fx_home, &b);
-    TEST_ASSERT_EQUAL_STRING("#1 Add|Box IP:192.168.8.225|Port:5343|.\nHotspot:CompanionDock-8D1C|Password:k7m2p9xq|.|[Menu]",
+    TEST_ASSERT_EQUAL_STRING("#1 Add|Dock IP:192.168.8.225|Port:5343|.\nHotspot:CompanionDock-8D1C|Password:k7m2p9xq|.|[Menu]",
                              page_text(0));
     plan(PID_MINI, fx_home, &b); /* on 80 px it doesn't fit one key on one line: two keys, then its port */
-    TEST_ASSERT_EQUAL_STRING("Box IP:192.168.|:8.225|Port:5343", row_text(0, 1));
+    TEST_ASSERT_EQUAL_STRING("Dock IP:192.168.|:8.225|Port:5343", row_text(0, 1));
     b = fx_box_default(); /* the Neo home on demand: "Connected Companion", then its address on a key */
     b.scen = FX_CONNECTED;
     b.close = true;
@@ -648,7 +648,7 @@ static void test_r92_small_decks_never_split(void)
     TEST_ASSERT_EQUAL(1, ip[1].fit.nl);
     TEST_ASSERT_EQUAL(ip->fit.px, ip[1].fit.px);
     TEST_ASSERT_GREATER_OR_EQUAL(DUI_TEXT_MIN_PX, ip->fit.px);
-    TEST_ASSERT_EQUAL_STRING("Box IP", ip->caption);
+    TEST_ASSERT_EQUAL_STRING("Dock IP", ip->caption);
     TEST_ASSERT_NULL(ip[1].caption);
     /* the big decks keep the octets over keys; "Reconnecting" never over keys: whole on a key, or on two lines
      * of one key at its syllable-like break */
@@ -829,7 +829,7 @@ static void test_align_caption_row(void)
 {
     T[0] = mk(DUI_TILE_STEP, NULL, "Add", DUI_ROLE_VALUE);
     T[0].num = 1;
-    T[1] = mk(DUI_TILE_CAP, "Box IP", "192", DUI_ROLE_ACCENT);
+    T[1] = mk(DUI_TILE_CAP, "Dock IP", "192", DUI_ROLE_ACCENT);
     T[2] = mk(DUI_TILE_WORD, NULL, "168", DUI_ROLE_ACCENT);
     T[3] = mk(DUI_TILE_WORD, NULL, "8", DUI_ROLE_ACCENT);
     T[4] = mk(DUI_TILE_CAP, "Port", "5343", DUI_ROLE_ACCENT);
@@ -922,7 +922,7 @@ static void test_align_ink_baseline(void)
         char msg[32];
         T[0] = mk(DUI_TILE_STEP, NULL, "Add", DUI_ROLE_VALUE);
         T[0].num = 1;
-        T[1] = mk(DUI_TILE_CAP, "Box IP", "192", DUI_ROLE_ACCENT);
+        T[1] = mk(DUI_TILE_CAP, "Dock IP", "192", DUI_ROLE_ACCENT);
         T[2] = mk(DUI_TILE_WORD, NULL, "168", DUI_ROLE_ACCENT);
         T[3] = mk(DUI_TILE_CAP, "Uptime", "2h 14m", DUI_ROLE_VALUE);
         T[4] = mk(DUI_TILE_WORD, NULL, "In use", DUI_ROLE_OK); /* a state word that holds one line */
@@ -1365,7 +1365,7 @@ static void test_button_outline_inset(void)
     for (size_t k = 0; k < sizeof sizes / sizeof sizes[0]; k++) {
         const int px = sizes[k];
         uint8_t *p = img(px, px);
-        const dui_tile_t t = button(DUI_ICON_INFO, "Box");
+        const dui_tile_t t = button(DUI_ICON_INFO, "Dock");
         dui_render_key(&t, px, p);
         const int y = px / 2, inset = (5 * px + 48) / 96;
         int edge = -1;

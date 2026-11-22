@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Companion Dock installer</title>
-<meta name="description" content="Install or update the Companion Dock firmware on a Waveshare ESP32-P4-WIFI6-POE-ETH board from your browser. An update keeps the box's settings.">
+<meta name="description" content="Install or update the Companion Dock firmware on a Waveshare ESP32-P4-WIFI6-POE-ETH board from your browser. An update keeps the dock's settings.">
 <meta name="theme-color" content="#000000">
 <meta name="color-scheme" content="dark">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%230a0a0a'/%3E%3Cg fill='none' stroke='%23fff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M13 5H19M13 5V12M19 5V12M13 12 5 27H27L19 12'/%3E%3C/g%3E%3Cg fill='none' stroke='%23fff' stroke-width='1.5'%3E%3Ccircle cx='12' cy='21' r='2.4'/%3E%3Ccircle cx='20' cy='23' r='2'/%3E%3C/g%3E%3C/svg%3E">
@@ -215,7 +215,7 @@ p, li { text-wrap: pretty; }
   <div class="wrap two">
     <div>
       <h1>Install or update over USB.</h1>
-      <p class="lede">This page puts the Companion Dock firmware on a Waveshare ESP32-P4-WIFI6-POE-ETH board. A box that already runs it can be updated here and keeps its settings.</p>
+      <p class="lede">This page puts the Companion Dock firmware on a Waveshare ESP32-P4-WIFI6-POE-ETH board. A dock that already runs it can be updated here and keeps its settings.</p>
     </div>
     <dl class="latest" id="hero-ver" hidden>
       <dt>The version this page installs</dt>
@@ -255,7 +255,7 @@ p, li { text-wrap: pretty; }
           <label><input type="radio" name="mode" value="fresh"><span class="mode"><b>Fresh install</b> Erases the settings. For a new board or a clean start.</span></label>
         </fieldset>
         <label class="pick" id="pick" hidden>Version to install <select id="version"></select></label>
-        <label class="erase" id="erase" hidden><input type="checkbox" id="agree"> <span><b>This erases the box's settings.</b> I understand they can't be brought back.</span></label>
+        <label class="erase" id="erase" hidden><input type="checkbox" id="agree"> <span><b>This erases the dock's settings.</b> I understand they can't be brought back.</span></label>
         <details class="own">
           <summary>Use a firmware file from this computer</summary>
           <input type="file" id="file" accept=".bin" aria-label="A full firmware image">
@@ -283,17 +283,17 @@ p, li { text-wrap: pretty; }
 <section class="band" aria-labelledby="h-after">
   <div class="wrap two">
     <div>
-      <h2 id="h-after">The box restarts by itself.</h2>
+      <h2 id="h-after">The dock restarts by itself.</h2>
     </div>
     <div class="prose">
       <h3>After an update</h3>
-      <p>The box starts in about 5 seconds, joins its network and reconnects to Companion. Its Firmware page and the deck's Box screen show the new version.</p>
+      <p>The dock starts in about 5 seconds, joins its network and reconnects to Companion. Its Firmware page and the deck's Dock screen show the new version.</p>
       <h3>After a fresh install</h3>
       <p>The Stream Decks show the setup screen with two QR codes.</p>
       <ol>
-        <li>Scan the first code with your phone to join the box's hotspot.</li>
+        <li>Scan the first code with your phone to join the dock's hotspot.</li>
         <li>Scan the second to open the setup page, then join your network on its Wi-Fi page, or plug in an Ethernet cable.</li>
-        <li>Add the box in Companion. <a href="https://github.com/romansemkiv/companion-dock#3-add-it-in-companion" rel="noopener">How to add it</a> covers both modes.</li>
+        <li>Add the dock in Companion. <a href="https://github.com/romansemkiv/companion-dock#3-add-it-in-companion" rel="noopener">How to add it</a> covers both modes.</li>
       </ol>
     </div>
   </div>
@@ -319,7 +319,7 @@ p, li { text-wrap: pretty; }
       </details>
       <details>
         <summary>Update isn't offered</summary>
-        <p>The page checks the board when it connects and offers an update only when Companion Dock is on it, so that the settings it keeps are this firmware's. On a new board, or one that runs other firmware, the Update choice says why it can't be done and a fresh install is the way. A box on the network can also be updated from its own web page, on the Firmware page.</p>
+        <p>The page checks the board when it connects and offers an update only when Companion Dock is on it, so that the settings it keeps are this firmware's. On a new board, or one that runs other firmware, the Update choice says why it can't be done and a fresh install is the way. A dock on the network can also be updated from its own web page, on the Firmware page.</p>
       </details>
       <details>
         <summary>Installing an older version</summary>
@@ -392,8 +392,8 @@ const picked = () => (canPick() && versions.find((v) => v.version === $("#versio
 const KEEPS = "Keeps the Wi-Fi networks, the settings PIN, the Companion address and every other setting.";
 function describe({ board, plan, version }) {
   if (plan.ok && board.app)
-    return [board.app.version === version ? `This box already runs Companion Dock ${version}. Writing it again does no harm.`
-      : `This box runs Companion Dock ${board.app.version}.`,
+    return [board.app.version === version ? `This board already runs Companion Dock ${version}. Writing it again does no harm.`
+      : `This board runs Companion Dock ${board.app.version}.`,
       `An update to ${version} keeps its settings.`, KEEPS];
   if (plan.ok && board.readFailed)
     return ["This board is laid out for Companion Dock. The page couldn't read which version it runs.",
@@ -509,7 +509,7 @@ const getImage = () => localImage || download(latest);
    circuit: the chip stayed in the flasher stub until a power cycle. DTR off (BOOT high), RTS on 100 ms (EN low),
    RTS off: the box starts its firmware. A moment for it to start before the port closes. */
 async function restart(transport) {
-  note("Restarting the box: EN pulsed through RTS, BOOT released.");
+  note("Restarting the dock: EN pulsed through RTS, BOOT released.");
   await transport.setDTR(false);
   await transport.setRTS(true);
   await sleep(100);
@@ -651,7 +651,7 @@ async function disconnect() {
   const { transport } = session;
   session = null; phase = "idle"; render();
   await release(transport);
-  setStatus("Disconnected. The box is starting its firmware again.");
+  setStatus("Disconnected. The dock is starting its firmware again.");
 }
 
 async function install() {
@@ -676,12 +676,12 @@ async function install() {
       calculateMD5Hash: md5,
     });
     progress(1);
-    setStatus("Restarting the box…");
+    setStatus("Restarting the dock…");
     await release(transport);
     session = null; phase = "idle";
     progress(null);
-    setStatus(update ? `Updated to ${version}. The box is starting with its settings; it's back on the network in a few seconds.`
-      : `Installed ${version}. The box is starting; the decks show the setup screen in a few seconds.`);
+    setStatus(update ? `Updated to ${version}. The dock is starting with its settings; it's back on the network in a few seconds.`
+      : `Installed ${version}. The dock is starting; the decks show the setup screen in a few seconds.`);
     $("#run").classList.add("done");
   } catch (e) {
     await release(transport);

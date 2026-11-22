@@ -13,7 +13,7 @@
 // "No network"; main "Setup page" and the hotspot's address (ap_ip), or "Plug in network" when the
 // hotspot is off.
 void fx_screen_no_network(sui_content_t *c, const char *ap_ip, const char *ap_ssid, const char *ap_pass);
-// "Finding Companion" (or "Connecting" and main the target first); main "Box IP" and ip.
+// "Finding Companion" (or "Connecting" and main the target first); main "Dock IP" and ip.
 void fx_screen_looking(sui_content_t *c, const char *ip, const char *target,
                         const char *ap_ssid, const char *ap_pass);
 // "Choose Companion"; main "Web page" and ip (the web page's address).

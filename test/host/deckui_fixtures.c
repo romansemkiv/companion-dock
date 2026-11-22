@@ -63,7 +63,7 @@ static void menu_buttons(dui_screen_t *s, const fx_box_t *b, bool as_group)
         {DUI_ICON_NET, "Network", FX_ACT_NETWORK},
         {DUI_ICON_COMPANION, "Companion", FX_ACT_COMPANION},
         {DUI_ICON_HOTSPOT, "Hotspot", FX_ACT_HOTSPOT},
-        {DUI_ICON_INFO, "Box", FX_ACT_BOX},
+        {DUI_ICON_INFO, "Dock", FX_ACT_BOX},
     };
     const int dot[4] = {DUI_STATE_NONE, scen_state(b->scen), b->ap ? DUI_STATE_OK : DUI_STATE_NONE,
                         b->slot == FX_SLOT_OLDER ? DUI_STATE_WAIT : DUI_STATE_NONE};
@@ -106,12 +106,12 @@ void fx_home(dui_screen_t *s, const fx_box_t *b)
     case FX_DOCK:
         dui_group(s, DUI_ZONE_MAIN, 0);
         dui_step(s, 1, "Add", "remote surface");
-        dui_ipv4(s, "Box IP", IP);
+        dui_ipv4(s, "Dock IP", IP);
         dui_port(s, "Port", "5343");
         break;
     case FX_FINDING:
         dui_group(s, DUI_ZONE_MAIN, 0);
-        dui_ipv4(s, "Box IP", IP);
+        dui_ipv4(s, "Dock IP", IP);
         dui_spin(s);
         dui_word(s, "Searching", DUI_ROLE_LABEL);
         break;
@@ -295,7 +295,7 @@ void fx_box(dui_screen_t *s, const fx_box_t *b)
 {
     dui_screen_init(s);
     fx_status(s, b);
-    dui_title(s, "Box");
+    dui_title(s, "Dock");
     dui_group(s, DUI_ZONE_MAIN, 0);
     dui_value(s, "Name", NAME, DUI_ROLE_VALUE);
     dui_cap(s, "Uptime", "2h 14m", DUI_ROLE_VALUE);

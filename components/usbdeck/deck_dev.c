@@ -715,7 +715,7 @@ static void deck_teardown(usbdeck_t *d)
         return;
     }
     if (!atomic_load(&d->hid.gone)) return; /* still plugged in: its port isn't waiting for anything */
-    usbdeck_problem("USB port not freed after a Stream Deck was unplugged — restarting the box");
+    usbdeck_problem("USB port not freed after a Stream Deck was unplugged — restarting the dock");
     usbdeck_restart();
 }
 

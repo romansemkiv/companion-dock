@@ -107,7 +107,7 @@ With no network set up yet, the decks show the setup screen with two QR codes. S
 hotspot and the second to open the setup page, then join your network there. The manual's
 [First setup](manual.md#first-setup) section has the details, including adding the box in Companion.
 
-To check that it worked: the web page shows the version on its **Firmware** page, and the deck's **Box** screen
+To check that it worked: the web page shows the version on its **Firmware** page, and the deck's **Dock** screen
 shows it too.
 
 ## Updating a running box

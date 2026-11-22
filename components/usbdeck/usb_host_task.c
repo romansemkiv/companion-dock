@@ -106,7 +106,7 @@ static void bus_reset_finish(void)
         atomic_store(&s_resetting, false);
         return;
     }
-    usbdeck_problem("USB didn't come back after a reset (%s) — restarting the box", esp_err_to_name(err));
+    usbdeck_problem("USB didn't come back after a reset (%s) — restarting the dock", esp_err_to_name(err));
     vTaskDelay(pdMS_TO_TICKS(500)); /* let the log and the problem go out */
     /* s_resetting stays set: no other reset starts meanwhile */
     if (xTaskCreate(usb_restart_task, "usb_restart", RESTART_STACK, NULL, SVC_PRIO, NULL) == pdPASS) return;

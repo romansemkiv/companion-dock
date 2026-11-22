@@ -35,13 +35,13 @@ Companion restarts.
   mDNS and Companion adds each one once
 - **A maintenance UI on the decks** while Companion isn't driving them, and on demand (the service button,
   the web page, the API) over Companion's own: the box's state and IP, the hotspot name and password,
-  Network, Companion, Hotspot (with join QR codes) and Box screens, pages, holds for what restarts or cuts
+  Network, Companion, Hotspot (with join QR codes) and Dock screens, pages, holds for what restarts or cuts
   people off, and the settings PIN locking them, unlocked on the deck with a PIN pad
   ([Maintenance screens](#maintenance-screens-on-the-decks));
   "Reconnecting" while Companion is away, and custom messages from the web page or the API
 - **Sounds and a status light**: the board's speaker chimes when the box is ready and when Companion
   connects, beeps at a problem, blips when a deck is plugged in or out and clicks on every key press; one
-  NeoPixel on a header pin shows the status in colour. "Find my box" beeps and blinks
+  NeoPixel on a header pin shows the status in colour. "Find my dock" beeps and blinks
   ([Speaker and status light](#speaker-and-status-light))
 - A web page for status, settings and firmware upload. Its top bar has the deck's
   network signs: Ethernet while linked, Wi-Fi and the hotspot, each with its own address (Wi-Fi with its
@@ -130,8 +130,8 @@ chip's pull-up. A box set up before 0.2.9 keeps the pin it had (GPIO32) until it
 
   | Action | Does |
   |---|---|
-  | `menu` | the box menu opened on the biggest deck with a screen, or every box menu closed (the short press's default) |
-  | `find` | Find my box: beeps, and the light blinks white for 30 s (the long press's default) |
+  | `menu` | the dock menu opened on the biggest deck with a screen, or every dock menu closed (the short press's default) |
+  | `find` | Find my dock: beeps, and the light blinks white for 30 s (the long press's default) |
   | `sound` | the speaker on / off (saved, as the deck menu's Sound key; a notice on the decks) |
   | `light` | the status light on / off (saved; a notice on the decks) |
   | `restart` | the box restarts. **Long press only**, so a brush of the key never restarts the box |
@@ -167,14 +167,14 @@ Its NeoPixel then is the status light (the #1312 is not needed). The switch's se
 | Problem: a low double beep | Companion lost after it was connected, a deck stops responding or is quarantined, the network lost. Once when it begins, never again while it lasts; a second problem within 10 s of a beep stays quiet (the network going takes Companion with it) |
 | Deck in / deck out: a rising / falling blip | a Stream Deck plugged in / removed |
 | Key click: a short, quiet tick | every key press Companion gets (both modes). It is queued after the press went out, so it adds no latency, and it never cuts another sound off |
-| Find my box: low-high beeps for 3 s | the *Find my box* button on the *Device* page, or `Device.Identify` |
+| Find my dock: low-high beeps for 3 s | the *Find my dock* button on the *Device* page, or `Device.Identify` |
 
-A new sound replaces the one playing, unless that one ranks higher (Find my box > problem > ready and
+A new sound replaces the one playing, unless that one ranks higher (Find my dock > problem > ready and
 connected > deck blips > key click): the deck blips after a USB reset don't cut the problem beep off.
 
 | Light, highest priority first | Means |
 |---|---|
-| White, fast blink (30 s) | Find my box |
+| White, fast blink (30 s) | Find my dock |
 | Purple, fast blink | a firmware update: an upload being written, or the Wi-Fi chip's (C6) update at start-up |
 | Red and purple, alternating | a deck problem: a deck is quarantined, or not responding or not taking images (until 10 s after its last failure), and 10 s after a USB reset that cured one |
 | Red, slow blink | no network (no Ethernet or Wi-Fi address) |
@@ -186,7 +186,7 @@ connected > deck blips > key click): the deck blips after a USB reset don't cut 
 Slow is 500 ms on, 500 ms off; fast is 125 ms. Every sound event also flashes the light over the status
 colour, which then returns: ready white ×2, connected green ×2, problem red/purple ×4, deck in cyan ×1,
 deck out cyan ×2, key click white 60 ms (a click during a flash restarts it). It happens with the sound
-muted too, only while the light is on and *Flash with each event* (`ledFlash`, on) is on; Find my box and a
+muted too, only while the light is on and *Flash with each event* (`ledFlash`, on) is on; Find my dock and a
 firmware update are never interrupted. Settings, on the *Speaker & LED* page or with
 `Feedback.SetConfig`, apply at once: the speaker on or off, the volume (50 % on a new box), each sound on
 or off (all on), the light on or off (on), its pin (26) and brightness (30 %) and the flashes (on). The page's play buttons
@@ -267,8 +267,8 @@ over mDNS (`_companion-satellite-tcp._tcp`) the box connects to it and stays pin
 `id`. It follows that instance if its IP changes and never switches to another one by itself. With
 several, the decks say "Choose Companion" with "Web page" and the box IP, and the web page lists them. You can also
 set a host and port by hand. Companion's *Surfaces → Discover* lists the box (`_companion-satellite._tcp`
-on port 80, TXT `restEnabled=true`, instance name = box name), and its *setup* button configures the box
-through `POST /api/config`. With a settings PIN set, it still can while *Let Companion adopt this box without the
+on port 80, TXT `restEnabled=true`, instance name = dock name), and its *setup* button configures the box
+through `POST /api/config`. With a settings PIN set, it still can while *Let Companion adopt this dock without the
 PIN* is on (the default, Device page, `companionAdopt`): then only the Companion address and port it posts apply.
 Turned off, set the address on the box's page.
 When the address it posts belongs to a Companion the box sees over mDNS, the box pins that instance, so it
@@ -293,7 +293,7 @@ has reserved (a reserved one only when all others are taken).
 
 - **Discovery.** Each listening dock is announced over mDNS as `_elg._tcp` with TXT `dt=215` (Companion's
   discovery lists only Network Docks and Studios, so the box keeps that type) and `sn=<deck serial>`.
-  The name is `<model> @ <box name>`, e.g. `Module 32 @ CompanionDock-8D1C`; a second deck of the same model
+  The name is `<model> @ <dock name>`, e.g. `Module 32 @ CompanionDock-8D1C`; a second deck of the same model
   makes both say their dock, `XL (dock 1) @ …` and `XL (dock 3) @ …`. A dock without a deck isn't announced. Companion's
   discovered list groups the box's docks by address and shows the first one's name, with the description
   "Stream Deck Network Dock".
@@ -455,7 +455,7 @@ satellite (Phosphor has none), drawn in Phosphor's stroke.
   neither is shown in dock mode. **Hotspot**: name (captioned *HOTSPOT*) and
   password, then its Wi-Fi join QR code, *Turn off* (hold 1.5 s) or *Always on* (the hotspot setting on and kept, as the web page
   turns it on; locked under the settings PIN), *Show QR* (the code to join the hotspot again, with one for
-  the setup page). **Box** (Phosphor's *Circuitry*): name, uptime, version, both firmware slots,
+  the setup page). **Dock** (Phosphor's *Circuitry*): name, uptime, version, both firmware slots,
   the **Sync** button, always there: *Sync now* while the other slot differs, is empty or invalid;
   in sync its tag says *In sync* and a tap copies the running firmware again all the same; disabled with the
   reason in its tag while a copy runs (its percentage), over a newer image (*newer*: a forced copy stays on the
@@ -528,31 +528,31 @@ satellite (Phosphor has none), drawn in Phosphor's stroke.
   digit, shortened where a key is narrow). After the right PIN the key that opened it glows cyan for 3 s on the
   screen it came from, and the notice says what to do: "Unlocked · hold Restart", "Unlocked · press Sync now". A box whose secret
   is still a text password from an older firmware (no PIN) says "Set a PIN on the web page" instead.
-- **On demand**, **a box menu per deck**: every deck with a screen has its own, and several
+- **On demand**, **a dock menu per deck**: every deck with a screen has its own, and several
   can be open at once. It opens on a deck through the secret gesture made on that deck (below), that deck's
-  *Show box menu* button in the web page's Home table, or `Deck.ShowMaintenance {"on": true, "serial": "…"}`; it
+  *Show dock menu* button in the web page's Home table, or `Deck.ShowMaintenance {"on": true, "serial": "…"}`; it
   closes on that deck by its *Close* key (✕, top-left of home), its *Close menu* button on the page,
   `{"on": false, "serial": "…"}`, 60 s without a press on it, or unplugging the deck. A deck plugged in, or
   plugged back in, always arrives closed. What names no deck: **a short press of the service
-  button** (50 ms to 2 s) closes every open box menu, or, with none open, opens it on the biggest attached deck
+  button** (50 ms to 2 s) closes every open dock menu, or, with none open, opens it on the biggest attached deck
   with a screen: the most keys, then the larger keys, then one with a touch strip or info bar, then
   the one plugged in first. So a + XL (36 keys) beats a Module 32 or XL (32), which beats an MK.2 (15), then a +
   (8, bigger keys than the Neo), the Neo, and the Mini (6); the Pedal never counts. `Deck.ShowMaintenance {"on":
   true}` without a serial opens on that same deck, `{"on": false}` closes them all (the page's banner, *Close
   all*). With no deck with a screen attached it doesn't open (the RPC says so). Every other deck stays as it
   was: one Companion drives keeps its images and presses, one the box drives keeps its own screen. On a deck
-  the box menu is open on, if Companion drives it, no key press reaches Companion (keys it saw pressed are
+  the dock menu is open on, if Companion drives it, no key press reaches Companion (keys it saw pressed are
   released first), Companion stays connected and its images keep updating the box's cache. On close,
   Companion's images come back from the cache. Until they have been written to the deck (not merely queued for
   it), its presses go nowhere, and a key held down through it reaches Companion only once it has been let go: a
   press meant for the maintenance screen doesn't fire a Companion button. A fast deck hands back as soon as its
   images are written; the wait is capped at 3 s, enough for the slow full-speed BMP decks (the
   original Stream Deck, the Mini) to rewrite every key. Should the deck still be writing at 3 s, its input goes
-  back to Companion anyway. The hand-back belongs to its deck: opening or closing the box menu on another deck
+  back to Companion anyway. The hand-back belongs to its deck: opening or closing the dock menu on another deck
   never cuts it short.
 - **Secret gesture** (you can change it, below): by default **tap the top-right key**, then within
   **3 s** press the **top-right and bottom-right keys** together and hold both for **2 s**, while Companion drives
-  the deck (either mode): the box menu opens on **that** deck (unless it is open there already; the service
+  the deck (either mode): the dock menu opens on **that** deck (unless it is open there already; the service
   button and the RPC without a serial pick the biggest), with the click and the light's flash. The keys are
   the right column's top and bottom (the original Stream Deck's mirrored rows are taken care of): Module 32 / XL
   keys 8 and 32, + XL 9 and 36, MK.2 / 15 5 and 15, + / Neo 4 and 8, Mini 3 and 6; never the Pedal. **The first
@@ -568,10 +568,10 @@ satellite (Phosphor has none), drawn in Phosphor's stroke.
   held-back bits cleared), and a consumed press never clicks. So **"tap top-right, then top-right + bottom-right"
   is reserved**. The gesture does nothing while the screen is open (close it as usual), or on a deck the box
   already shows its screen on; the PIN doesn't block opening (it only unlocks the locked actions).
-- **Changing the gesture**, for a Companion page that uses those keys: Device → **Box menu gesture** on the web
+- **Changing the gesture**, for a Companion page that uses those keys: Device → **Dock menu gesture** on the web
   page (behind the settings PIN, like every setting; one setting for every deck, both modes, applied at once, no
-  restart). **Open the box menu from the keys** turns it off: then no key is ever held back and the box menu opens
-  only from Home's *Show box menu* or the service button. **Tap** picks the key tapped first, any of the four
+  restart). **Open the dock menu from the keys** turns it off: then no key is ever held back and the dock menu opens
+  only from Home's *Show dock menu* or the service button. **Tap** picks the key tapped first, any of the four
   corners (they exist on every deck); **Then hold it with** the corner held with it (a different one); **Taps** 1,
   2 or 3 (each tap within 3 s of the one before, the other key not pressed between them; more taps make a match by
   accident less likely); **For** the hold, 2, 3 or 5 s. Everything above holds for the keys chosen: the taps reach
@@ -739,10 +739,10 @@ box's hotspot and the second to open the setup page, then set up Ethernet or Wi-
    the web page; the box restarts): with one Companion 5 on the subnet, the decks appear in Companion within
    seconds with no configuration, and they show "Finding Companion" until then. With several, choose
    one on the web page.
-3. **The web page:** `http://<box IP>/` or `http://companiondock-xxxx.local/` (the box name as a host
+3. **The web page:** `http://<box IP>/` or `http://companiondock-xxxx.local/` (the dock name as a host
    name). It covers status, the Companion choice or a manual address, Ethernet (DHCP or static), Wi-Fi,
-   the hotspot, the box name, the settings password, messages to the decks, the speaker and the status
-   light, Find my box, firmware upload and the log.
+   the hotspot, the dock name, the settings password, messages to the decks, the speaker and the status
+   light, Find my dock, firmware upload and the log.
 4. **No DHCP, or no cable yet:** join the setup hotspot (below), then set a static IP or Wi-Fi.
 
 The page asks before anything that restarts the box (restart, mode switch, firmware install, factory reset)
@@ -771,7 +771,7 @@ or that can cut you off (network changes, the settings password).
 
 > **Open hotspot.** If you make the hotspot open, anyone in range can join it and open the web page, which
 > changes every setting. For an install, keep the hotspot password on, or set a settings password
-> (*Device → Box name and password*), or turn the hotspot off. Note that the decks show the hotspot
+> (*Device → Dock name and PIN*), or turn the hotspot off. Note that the decks show the hotspot
 > password to anyone who can see them on the maintenance screens' home whenever Companion isn't driving
 > a deck (the normal idle screen in Network Dock mode), and on the *Hotspot* screen.
 
@@ -780,7 +780,7 @@ or that can cut you off (network changes, the settings password).
 | What | How | Does |
 |---|---|---|
 | **RESET ×3** | press RESET 3 times in a row, each press within 3 s of the last start | setup hotspot on for 15 minutes, even if it is turned off. Nothing is reset. A PoE cable replugged a few times does no more than this |
-| **Service key, short / long press** | press the [service key](#service-key) for 50 ms to 3 s / hold it 3 s and let go before 5 s | as set (*Short press*, *Long press*): by default the box menu on the biggest deck with a screen (or, with any open, every box menu closed) / Find my box ([Maintenance screens](#maintenance-screens-on-the-decks)) |
+| **Service key, short / long press** | press the [service key](#service-key) for 50 ms to 3 s / hold it 3 s and let go before 5 s | as set (*Short press*, *Long press*): by default the dock menu on the biggest deck with a screen (or, with any open, every dock menu closed) / Find my dock ([Maintenance screens](#maintenance-screens-on-the-decks)) |
 | **Service key 5 s** | hold the service key 5 s, then release | setup hotspot on for 15 minutes |
 | **Service key 10 s** | hold it 10 s, then release | **factory reset**: settings, Wi-Fi and settings password erased, then a restart. The dock map (which deck has which Network Dock port) is kept, so Companion's Remote Surface entries keep working |
 | Factory reset from the page | *Device → Factory reset → Reset now*, or `Device.FactoryReset` | the same erase. It needs the settings password when one is set |
@@ -789,14 +789,14 @@ or that can cut you off (network changes, the settings password).
 | USB reflash after an OTA or a sync | `idf.py -p PORT flash` or `./build.sh -p PORT`; or `idf.py app-flash`, then **Boot other slot** | the box may run `ota_1` (the boot log's first line and the *Firmware* page name the slot); `app-flash` writes `ota_0` only, so the box keeps running `ota_1` and shows the new image as *Other slot newer*: start it with **Boot other slot**. `flash` also resets otadata, so the box starts `ota_0` |
 | Hung task | nothing to do | the task watchdog (10 s) restarts the box |
 | Wi-Fi chip (C6) lost | nothing to do | with Ethernet up the box goes on over the cable. Without it (no link or no address for 3 minutes in a row) and with Wi-Fi or the hotspot configured, the box restarts, which resets the C6: at most 3 times per power-on, then once every 30 minutes |
-| Wedged deck | nothing to do | the box retries, then resets the USB port (at most every 10 s box-wide). A deck that the reset doesn't cure is quarantined for 10 minutes (doubling up to 60), then retried. If an unplugged deck leaves its USB port unusable (not freed within 10 s), the problem list says "USB port not freed after a Stream Deck was unplugged — restarting the box" and the box restarts (last reset: `USB power-on failed`) |
+| Wedged deck | nothing to do | the box retries, then resets the USB port (at most every 10 s box-wide). A deck that the reset doesn't cure is quarantined for 10 minutes (doubling up to 60), then retried. If an unplugged deck leaves its USB port unusable (not freed within 10 s), the problem list says "USB port not freed after a Stream Deck was unplugged — restarting the dock" and the box restarts (last reset: `USB power-on failed`) |
 
 > **Settings PIN warning.** If you set a settings PIN and forget it, the web page and the API stay locked,
 > and the page's factory reset needs that PIN too. The ways back are:
 > - the **service key** (GPIO21 unless moved), held 10 s, while it is on. **It is optional hardware, not on the
 >   board**: wire a push button (or a NeoKey) from its pin to GND before you need it;
 > - without the button, a **USB reflash**: erase the NVS partition over the USB-C port. That loses every
->   setting (Wi-Fi, static IP, Companion choice, box name, dock map). The box then starts like a new one,
+>   setting (Wi-Fi, static IP, Companion choice, dock name, Network Dock map). The box then starts like a new one,
 >   with the hotspot on and a new random password (shown on the decks and over serial):
 >
 >   ```sh
@@ -896,15 +896,15 @@ session token.
 
 | Group | Methods |
 |---|---|
-| Device | `Device.GetInfo` (name, id, MAC, model, hardware, version, ESP-IDF, build date, `edition`: `"standard"` for this firmware, `unit` (only when the box has a unit record, see *Unit record*: `{caseSn, caseType, edition, at}`, or `{error: "other board"}` / `{error: "unreadable"}`), `auth_en`, `lastReset`) `Device.GetConfig` / `SetConfig` (`boxName`, `mdnsEnabled`, `deckBrightness` 10–100 in steps of 10, default 70: a deck's brightness while it shows the maintenance screens, also on demand over Companion; `deckLimit` 2 or 4, default 2: the decks taken at once; a change saves and restarts the box, `restart_required` / `restarting` / `delay_ms` as a surface mode change; `companionAdopt`, default true: with a settings PIN set, Companion's *Discover* may still set the Companion address through the Satellite REST API; the box menu gesture, applied at once: `gestureEnabled` default true, `gestureKeys` two different corners of `topLeft` `topRight` `bottomLeft` `bottomRight`, the first tapped, default `["topRight","bottomRight"]`, `gestureTaps` 1–3, default 1, `gestureHoldSeconds` 2, 3 or 5, default 2) `Device.Restart` `Device.FactoryReset` `Device.SetAuth` (`{pass, old_pass}`: set, change or remove the settings PIN; a new one must be 4 to 8 digits, "The PIN must be 4 to 8 digits"; `old_pass` is the current PIN, or an older firmware's text password) `Device.ListMethods` `Device.Identify` (Find my box: beeps for 3 s, the light blinks white for 30 s) |
-| System | `Sys.GetStatus` (`name`, `uptime_s`, `mode`, `net` (`route`, `ip`: the route's address; `eth_addr`, `sta_addr`: each connection's own; `eth_link`, `eth_dhcp`, `wifi_connected`, `wifi_enabled`, `wifi_set` (a Wi-Fi network is set up), `radio_down`, `sta_not_found` (the network being tried wasn't found), `sta_net`, `sta_ssid`, `sta_rssi`, `ap_on`, `ap_forced`, `ap_ssid`, `ap_ip`, `ap_clients`), `companion`, `dock`, `decks`, `problems`, `message`, `maintenance` (the box menu is open on a deck), each of `decks` with `menu` (open on it), `screen` (it has one) and `ignored` (over the deck limit), `deckLimit` (this run's), `decksIgnored` (the decks attached over it), `maintenanceDeck` (the deck the service button would open on, or the first open one), `firmware` (with `pending_verify`; while it is true, once the self-check is scheduled: `check_at_s`, the next check, and `rollback_at_s`, the check that goes back to the previous firmware if they keep failing, both on the `uptime_s` clock, and `check_failed`, what the last check found), `c6`, `heap`, `lastReset`, `rev` (`cfg`: the settings saves since the start, 0 after a restart; `found`, `slots`: fingerprints of `Companion.List` and of `Ota.GetStatus`'s slots; each changes when they do)) |
+| Device | `Device.GetInfo` (name, id, MAC, model, hardware, version, ESP-IDF, build date, `edition`: `"standard"` for this firmware, `unit` (only when the box has a unit record, see *Unit record*: `{caseSn, caseType, edition, at}`, or `{error: "other board"}` / `{error: "unreadable"}`), `auth_en`, `lastReset`) `Device.GetConfig` / `SetConfig` (`boxName`, `mdnsEnabled`, `deckBrightness` 10–100 in steps of 10, default 70: a deck's brightness while it shows the maintenance screens, also on demand over Companion; `deckLimit` 2 or 4, default 2: the decks taken at once; a change saves and restarts the box, `restart_required` / `restarting` / `delay_ms` as a surface mode change; `companionAdopt`, default true: with a settings PIN set, Companion's *Discover* may still set the Companion address through the Satellite REST API; the dock menu gesture, applied at once: `gestureEnabled` default true, `gestureKeys` two different corners of `topLeft` `topRight` `bottomLeft` `bottomRight`, the first tapped, default `["topRight","bottomRight"]`, `gestureTaps` 1–3, default 1, `gestureHoldSeconds` 2, 3 or 5, default 2) `Device.Restart` `Device.FactoryReset` `Device.SetAuth` (`{pass, old_pass}`: set, change or remove the settings PIN; a new one must be 4 to 8 digits, "The PIN must be 4 to 8 digits"; `old_pass` is the current PIN, or an older firmware's text password) `Device.ListMethods` `Device.Identify` (Find my dock: beeps for 3 s, the light blinks white for 30 s) |
+| System | `Sys.GetStatus` (`name`, `uptime_s`, `mode`, `net` (`route`, `ip`: the route's address; `eth_addr`, `sta_addr`: each connection's own; `eth_link`, `eth_dhcp`, `wifi_connected`, `wifi_enabled`, `wifi_set` (a Wi-Fi network is set up), `radio_down`, `sta_not_found` (the network being tried wasn't found), `sta_net`, `sta_ssid`, `sta_rssi`, `ap_on`, `ap_forced`, `ap_ssid`, `ap_ip`, `ap_clients`), `companion`, `dock`, `decks`, `problems`, `message`, `maintenance` (the dock menu is open on a deck), each of `decks` with `menu` (open on it), `screen` (it has one) and `ignored` (over the deck limit), `deckLimit` (this run's), `decksIgnored` (the decks attached over it), `maintenanceDeck` (the deck the service button would open on, or the first open one), `firmware` (with `pending_verify`; while it is true, once the self-check is scheduled: `check_at_s`, the next check, and `rollback_at_s`, the check that goes back to the previous firmware if they keep failing, both on the `uptime_s` clock, and `check_failed`, what the last check found), `c6`, `heap`, `lastReset`, `rev` (`cfg`: the settings saves since the start, 0 after a restart; `found`, `slots`: fingerprints of `Companion.List` and of `Ota.GetStatus`'s slots; each changes when they do)) |
 | Companion | `Companion.GetConfig` / `SetConfig` (`companionAuto`, `companionHost`, `companionPort`, `companionPinId`, `mode`: a changed mode restarts the box) `Companion.GetStatus` (connection state, Companion and API version, the docks in dock mode) `Companion.List` (instances seen over mDNS in the last 30 s) `Companion.Choose {id}` (pin one) |
 | Network | `Eth.GetConfig` / `SetConfig` / `GetStatus` (`ethDhcp`, `ethIp`, `ethMask`, `ethGw`, `ethDns`), `Wifi.GetConfig` / `SetConfig` / `GetStatus` (`wifiSsid`, `wifiPass`, and the backup network's `wifiBackupSsid`, `wifiBackupPass`, and `wifiEnabled` (default true; false: the station is off and the hotspot stays); the passwords are never returned, only `wifiHasPass` and `wifiBackupHasPass`; `GetStatus` adds `net`: `"main"`, `"backup"` or `"none"` for the network joined, with its name in `sta_ssid` and its signal in `sta_rssi`, `backup`: whether one is set, and `enabled`: `wifiEnabled` as applied), `Wifi.Scan` (starts a scan, `{results: true}` fetches the networks in range; see below), `Wifi.Use {net}` (`"main"` or `"backup"`: join it now and keep it as the one in use; errors when Wi-Fi isn't running or no backup is set up), `Ap.GetConfig` / `SetConfig` / `GetStatus` (`apEnabled`, `apSecured`, `apPass`; `apSecured` true, the default: WPA2, `apPass` 8-63 characters; false: the hotspot is open and `apPass` is kept unused. The hotspot password is returned, as the page shows it) |
-| Decks | `Deck.List` (model, serial, firmware, USB speed, hub depth and port) `Deck.ShowMessage {text, seconds}` (1–160 printable characters and newlines; 0 s = until cleared, at most 3600 s) `Deck.ClearMessage` `Deck.ShowMaintenance {on, serial?}` (the box menu on that deck, Companion's too, or closed on it; without `serial`, true opens on the biggest deck with a screen, false closes them all; `{on, open: [serials], serial, model}` back, `on` any open, `serial` / `model` the deck just opened; a serial not attached or without a screen, or no deck with a screen, is an error) |
+| Decks | `Deck.List` (model, serial, firmware, USB speed, hub depth and port) `Deck.ShowMessage {text, seconds}` (1–160 printable characters and newlines; 0 s = until cleared, at most 3600 s) `Deck.ClearMessage` `Deck.ShowMaintenance {on, serial?}` (the dock menu on that deck, Companion's too, or closed on it; without `serial`, true opens on the biggest deck with a screen, false closes them all; `{on, open: [serials], serial, model}` back, `on` any open, `serial` / `model` the deck just opened; a serial not attached or without a screen, or no deck with a screen, is an error) |
 | Speaker and light | `Feedback.GetConfig` / `SetConfig` (`speakerEnabled`, `speakerVolume` 0–100, `soundReady`, `soundConnected`, `soundProblem`, `soundDeckPlug`, `soundKeyClick`, `ledEnabled`, `ledFlash`, `ledPin`, `ledBrightness` 1–100; GetConfig also lists the pins `ledPin` may name in `ledPins`) `Feedback.Test {event, volume?}` (plays `ready`, `connected`, `problem`, `deckIn`, `deckOut`, `keyClick`, `confirm` (a hold done), `locked` (a locked button) or `identify` and flashes the light, also when that sound is off; `volume` previews another volume) |
 | Firmware | `Ota.GetStatus` (both slots, the running one, pending verify, the last upload's progress, and the [recovery slot](#recovery-slot) as `sync`: `{state, pct, other: {label, project, version, date, time, valid, foreign}}`, state `in_sync`, `syncing`, `differs`, `other_newer`, `empty`, `invalid` or `waiting`; `valid`: a valid image of this project, which `Ota.BootOther` may start; `foreign`: another project's image or one without an app descriptor, shown as `invalid`) `Ota.Sync {force?}` (copy the running firmware into the other slot now; refused while an upload or a sync runs, while the firmware is pending verify, and over a newer image unless `force`) `Ota.BootOther` (make the other slot the boot slot and restart; refused for an empty or invalid slot, another project's firmware, and while pending verify) |
 | Performance | `Sys.GetPerf` → `{windowMs, cpuMhz, tempC, cores, heap, tasks, eth}`: each core's load and each task's share of one core (`cpu`, %) over the `windowMs` since the previous call, by anyone (FreeRTOS run-time stats, 64-bit, from esp_timer; `null` on the first call after a start), the chip's temperature (`null` when the sensor can't be read), `heap.internal` / `heap.psram` (`total`, `free`, `minFree`: the lowest since the start, `largest`: the largest free block), each task's `name`, `core` (-1: either), `prio`, `state` and `stackFree` (bytes never used since the start), and `eth` (`null` without Ethernet): the receive filter's counts since the start (`unicast`, `multi` passed; `unwanted`, `rate` dropped) and the frames the EMAC itself lost (`lostBuf`: no free receive buffer, `lostFifo`: its FIFO overflowed; added up every 100 ms), `storm` (broadcast is blocked now) and `storms` (broadcast storms since the start). The web page's **Performance** page shows it, read every 2 s while open, with the Ethernet counts' rates per second |
-| Log | `Log.Get {since, oldest?}` → `{seq, text, up_ms}` (the last 16 KB of log text, 8 KB per call; pass `seq` back. More than 8 KB waiting: the newest, or with `oldest: true` the oldest kept, so that calls in a row read all of it in order. `up_ms` is the log's own clock, the `(12345)` on each line, at the moment of the read. The web page's **Logs** page reads the whole ring that way when it opens, then follows the log live. With **Timestamps** on (remembered), each line shows the local time it was logged (`HH:MM:SS.mmm`, worked out from `up_ms`, as the box has no clock of its own). **Copy** puts the text shown on the clipboard, **Export .log** saves it as `<box name>-<YYYY-MM-DD-HHMMSS>.log`, and **Clear view** empties the view, not the box's log) |
+| Log | `Log.Get {since, oldest?}` → `{seq, text, up_ms}` (the last 16 KB of log text, 8 KB per call; pass `seq` back. More than 8 KB waiting: the newest, or with `oldest: true` the oldest kept, so that calls in a row read all of it in order. `up_ms` is the log's own clock, the `(12345)` on each line, at the moment of the read. The web page's **Logs** page reads the whole ring that way when it opens, then follows the log live. With **Timestamps** on (remembered), each line shows the local time it was logged (`HH:MM:SS.mmm`, worked out from `up_ms`, as the box has no clock of its own). **Copy** puts the text shown on the clipboard, **Export .log** saves it as `<dock name>-<YYYY-MM-DD-HHMMSS>.log`, and **Clear view** empties the view, not the box's log) |
 | Security | `Auth.GetStatus` (public: `auth_en`, `pin`: the secret is a PIN, false for an older firmware's text password; `authed`, `locked_s`) `Auth.Login {password}` (public: the PIN, or an older firmware's text password; a 12 h token) `Auth.Logout` |
 
 Every `*.SetConfig` takes `dry_run`. Config keys are camelCase (as stored). Status and result keys are
@@ -962,7 +962,7 @@ nothing applied. In dock mode they need the token.
 Satellite REST requests answered without the PIN, only an IP, a `.local` name or the box's own name is
 accepted as Host (no DNS rebinding). The page has a CSP.
 
-**Discovery:** mDNS host `<box name>.local` (lower case, other characters as `-`). Satellite mode:
+**Discovery:** mDNS host `<dock name>.local` (lower case, other characters as `-`). Satellite mode:
 `_companion-satellite._tcp` on port 80. Dock mode: `_elg._tcp` per listening dock.
 
 ## Stream Deck support
@@ -1018,7 +1018,7 @@ listed on the status page.
   more, but one that did would fail to open.
 - A full-speed deck on a hub is invisible to the firmware (ESP-IDF 5.5 doesn't report the failed
   enumeration), so the page only shows a hint.
-- With a settings PIN set and *Let Companion adopt this box without the PIN* on (the default), anyone on
+- With a settings PIN set and *Let Companion adopt this dock without the PIN* on (the default), anyone on
   the network can point the box at another Companion through the Satellite REST API, as Companion's *Discover →
   setup* does; nothing else is open. A website can't (the Host check stops DNS rebinding), and the changes
   are rate-limited (3, then one a minute) so they can't wear out the flash. Turn it off to require the PIN for that
@@ -1120,7 +1120,7 @@ in particular for the decks and setups not covered yet.
 - the speaker: the amplifier's idle switch-off (`SPK_IDLE_US`, hiss against pop), each sound from its event; the
   status light's states by eye;
 - Companion's *Surfaces → Discover* adopting a PIN-locked box, and two Companions on the LAN;
-- the box menu gesture set on the web page, in both modes: off (the default gesture then opens nothing), other
+- the dock menu gesture set on the web page, in both modes: off (the default gesture then opens nothing), other
   corners, 2 and 3 taps, the 3 and 5 s holds, and the default keys never late once the gesture moved off them.
 
 ## Measurements
@@ -1130,7 +1130,7 @@ in particular for the decks and setups not covered yet.
 | Start to "ready" | 4.5 s, 4.3 s of it the network stage (C6 bring-up) | serial log, 0.1.0-dev, -O2 |
 | Power-on to the deck added in Companion | 14.4 s | Wi-Fi, Module 32, Companion 5.1.1 |
 | Restart (`Device.Restart` or a mode switch) to the API answering | about 12 s; Companion has the deck again 3–5 s later | Wi-Fi, 24 mode-switch restarts |
-| The web page across a restart / an outage | reconnects 12–14 s after a restart; the "No answer from the box" chip shows 28–40 s after the last answer | Wi-Fi, browser; the chip waits for the 20 s RPC timeout while a silent WebSocket stays open |
+| The web page across a restart / an outage | reconnects 12–14 s after a restart; the "No answer from the dock" chip shows 28–40 s after the last answer | Wi-Fi, browser; the chip waits for the 20 s RPC timeout while a silent WebSocket stays open |
 | 32-key page, dock mode | 95 ms (96 ms in the -Og build: the USB bus sets the pace); since the FIFO fix 66–116 ms single runs, p50 101 / p90 180 / max 534 ms over a 10-minute soak with Companion retaking the dock between runs | `dock_check`: from the first of 32 key images to a report queued behind them coming back |
 | USB client task at idle | 9.3 % of a core with one deck before the FIFO fix (4000 empty IN completions a second); 0.00–0.05 % after it | FreeRTOS run-time stats, temporary build, Module 32 |
 | Settings password check (PBKDF2-HMAC-SHA256, 10 000 rounds) | 268 ms, timed on the box around the check; an `Auth.Login` round trip takes 270–320 ms above a plain call, depending on which core the web server's task runs on (core 0 also carries the USB client task) | 30 logins over one HTTP connection. The -O2 build did not change it: `auth_logic.c` was already compiled -O2 and its code is byte-identical (the image before: 270 ms) |

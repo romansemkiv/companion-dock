@@ -283,7 +283,7 @@ static esp_err_t deny(httpd_req_t *req)
 static bool guard(httpd_req_t *req)
 {
     if (!host_ok(req)) {
-        send_error(req, "403 Forbidden", 403, "unknown host name: use the box's IP address or <name>.local");
+        send_error(req, "403 Forbidden", 403, "unknown host name: use the dock's IP address or <name>.local");
         return false;
     }
     char tok[TOKEN_CAP];
@@ -437,7 +437,7 @@ static esp_err_t h_rpc_method(httpd_req_t *req)
     const bool pub = rpc_method_is_public(method);
     if (!pub && !req_authed(req)) return deny(req);
     if (req->method == HTTP_GET && !auth_enabled() && !pub && rpc_method_exists(method) && !has_auth_header(req))
-        return send_error(req, "405 Method Not Allowed", 405, "use POST while the box has no password");
+        return send_error(req, "405 Method Not Allowed", 405, "use POST while the dock has no password");
 
     cJSON *params;
     if (req->method == HTTP_POST && req->content_len) {
@@ -969,7 +969,7 @@ static esp_err_t ota_upload(httpd_req_t *req)
     atomic_store(&s_ota_writing, true);
     if (webui_restart_pending()) {
         atomic_store(&s_ota_writing, false);
-        return send_error(req, "409 Conflict", RPC_E_BAD_STATE, "the box is restarting: upload once it is back");
+        return send_error(req, "409 Conflict", RPC_E_BAD_STATE, "the dock is restarting: upload once it is back");
     }
     const esp_partition_t *part = esp_ota_get_next_update_partition(NULL);
     if (!part) return ota_refuse(req, "500 Internal Server Error", RPC_E_UNAVAILABLE, "no OTA slot to write");

@@ -3,7 +3,7 @@
  * changes both ends. Pure: no includes. */
 #pragma once
 
-#define RPC_MSG_UPLOAD "a firmware upload is running, or the box is restarting into the other slot"
+#define RPC_MSG_UPLOAD "a firmware upload is running, or the dock is restarting into the other slot"
 #define RPC_MSG_SYNCING "the recovery slot is being synced (about a minute): try again shortly"
 #define RPC_MSG_CHECKING "the firmware slots are still being checked: try again in a few seconds"
 #define RPC_MSG_SELF_CHECK "the running firmware is still checking itself (about 30 s after start): try again shortly"

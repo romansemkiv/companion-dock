@@ -160,7 +160,7 @@ for (const file of files.filter((f) => path.basename(f) === 'index.html')) {
   for (const id of ['chost', 'cport', 'dns', 'ssid', 'wpass', 'bssid', 'bpass', 'appass', 'bname', 'pwnew', 'pwold', 'msgtext', 'msgsec'])
     need(new RegExp(`bad\\('${id}'`).test(html), `no error under the field ${id}`);
   need(html.includes("[['ethIp','ip'],['ethMask','mask'],['ethGw','gw']])if(!quad(p[k]))return bad(i,"), 'the Ethernet address errors are not under their fields');
-  for (const gone of ["toast('Password: 8-63 characters',true)", "toast(l+': enter four numbers", "toast('Enter a box name',true)", "toast(bad,true)"])
+  for (const gone of ["toast('Password: 8-63 characters',true)", "toast(l+': enter four numbers", "toast('Enter a dock name',true)", "toast(bad,true)"])
     need(!html.includes(gone), `a form error is still only a toast: ${gone}`);
   for (const id of ['wpass', 'bpass', 'appass']) need(html.includes(`pfld('${id}'`), `the password ${id} has no Show button`);
   for (const m of html.matchAll(/\bon(?:change|input)\s*[:=]\s*["'`]?([^,}"'`]*)/gi))   // handlers set as attributes too
@@ -392,10 +392,10 @@ async function smoke(file) {
   // Device.SetConfig {companionAdopt} only when it changed; nothing acts on the checkbox by itself
   {
     const idx = fs.readFileSync(file, 'utf8');
-    if (!idx.includes("Companion's Surfaces → Discover can point this box at itself. Turn off to require the PIN for that too."))
+    if (!idx.includes("Companion's Surfaces → Discover can point this dock at itself. Turn off to require the PIN for that too."))
       errs.push('the adopt checkbox has no note');
     if (!/saveRow\(saveDevice,/.test(idx)) errs.push('the Box name and PIN panel saves without a saveRow (no dirty state)');
-    if (/can't set up this box/.test(idx)) errs.push("the PIN note still says Companion's Discover can't set up the box");
+    if (/can't set up this dock/.test(idx)) errs.push("the PIN note still says Companion's Discover can't set up the box");
     const chkOrig = ctx.chk, rpcPrev = ctx.rpc;
     let seen = null;
     ctx.chk = (id, label, on) => { if (id === 'cadopt') seen = { label, on }; return chkOrig(id, label, on); };
@@ -403,7 +403,7 @@ async function smoke(file) {
       seen = null;
       ctx.rpc = async (m, p) => m === 'Device.GetConfig' ? Object.assign({ boxName: 'Box', deckLimit: 2 }, cfg) : rpcPrev(m, p);
       await vm.runInContext('(async()=>{page="device";PG={};await PAGES.device(PG)})()', ctx);
-      if (!seen || seen.label !== 'Let Companion adopt this box without the PIN' || seen.on !== want)
+      if (!seen || seen.label !== 'Let Companion adopt this dock without the PIN' || seen.on !== want)
         errs.push(`Device.GetConfig ${JSON.stringify(cfg)} gives the adopt checkbox ${JSON.stringify(seen)}, not on ${want}`);
     }
     ctx.chk = chkOrig;
@@ -455,7 +455,7 @@ async function smoke(file) {
   // twice is an error under the second field, and nothing is sent
   {
     const idx = fs.readFileSync(file, 'utf8');
-    if (!/panel\('Box menu gesture',/.test(idx)) errs.push('no Box menu gesture panel');
+    if (!/panel\('Dock menu gesture',/.test(idx)) errs.push('no Box menu gesture panel');
     if (!/saveRow\(saveGesture\)/.test(idx)) errs.push('the gesture panel saves without a saveRow (no dirty state)');
     const chkOrig = ctx.chk, pickOrig = ctx.pick, rpcPrev = ctx.rpc;
     if (typeof pickOrig !== 'function') errs.push('pick(id, label, opts, val) is missing');
@@ -474,7 +474,7 @@ async function smoke(file) {
         const got = { gon: seen.gon && seen.gon.on };
         for (const id of ['gk1', 'gk2', 'gtaps', 'ghold']) got[id] = seen[id] && seen[id].val;
         if (JSON.stringify(got) !== JSON.stringify(want)) errs.push(`Device.GetConfig ${JSON.stringify(cfg)} shows ${JSON.stringify(got)}, not ${JSON.stringify(want)}`);
-        if (!seen.gon || seen.gon.label !== 'Open the box menu from the keys') errs.push(`the gesture switch reads ${JSON.stringify(seen.gon)}`);
+        if (!seen.gon || seen.gon.label !== 'Open the dock menu from the keys') errs.push(`the gesture switch reads ${JSON.stringify(seen.gon)}`);
         if (!seen.gk1 || seen.gk1.opts !== corners || !seen.gk2 || seen.gk2.opts !== corners) errs.push('the two key fields do not offer the four corners');
         if (!seen.gtaps || seen.gtaps.opts !== '1:Once,2:Twice,3:3 times') errs.push(`the taps field offers ${seen.gtaps && seen.gtaps.opts}`);
         if (!seen.ghold || seen.ghold.opts !== '2:2 s,3:3 s,5:5 s') errs.push(`the hold field offers ${seen.ghold && seen.ghold.opts}`);
@@ -753,7 +753,7 @@ async function smoke(file) {
     if (!docksEmpty) errs.push('docksEmpty(status) is missing');
     else {
       const t = docksEmpty(states.docknodeck);
-      if (!/Plug in a Stream Deck/.test(t) || /once the box is on a network/i.test(t)) errs.push(`docksEmpty(no deck): ${t}`);
+      if (!/Plug in a Stream Deck/.test(t) || /once the dock is on a network/i.test(t)) errs.push(`docksEmpty(no deck): ${t}`);
       if (!/network/i.test(docksEmpty(Object.assign({}, states.docknodeck, { net: { route: 'none' } }))))
         errs.push('docksEmpty(no network) should name the network');
     }
@@ -773,20 +773,20 @@ async function smoke(file) {
       ctx.ic = (name) => ({ icon: name });
       const none = shownText(states.docknodeck);
       if (!/Plug in a Stream Deck/.test(none)) errs.push('dock mode, no deck: nothing says to plug a deck in');
-      for (const bad of [/add the box/i, /once the box is on a network/i, /Add Remote Surface/, /Waiting for Companion/])
+      for (const bad of [/add (it|this Companion Dock) in Companion/i, /once the dock is on a network/i, /Add Remote Surface/, /Waiting for Companion/])
         if (bad.test(none)) errs.push(`dock mode, no deck: the pages say ${bad}`);
       const some = shownText(states.dock); // the control: with decks, the docks and how to add them show
       if (!/Add Remote Surface/.test(some) || /Plug in a Stream Deck/.test(some)) errs.push('dock mode with decks: the docks panel is wrong');
       // each deck's box menu control is in its Home row (no longer on Device)
-      if ((some.match(/\| Show box menu\b/g) || []).length !== 2) errs.push('the Home deck rows have no box menu control each');
+      if ((some.match(/\| Show dock menu\b/g) || []).length !== 2) errs.push('the Home deck rows have no box menu control each');
       // on a phone each deck is a stacked row: the model and its In Companion pill, then serial · fw · USB
-      if (!/Stream Deck XL \| Dock 1 \|/.test(some) || !/CL1 · 1\.01\.000 · High speed, direct/.test(some))
+      if (!/Stream Deck XL \| Network Dock 1 \|/.test(some) || !/CL1 · 1\.01\.000 · High speed, direct/.test(some))
         errs.push(`the deck rows have no stacked form for phones: ${some}`);
       if (!/MINI1 · 1\.01\.000 · Full speed, hub port 2/.test(shownText(states.satellite)) || !/Stream Deck XL \| In Companion/.test(shownText(states.satellite)))
         errs.push('the deck rows (satellite) have no stacked form for phones');
       // while it is open, Home's one banner says so and closes it
       const on = shownText(Object.assign({}, states.dock, { maintenance: true, decks: states.mtopen.decks }));
-      if (!/Box menu open on Stream Deck XL\. Companion gets the deck back when you close it\. \| Close menu/.test(on)) errs.push('Home: no banner for the open box menu');
+      if (!/Dock menu open on Stream Deck XL\. Companion gets the deck back when you close it\. \| Close menu/.test(on)) errs.push('Home: no banner for the open box menu');
     } catch (e) { errs.push(`dock mode, no deck: ${e && e.stack || e}`); }
     finally { ctx.h = hOrig; ctx.ic = icOrig; ctx.fill = fillOrig; }
   }
@@ -900,7 +900,7 @@ async function smoke(file) {
       // first contact: the page over the hotspot (192.168.4.1) with no uplink
       const fr = view(states.nonet, '192.168.4.1');
       const frb = fr['#hbn'] || [];
-      if (frb.length !== 1 || cls(frb[0]) !== 'bn acc setup' || !/Step 1: connect the box to the venue network/.test(texts(frb)))
+      if (frb.length !== 1 || cls(frb[0]) !== 'bn acc setup' || !/Step 1: connect the dock to the venue network/.test(texts(frb)))
         errs.push(`Home first contact: the banner ${frb.map(cls)} ${texts(frb)}`);
       const frBtns = find(frb, (x) => x.tag === 'button').map(texts);
       if (frBtns.join() !== 'Set up Wi-Fi,Open Ethernet') errs.push(`Home first contact: buttons ${frBtns}`);
@@ -941,26 +941,26 @@ async function smoke(file) {
       ctx.h = (tag, attrs, ...kids) => ({ tag, attrs: attrs || {}, kids: kids.flat(Infinity).filter((k) => k != null && k !== false) });
       ctx.ic = (name) => ({ icon: name });
       let r = rows(states.satellite);   // closed on both
-      if (r.length !== 2 || r[0].btns !== 'Show box menu/ghost sm/mtCL1' || r[1].btns !== 'Show box menu/ghost sm/mtMINI1' || r[0].pill || r[1].pill)
+      if (r.length !== 2 || r[0].btns !== 'Show dock menu/ghost sm/mtCL1' || r[1].btns !== 'Show dock menu/ghost sm/mtMINI1' || r[0].pill || r[1].pill)
         errs.push(`Home box menu, closed: ${JSON.stringify(r.map((x) => [x.model, x.pill, x.btns]))}`);
       r = rows(states.mtopen);   // open on the XL: its row marked, the same focus key; the Mini untouched
-      if (r[0].pill !== 'pill acc:Box menu' || r[0].btns !== 'Close menu/ghost sm/mtCL1' || r[1].btns !== 'Show box menu/ghost sm/mtMINI1' || r[1].pill)
+      if (r[0].pill !== 'pill acc:Dock menu' || r[0].btns !== 'Close menu/ghost sm/mtCL1' || r[1].btns !== 'Show dock menu/ghost sm/mtMINI1' || r[1].pill)
         errs.push(`Home box menu, open on one: ${JSON.stringify(r.map((x) => [x.model, x.pill, x.btns]))}`);
       r = rows(pedal);   // the Pedal: no control
-      if (r.length !== 3 || r[2].model !== 'Stream Deck Pedal' || !r[2].cell || r[2].cell.kids.length || r[0].btns !== 'Show box menu/ghost sm/mtCL1')
+      if (r.length !== 3 || r[2].model !== 'Stream Deck Pedal' || !r[2].cell || r[2].cell.kids.length || r[0].btns !== 'Show dock menu/ghost sm/mtCL1')
         errs.push(`Home box menu, a deck without a screen: ${JSON.stringify(r.map((x) => [x.model, x.pill, x.btns]))}`);
       const lbl = find(view(states.mtopen)['#decks'], (x) => x.tag === 'button').map((x) => x.attrs['aria-label']).join();
-      if (lbl !== 'Close the box menu on Stream Deck XL,Show the box menu on Stream Deck Mini') errs.push(`Home box menu: the buttons' names ${lbl}`);
+      if (lbl !== 'Close the dock menu on Stream Deck XL,Show the dock menu on Stream Deck Mini') errs.push(`Home box menu: the buttons' names ${lbl}`);
       const banner = (st) => { const b = view(st)['#hbn'] || []; return `${b.map(cls)}:${texts(b)}:${find(b, (x) => x.tag === 'button').map((x) => x.attrs['data-k'])}`; };
       let bn = banner(states.mtopen);
-      if (bn !== 'bn acc bw:Box menu open on Stream Deck XL. Companion gets the deck back when you close it.|Close menu:mtall') errs.push(`Home box menu banner, one deck: ${bn}`);
+      if (bn !== 'bn acc bw:Dock menu open on Stream Deck XL. Companion gets the deck back when you close it.|Close menu:mtall') errs.push(`Home box menu banner, one deck: ${bn}`);
       bn = banner(Object.assign({}, states.mtopen, { decks: states.mtopen.decks.map((d) => Object.assign({}, d, { menu: true })) }));
-      if (bn !== 'bn acc bw:Box menu open on 2 decks. Companion gets each deck back when you close its menu.|Close all:mtall') errs.push(`Home box menu banner, two decks: ${bn}`);
-      if (/Box menu open/.test(banner(states.satellite))) errs.push('Home box menu banner with none open');
+      if (bn !== 'bn acc bw:Dock menu open on 2 decks. Companion gets each deck back when you close its menu.|Close all:mtall') errs.push(`Home box menu banner, two decks: ${bn}`);
+      if (/Dock menu open/.test(banner(states.satellite))) errs.push('Home box menu banner with none open');
       const idx = fs.readFileSync(file, 'utf8') /* the copy being checked (stripped or source) */;
       // Device: the message on the decks, no box menu control (on Home; the gesture setting is Device's)
       const dev = String(vm.runInContext('PAGES.device', ctx));
-      if (!/panel\('Message on the decks',\[h\('p'/.test(dev) || /show box menu|close menu|box menu open|mtToggle|mtbox|renderMt/i.test(dev) || /mtbox|renderMt|LIVE\.device/.test(idx))
+      if (!/panel\('Message on the decks',\[h\('p'/.test(dev) || /show dock menu|close menu|dock menu open|mtToggle|mtbox|renderMt/i.test(dev) || /mtbox|renderMt|LIVE\.device/.test(idx))
         errs.push('Device: the box menu is still there, or no "Message on the decks" panel');
       if (!/keepFocus\(\$\('#hbn'\)/.test(idx) || !/keepFocus\(\$\('#chain'\)/.test(idx) || !/keepFocus\(\$\('#decks'\)/.test(idx)) errs.push('a live redraw does not keep the focus');
       // opening asks first when Companion drives that deck; closing, or no Companion, doesn't
@@ -974,14 +974,14 @@ async function smoke(file) {
         return { asked, sent };
       };
       let t = await run(states.satellite, 1, true, false);
-      if (!t.asked || t.asked.title !== 'Show the box menu on Stream Deck Mini?' || t.asked.ok !== 'Show the box menu' || !/Companion loses \|Stream Deck Mini/.test(texts(t.asked.body)) || t.sent.length)
+      if (!t.asked || t.asked.title !== 'Show the dock menu on Stream Deck Mini?' || t.asked.ok !== 'Show the dock menu' || !/Companion loses \|Stream Deck Mini/.test(texts(t.asked.body)) || t.sent.length)
         errs.push(`box menu with Companion connected: asked ${t.asked && t.asked.title}, sent ${t.sent}`);
       t = await run(states.satellite, 0, true, true);
       if (!t.sent.includes('Deck.ShowMaintenance{"on":true,"serial":"CL1"}')) errs.push(`box menu confirmed: sent ${t.sent}`);
       t = await run(states.choose, 0, true, false);   // Companion not connected: no question
       if (t.asked || !t.sent.includes('Deck.ShowMaintenance{"on":true,"serial":"CL1"}')) errs.push(`box menu without Companion: asked ${!!t.asked}, sent ${t.sent}`);
       t = await run(states.dock, 0, true, false);   // dock mode: CL1's dock has Companion, the Mini's deck no dock
-      if (!t.asked || t.asked.title !== 'Show the box menu on Stream Deck XL?' || t.sent.length) errs.push(`box menu, dock mode, CL1: asked ${!!t.asked}, sent ${t.sent}`);
+      if (!t.asked || t.asked.title !== 'Show the dock menu on Stream Deck XL?' || t.sent.length) errs.push(`box menu, dock mode, CL1: asked ${!!t.asked}, sent ${t.sent}`);
       t = await run(states.dock, 1, true, false);
       if (t.asked || !t.sent.includes('Deck.ShowMaintenance{"on":true,"serial":"MINI1"}')) errs.push(`box menu, dock mode, MINI1: asked ${!!t.asked}, sent ${t.sent}`);
       t = await run(states.mtopen, 0, false, false);   // closing a deck: no question
@@ -1010,7 +1010,7 @@ async function smoke(file) {
         return find(shown, (x) => x.tag === 'section' && /Stream Decks/.test(texts(find(x, (y) => y.tag === 'h2')[0] || '')))[0];
       };
       let pn = await panelAt(2);
-      if (!pn || texts(find(pn, (x) => x.tag === 'p')[0]) !== "Up to 2 Stream Decks: the box's power over Ethernet is sized for 2."
+      if (!pn || texts(find(pn, (x) => x.tag === 'p')[0]) !== "Up to 2 Stream Decks: the dock's power over Ethernet is sized for 2."
           || find(pn, (x) => x.tag === 'button').map(texts).join() !== 'Allow up to 4 decks…')
         errs.push(`Device deck limit at 2: ${pn && texts(pn)}`);
       pn = await panelAt(4);
@@ -1028,14 +1028,14 @@ async function smoke(file) {
       let t = await run(4, false, true);
       const paras = t.asked ? find(t.asked.body, (x) => x.tag === 'p').map((x) => texts(x).replace(/\|/g, '')) : [];
       if (!t.asked || t.asked.title !== 'Allow up to 4 Stream Decks?' || t.asked.ok !== 'Allow 4 and restart' || t.asked.no !== 'Keep 2'
-          || !/danger|warn/.test(t.asked.kind || 'warn') || paras.join(' ') !== 'The box powers its USB port from Power over Ethernet, which is sized for 2 Stream Decks. '
-            + 'With more, the decks can drop out or the box can restart. A powered USB hub gives the extra decks their own power. You enable this at your own risk. The box restarts.'
+          || !/danger|warn/.test(t.asked.kind || 'warn') || paras.join(' ') !== 'The dock powers its USB port from Power over Ethernet, which is sized for 2 Stream Decks. '
+            + 'With more, the decks can drop out or the dock can restart. A powered USB hub gives the extra decks their own power. You enable this at your own risk. The dock restarts.'
           || t.sent.length)
         errs.push(`deck limit 4: asked ${t.asked && JSON.stringify([t.asked.title, t.asked.ok, t.asked.no, t.asked.kind, paras])}, sent ${t.sent}`);
       t = await run(4, true, true);
       if (t.sent.join() !== 'Device.SetConfig{"deckLimit":4}' || !t.flow) errs.push(`deck limit 4 confirmed: sent ${t.sent}, restart ${t.flow}`);
       t = await run(2, true, true);
-      if (!t.asked || t.asked.title !== 'Back to 2 Stream Decks?' || !/restart/.test(t.asked.ok) || t.asked.no || !/The box restarts/.test(texts(t.asked.body))
+      if (!t.asked || t.asked.title !== 'Back to 2 Stream Decks?' || !/restart/.test(t.asked.ok) || t.asked.no || !/The dock restarts/.test(texts(t.asked.body))
           || t.sent.join() !== 'Device.SetConfig{"deckLimit":2}' || !t.flow)
         errs.push(`deck limit back to 2: asked ${t.asked && t.asked.title}, sent ${t.sent}, restart ${t.flow}`);
       const idx = fs.readFileSync(file, 'utf8') /* the copy being checked (stripped or source) */;
@@ -1130,7 +1130,7 @@ async function smoke(file) {
       if (!/did not finish/.test(texts(d.shown[d.shown.length - 1]))) errs.push('scanWifi should say the box did not finish');
       d = await drive([new Error('no Wi-Fi: the C6 does not answer')]);
       if (d.shown.length !== 2 || !/Scan failed: no Wi-Fi/i.test(texts(d.shown[1]))) errs.push('scanWifi should show the error of a failed start');
-      d = await drive([{ scanning: true }, new Error('no answer from the box')]);
+      d = await drive([{ scanning: true }, new Error('no answer from the dock')]);
       if (!/Scan failed: no answer/i.test(texts(d.shown[d.shown.length - 1]))) errs.push('scanWifi should show the error of a failed poll');
       d = await drive([{ scanning: true }, 'leave']); // the page changed meanwhile: nothing is drawn over the new one
       if (d.shown.length !== 1) errs.push(`scanWifi drew ${d.shown.length - 1} times after the page changed`);
@@ -1261,7 +1261,7 @@ async function smoke(file) {
       if (w.join() !== 'width:62.5%,width:3%') errs.push(`perf CPU bars: ${w}`);
       const et = texts(d.eth);
       if (!/Broadcast storms\|Blocked now\| \|3$/.test(et)) errs.push(`perf: a storm under way is not said: ${et}`);
-      if (!/To the box\|300 \(100\/s\)/.test(et) || !/Dropped: no use\|9,000 \(4,000\/s\)/.test(et)) errs.push(`perf Ethernet rates: ${et}`);
+      if (!/To the dock\|300 \(100\/s\)/.test(et) || !/Dropped: no use\|9,000 \(4,000\/s\)/.test(et)) errs.push(`perf Ethernet rates: ${et}`);
       const bad = find(d.eth, (x) => /\bpill bad\b/.test(x.attrs.class || ''));
       if (bad.length !== 1 || texts(bad[0]) !== '7 (4/s)') errs.push(`perf: the EMAC's losses are not marked (${bad.map(texts)})`);
       const names = find(d.tasks, (x) => x.tag === 'tr').map((r) => texts(r.kids[0]));

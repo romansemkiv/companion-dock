@@ -127,7 +127,7 @@ static void menu_buttons(dui_screen_t *s, const dui_box_t *b, bool as_group)
         {DUI_ICON_NET, "Network", DUI_A_GO_NETWORK},
         {DUI_ICON_COMPANION, "Companion", DUI_A_GO_COMPANION}, /* the webhooks logo */
         {DUI_ICON_HOTSPOT, "Hotspot", DUI_A_GO_HOTSPOT},
-        {DUI_ICON_CIRCUITRY, "Box", DUI_A_GO_BOX}, /* Phosphor's Circuitry (the nine-dot logo is the web page's) */
+        {DUI_ICON_CIRCUITRY, "Dock", DUI_A_GO_BOX}, /* Phosphor's Circuitry (the nine-dot logo is the web page's) */
     };
     const int dot[4] = {DUI_STATE_NONE, HOME[home_state(b)].state, b->net.ap_on ? DUI_STATE_OK : DUI_STATE_NONE,
                         slot_attention(b) ? DUI_STATE_WAIT : DUI_STATE_NONE};
@@ -261,7 +261,7 @@ void dui_build_home(dui_screen_t *s, const dui_box_t *b)
     case H_DOCK:
         dui_group(s, DUI_ZONE_MAIN, 0);
         dui_step(s, 1, "Add", "remote surface");
-        dui_ipv4(s, "Box IP", box_ip(b));
+        dui_ipv4(s, "Dock IP", box_ip(b));
         port(s, b->dock.port);
         break;
     case H_NODOCK: { /* today's hint, one key ("Max 2" / "decks"), and what to do; the
@@ -275,7 +275,7 @@ void dui_build_home(dui_screen_t *s, const dui_box_t *b)
     }
     case H_FINDING:
         dui_group(s, DUI_ZONE_MAIN, 0);
-        dui_ipv4(s, "Box IP", box_ip(b));
+        dui_ipv4(s, "Dock IP", box_ip(b));
         dui_spin(s);
         dui_word(s, "Searching", DUI_ROLE_LABEL);
         break;
@@ -674,7 +674,7 @@ static void other_slot(dui_screen_t *s, const dui_box_t *b)
 
 void dui_build_box(dui_screen_t *s, const dui_box_t *b)
 {
-    sub_screen(s, b, "Box");
+    sub_screen(s, b, "Dock");
     char up[16], bright[8];
     uptime(up, sizeof up, b->box.uptime_s);
     dui_group(s, DUI_ZONE_MAIN, 0);

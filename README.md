@@ -32,8 +32,8 @@ web page.
   Satellite API: Companion finds the box and adds every deck by itself.
 - **Every current USB Stream Deck**: Original, MK.2, Mini, XL, Module 6, 15 and 32, Stream Deck +, + XL, Neo
   and the Pedal. Each deck keeps its Companion page across replugs and reboots (it is known by its serial).
-- **A box menu on the decks.** While Companion isn't driving a deck, the deck shows the box's own screens: the
-  state, the box's address, Network, Companion, Hotspot and Box settings, with holds for anything that restarts
+- **A dock menu on the decks.** While Companion isn't driving a deck, the deck shows the box's own screens: the
+  state, the box's address, Network, Companion, Hotspot and Dock settings, with holds for anything that restarts
   or cuts people off. A [key gesture](#4-open-the-box-menu-on-a-deck) or the web page opens the menu over
   Companion too.
 - **A web page** for status, settings, firmware updates, the log and a live performance view (CPU, memory, tasks,
@@ -49,7 +49,7 @@ web page.
   opens them.
 - **Companion's Discover** can point a PIN-locked box at itself in Satellite mode (this can be switched off).
 - **A speaker and a status light.** The board's speaker chimes when the box is ready and when Companion connects,
-  and clicks on key presses; one NeoPixel shows the state in colour. *Find my box* beeps and blinks.
+  and clicks on key presses; one NeoPixel shows the state in colour. *Find my dock* beeps and blinks.
 
 ## Hardware and cost
 
@@ -111,8 +111,8 @@ assembly and wiring are in [case/](case/README.md).
 | Home, opened on demand while Companion is connected | No network yet: QR codes to join the hotspot and open the setup page |
 | ![Module 32, Network screen](docs/images/deck-module32-network.png) | ![Module 32, Companion screen in Satellite mode](docs/images/deck-module32-companion.png) |
 | Network: Ethernet, primary and backup Wi-Fi on a fixed key map | Companion in Satellite mode, with *Set IP* and *Auto find* |
-| ![Module 32, Box screen](docs/images/deck-module32-box.png) | ![Module 32, PIN pad](docs/images/deck-module32-pin.png) |
-| Box: version, firmware slots, brightness, sound, restart | The PIN pad for locked keys |
+| ![Module 32, Dock screen](docs/images/deck-module32-box.png) | ![Module 32, PIN pad](docs/images/deck-module32-pin.png) |
+| Dock: version, firmware slots, brightness, sound, restart | The PIN pad for locked keys |
 | ![XL, static address editor](docs/images/deck-xl-static-ip.png) | ![Stream Deck +, home with the status on the touch strip](docs/images/deck-plus-home.png) |
 | XL: typing a static IP address | Stream Deck +: the status on the touch strip |
 | ![Stream Deck Mini, home](docs/images/deck-mini-home.png) | |
@@ -125,7 +125,7 @@ assembly and wiring are in [case/](case/README.md).
 | ![Web page, Companion](docs/images/web-companion.png) | ![Web page, Wi-Fi with three cards](docs/images/web-wifi.png) |
 | Companion: the mode and how to find Companion | Wi-Fi: state, primary and backup networks |
 | ![Web page, Device](docs/images/web-device.png) | ![Web page, Firmware](docs/images/web-firmware.png) |
-| Device: Find my box, deck limit, messages, box name and PIN | Firmware: upload, both slots, the recovery copy |
+| Device: Find my dock, deck limit, messages, dock name and PIN | Firmware: upload, both slots, the recovery copy |
 | ![Web page, no network](docs/images/web-no-network.png) | ![Web page on a phone, light theme](docs/images/web-home-phone-light.png) |
 | First contact over the hotspot, before any network is set up | On a phone, light theme |
 
@@ -181,7 +181,7 @@ The web page is at `http://<box IP>/` or `http://companiondock-xxxx.local/`.
   appear by themselves. With several, pick one on the web page or on the deck. *Surfaces → Discover* in Companion
   also finds the box.
 
-### 4. Open the box menu on a deck
+### 4. Open the dock menu on a deck
 
 While Companion drives a deck, the box's own menu is one gesture away, on that deck: its address, the network,
 Companion, the hotspot and the box's settings.
@@ -195,7 +195,7 @@ Companion, the hotspot and the box's settings.
    clicks and its menu opens on that deck.
 
 <p align="center">
-  <img src="docs/images/deck-mk2-box-menu.png" alt="The box menu on a 15-key Stream Deck: a Close key at the top-left, Connected, the box's IP address and port, and the Network, Companion, Hotspot and Box keys" width="46%">
+  <img src="docs/images/deck-mk2-box-menu.png" alt="The dock menu on a 15-key Stream Deck: a Close key at the top-left, Connected, the box's IP address and port, and the Network, Companion, Hotspot and Dock keys" width="46%">
 </p>
 
 Companion stays connected meanwhile. **✕** at the top-left closes the menu, and so does leaving it alone for 60
@@ -204,7 +204,7 @@ keys of its right column.
 
 Other ways to open it:
 
-- the web page: **Home → Show box menu** next to the deck;
+- the web page: **Home → Show dock menu** next to the deck;
 - a short press of the [service key](docs/manual.md#service-key), which opens it on the biggest deck.
 
 The gesture's keys, taps and hold time can be changed, or the gesture turned off, on the web page's **Device** page.
@@ -246,7 +246,7 @@ components/usbdeck/   USB host, hubs, raw HID decks, recovery from stuck decks
 components/deckmodel/ the deck models: geometry, image format, controls
 components/deckproto/ Stream Deck HID reports
 components/deckui/    the deck screens: layout per model, drawing, icons, QR codes, navigation
-components/surfaces/  decks to Companion: images, input, messages, the box menu
+components/surfaces/  decks to Companion: images, input, messages, the dock menu
 components/webui/     HTTP server, WebSocket, JSON-RPC methods, the web page (www/index.html)
 components/slotsync/  the recovery slot
 components/feedback/  speaker and status light

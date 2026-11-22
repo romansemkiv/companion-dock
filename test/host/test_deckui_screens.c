@@ -210,7 +210,7 @@ static void test_home_dock_waiting(void)
 {
     dui_box_t b = box_default();
     build(DUI_PAGE_HOME, &b);
-    TEST_ASSERT_EQUAL_STRING("#1 Add|Box IP:192|168|8|225|Port:5343 / " HOTSPOT, content(&S));
+    TEST_ASSERT_EQUAL_STRING("#1 Add|Dock IP:192|168|8|225|Port:5343 / " HOTSPOT, content(&S));
     TEST_ASSERT_EQUAL_STRING("remote surface", find(&S, NULL, "Add")->caption);
     TEST_ASSERT_EQUAL_STRING("Waiting for Companion", words(&S, false));
     TEST_ASSERT_EQUAL_STRING("Waiting", words(&S, true));
@@ -222,18 +222,18 @@ static void test_home_dock_waiting(void)
     strcpy(b.net.eth_ip, "10.0.0.7");
     b.net.eth_link = true;
     build(DUI_PAGE_HOME, &b);
-    TEST_ASSERT_EQUAL_STRING("#1 Add|Box IP:10|0|0|7|Port:5343 / " HOTSPOT, content(&S));
+    TEST_ASSERT_EQUAL_STRING("#1 Add|Dock IP:10|0|0|7|Port:5343 / " HOTSPOT, content(&S));
     TEST_ASSERT_EQUAL(DUI_NET_ETH, S.status.net);
     /* an open hotspot: "Open" for the password; off: no service zone */
     b = box_default();
     b.net.ap_secured = false;
     b.net.ap_pass[0] = '\0';
     build(DUI_PAGE_HOME, &b);
-    TEST_ASSERT_EQUAL_STRING("#1 Add|Box IP:192|168|8|225|Port:5343 / ^S Hotspot:CompanionDock-8D1C|Open|QR", content(&S));
+    TEST_ASSERT_EQUAL_STRING("#1 Add|Dock IP:192|168|8|225|Port:5343 / ^S Hotspot:CompanionDock-8D1C|Open|QR", content(&S));
     TEST_ASSERT_EQUAL(DUI_ROLE_LABEL, find(&S, NULL, "Open")->role);
     b.net.ap_on = false;
     build(DUI_PAGE_HOME, &b);
-    TEST_ASSERT_EQUAL_STRING("#1 Add|Box IP:192|168|8|225|Port:5343", content(&S));
+    TEST_ASSERT_EQUAL_STRING("#1 Add|Dock IP:192|168|8|225|Port:5343", content(&S));
     TEST_ASSERT_FALSE(S.status.hotspot);
 }
 
@@ -456,7 +456,7 @@ static void test_home_satellite_states(void)
 {
     dui_box_t b = sat(DUI_SAT_FINDING);
     build(DUI_PAGE_HOME, &b);
-    TEST_ASSERT_EQUAL_STRING("Box IP:192|168|8|225|*|Searching / " HOTSPOT, content(&S));
+    TEST_ASSERT_EQUAL_STRING("Dock IP:192|168|8|225|*|Searching / " HOTSPOT, content(&S));
     TEST_ASSERT_EQUAL_STRING("Finding Companion", words(&S, false));
     TEST_ASSERT_EQUAL(DUI_STATE_WAIT, S.status.state);
 
@@ -926,27 +926,27 @@ static void test_menu_buttons_and_dots(void)
     TEST_ASSERT_EQUAL(DUI_A_GO_NETWORK, menu_button(&S, "Network")->action);
     TEST_ASSERT_EQUAL(DUI_A_GO_COMPANION, menu_button(&S, "Companion")->action);
     TEST_ASSERT_EQUAL(DUI_A_GO_HOTSPOT, menu_button(&S, "Hotspot")->action);
-    TEST_ASSERT_EQUAL(DUI_A_GO_BOX, menu_button(&S, "Box")->action);
-    TEST_ASSERT_EQUAL(DUI_ICON_CIRCUITRY, menu_button(&S, "Box")->icon); /* Phosphor's Circuitry */
+    TEST_ASSERT_EQUAL(DUI_A_GO_BOX, menu_button(&S, "Dock")->action);
+    TEST_ASSERT_EQUAL(DUI_ICON_CIRCUITRY, menu_button(&S, "Dock")->icon); /* Phosphor's Circuitry */
     TEST_ASSERT_EQUAL(DUI_STATE_NONE, menu_button(&S, "Network")->state);
     TEST_ASSERT_EQUAL(DUI_STATE_WAIT, menu_button(&S, "Companion")->state);
     TEST_ASSERT_EQUAL(DUI_STATE_OK, menu_button(&S, "Hotspot")->state);
-    TEST_ASSERT_EQUAL(DUI_STATE_NONE, menu_button(&S, "Box")->state);
+    TEST_ASSERT_EQUAL(DUI_STATE_NONE, menu_button(&S, "Dock")->state);
     b.net.ap_on = false;
     b.box.slot = DUI_SLOT_DIFFERS;
     b.dock.no_free = true;
     build(DUI_PAGE_HOME, &b);
     TEST_ASSERT_EQUAL(DUI_STATE_BAD, menu_button(&S, "Companion")->state);
     TEST_ASSERT_EQUAL(DUI_STATE_NONE, menu_button(&S, "Hotspot")->state);
-    TEST_ASSERT_EQUAL(DUI_STATE_WAIT, menu_button(&S, "Box")->state);
+    TEST_ASSERT_EQUAL(DUI_STATE_WAIT, menu_button(&S, "Dock")->state);
     /* the Menu screen: Back and the same four, the whole grid */
     build(DUI_PAGE_MENU, &b);
     TEST_ASSERT_TRUE(S.sub);
     TEST_ASSERT_TRUE(S.full);
     TEST_ASSERT_EQUAL_STRING("Menu", S.status.title[0]);
-    TEST_ASSERT_EQUAL_STRING("[Network]|[Companion]|[Hotspot]|[Box]", content(&S));
-    TEST_ASSERT_EQUAL(DUI_STATE_WAIT, button(&S, "Box")->state);
-    TEST_ASSERT_EQUAL(DUI_A_GO_BOX, button(&S, "Box")->action);
+    TEST_ASSERT_EQUAL_STRING("[Network]|[Companion]|[Hotspot]|[Dock]", content(&S));
+    TEST_ASSERT_EQUAL(DUI_STATE_WAIT, button(&S, "Dock")->state);
+    TEST_ASSERT_EQUAL(DUI_A_GO_BOX, button(&S, "Dock")->action);
 }
 
 /* ---- Network ---- */
@@ -1747,7 +1747,7 @@ static void test_box_slot_buttons(void)
             TEST_ASSERT_TRUE(t->flags & DUI_F_DANGER);
         }
         build(DUI_PAGE_HOME, &b); /* the Box menu button's amber dot: the slot needs attention */
-        TEST_ASSERT_EQUAL_MESSAGE(C[i].dot ? DUI_STATE_WAIT : DUI_STATE_NONE, menu_button(&S, "Box")->state, msg);
+        TEST_ASSERT_EQUAL_MESSAGE(C[i].dot ? DUI_STATE_WAIT : DUI_STATE_NONE, menu_button(&S, "Dock")->state, msg);
     }
     /* no version read: the state in words */
     dui_box_t b = box_default();
