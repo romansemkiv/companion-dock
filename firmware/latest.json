@@ -2,9 +2,9 @@
   "version": "0.2.9",
   "date": "2026-11-22",
   "full": "companion-dock-v0.2.9-full.bin",
-  "full_size": 3352576,
-  "full_sha256": "2196de26f756d77ba3a17133844cf4ca403dba4b046dc0c9945f06ef06bbde82",
+  "full_size": 3352656,
+  "full_sha256": "ff2ff31fe7aa6bd5a0e43a4bc5024f5ac599afaed5b3b3f50f4a424c2dd18a4d",
   "app": "companion-dock-v0.2.9.bin",
-  "app_size": 3221504,
-  "app_sha256": "e9bd00d224dea0a6f3aae403120d4b2be4a32da07d1b1ec41368b2c13718b764"
+  "app_size": 3221584,
+  "app_sha256": "39f5d9045304a1a508e13861d8f3136df7bf38d2b6ca6bd603aa7f4ef91f2d68"
 }
