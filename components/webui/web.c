@@ -61,6 +61,8 @@ static char s_etag[24]; /* "<app ELF SHA-256 prefix>": new with every build */
 #define MAX_WS WST_MAX
 #define WS_SEND_TIMEOUT_S 2 /* a push to one client may hold up the server task this long */
 #define WS_FRAME_MAX 8192
+#define WS_RECV_POLL_MS 250 /* a WebSocket's receive wakes this often to look at the frame's deadline */
+#define WS_FRAME_DEADLINE_US (2 * 1000000LL) /* a frame (<= 8 KB), once begun, must be in within this */
 #define BODY_MAX 16384
 #define RECV_TIMEOUT_S 5     /* one receive may wait this long (IDF's default) */
 #define BODY_DEADLINE_US (5 * 1000000LL) /* a whole request body (<= 16 KB) must arrive within this */
@@ -495,6 +497,27 @@ static void ws_close(wst_slot_t *w)
     else if (e != ESP_OK) shutdown(w->fd, SHUT_RDWR);
 }
 
+/* A WebSocket's receive (ws_pre_handshake). httpd_ws_recv_frame reads a frame's header and payload with one receive
+ * after another, each waiting the socket's whole timeout (5 s) and none counting the time gone: anyone on the network,
+ * no sign-in needed, could declare an 8 KB frame and send a byte every few seconds, and hold the server's only task
+ * for hours. Here the receives of one frame share a deadline, set by h_ws when the frame begins: a wait that ends
+ * empty (WS_RECV_POLL_MS) is taken up again until then, so a frame that comes in parts loses nothing, and past it the
+ * receive fails, httpd_ws_recv_frame with it, and the socket is closed. Outside h_ws (httpd's own read of a frame's
+ * first byte, and of a PING or CLOSE it answers itself) the deadline is the last frame's, past or nearly: one short
+ * wait a receive. */
+static int64_t s_ws_rx_deadline; /* server task only */
+
+static int ws_recv(httpd_handle_t hd, int fd, char *buf, size_t n, int flags)
+{
+    (void)hd;
+    for (;;) {
+        const int r = recv(fd, buf, n, flags);
+        if (r >= 0) return r;
+        if (errno != EAGAIN && errno != EINTR) return HTTPD_SOCK_ERR_FAIL;
+        if (esp_timer_get_time() > s_ws_rx_deadline) return HTTPD_SOCK_ERR_TIMEOUT;
+    }
+}
+
 /* Before the 101 reply (IDF calls the URI handler only for frames, never for the handshake). The
  * upgrade needs no credentials (browsers cannot add headers to it), but it must come from this box's
  * own page or a non-browser client; ESP_FAIL closes the socket. */
@@ -513,6 +536,10 @@ static esp_err_t ws_pre_handshake(httpd_req_t *req)
     /* pushes run on the one server task: a client that stops reading holds it up this long */
     const struct timeval tv = {.tv_sec = WS_SEND_TIMEOUT_S};
     setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof tv);
+    /* and a frame is read by a deadline (ws_recv) */
+    const struct timeval rtv = {.tv_usec = WS_RECV_POLL_MS * 1000};
+    setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &rtv, sizeof rtv);
+    httpd_sess_set_recv_override(req->handle, fd, ws_recv);
     char tok[TOKEN_CAP];
     if (bearer(req, tok, sizeof tok)) ws_sign_in(w, tok);
     notify_kick();
@@ -565,6 +592,7 @@ static esp_err_t h_ws(httpd_req_t *req)
 {
     const int fd = httpd_req_to_sockfd(req);
     httpd_ws_frame_t f = {0};
+    s_ws_rx_deadline = esp_timer_get_time() + WS_FRAME_DEADLINE_US; /* for the header and the payload (ws_recv) */
     esp_err_t e = httpd_ws_recv_frame(req, &f, 0);
     if (e != ESP_OK) return e;
     if (f.type == HTTPD_WS_TYPE_CLOSE) {
