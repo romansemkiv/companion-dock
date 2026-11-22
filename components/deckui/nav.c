@@ -5,6 +5,8 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "dui_int.h"
+
 static void clear(dui_nav_out_t *o) { memset(o, 0, sizeof *o); }
 
 static uint64_t bit(const dui_nav_t *n, int col, int row) { return 1ull << (row * n->cols + col); }
@@ -117,6 +119,18 @@ void dui_nav_init(dui_nav_t *n, const dui_deck_t *d, int64_t now)
     no_held(n);
 }
 
+/* Who a choice key (DUI_A_PICK*) stands for: its words, the Companion's name and its address. Its action is only
+ * its place in the list, which another Companion takes when one goes. 0 for every other key. */
+static uint32_t pick_of(const dui_tile_t *t)
+{
+    if (t->action < DUI_A_PICK0 || t->action > DUI_A_PICK5) return 0;
+    uint32_t h = DUI__FNV_BASIS;
+    if (t->text) h = dui__fnv(h, t->text, t->len ? t->len : strlen(t->text));
+    h = dui__fnv(h, "", 1); /* the name's end: "ab" + "c" is not "a" + "bc" */
+    if (t->caption) h = dui__fnv(h, t->caption, strlen(t->caption));
+    return h;
+}
+
 void dui_nav_layout(dui_nav_t *n, const dui_layout_t *L)
 {
     n->pages = L->pages ? L->pages : 1;
@@ -125,7 +139,7 @@ void dui_nav_layout(dui_nav_t *n, const dui_layout_t *L)
     dui_tile_t t; /* the held key's tile changed (the box changed under it): it no longer counts */
     dui_layout_key(L, n->pg, n->held.col, n->held.row, &t);
     if (t.kind != n->held.kind || t.action != n->held.action || t.hold_ms != n->held.hold_ms ||
-        ((t.flags ^ n->held.flags) & DUI_F_LOCKED))
+        ((t.flags ^ n->held.flags) & DUI_F_LOCKED) || pick_of(&t) != n->held.pick)
         n->held.ignore = true;
 }
 
@@ -175,6 +189,7 @@ void dui_nav_key(dui_nav_t *n, const dui_layout_t *L, int col, int row, bool dow
     n->held.action = t.action;
     n->held.hold_ms = t.hold_ms;
     n->held.flags = t.flags;
+    n->held.pick = pick_of(&t);
     if (has && (t.kind == DUI_TILE_BUTTON || t.kind == DUI_TILE_PAGER || (t.kind == DUI_TILE_IND && t.action))) {
         if (t.flags & DUI_F_LOCKED) { /* locked; its release opens the PIN pad */
             out->sound = DUI_SOUND_CLICK;

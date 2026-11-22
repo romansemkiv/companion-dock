@@ -717,6 +717,66 @@ static void test_mini_choose_pages_by_hand(void)
     TEST_ASSERT_EQUAL(DUI_A_PICK0 + 2, R.action[0]);
 }
 
+/* A choice held while the list moves under it (a Companion gone from mDNS): the key now stands for another
+ * Companion with the same action (its place in the list), and its release picks nobody. The same Companion
+ * still on the key after a change elsewhere: picked. */
+static void test_choice_held_while_the_list_moves_picks_nobody(void)
+{
+    dui_box_t b = box_default();
+    b.mode = DUI_MODE_SAT;
+    b.sat.state = DUI_SAT_CHOOSE;
+    b.sat.ncomps = 3;
+    strcpy(b.sat.comp[2].name, "Edit-Bay");
+    strcpy(b.sat.comp[2].ip, "192.168.8.61");
+    rig(PID_M32, b);
+    int c, r;
+    TEST_ASSERT_TRUE(find_label("FOH-PC", &c, &r));
+    key(c, r, true);
+    R.now += 100;
+    R.b.sat.comp[0] = R.b.sat.comp[1]; /* Studio-Mac went: FOH-PC and Edit-Bay move up */
+    R.b.sat.comp[1] = R.b.sat.comp[2];
+    R.b.sat.ncomps = 2;
+    dui_nav_out_t o;
+    dui_nav_box_changed(&R.n, &o);
+    apply(&o);
+    dui_tile_t t;
+    TEST_ASSERT_TRUE(dui_layout_key(&R.L, dui_nav_pg(&R.n), c, r, &t));
+    TEST_ASSERT_EQUAL(DUI_A_PICK0 + 1, t.action); /* the same action on the held key ... */
+    TEST_ASSERT_EQUAL_STRING("Edit-Bay", t.text);  /* ... for another Companion */
+    R.now += 100;
+    key(c, r, false);
+    TEST_ASSERT_EQUAL(0, R.nact);
+    /* the next press picks what the key shows now */
+    R.now += 100;
+    tap(c, r);
+    TEST_ASSERT_EQUAL(1, R.nact);
+    TEST_ASSERT_EQUAL(DUI_A_PICK0 + 1, R.action[0]);
+
+    /* something else changed while it was held (the signal): the key is the same Companion's, picked */
+    rig(PID_M32, b);
+    TEST_ASSERT_TRUE(find_label("FOH-PC", &c, &r));
+    key(c, r, true);
+    R.now += 100;
+    R.b.net.rssi = -70;
+    dui_nav_box_changed(&R.n, &o);
+    apply(&o);
+    R.now += 100;
+    key(c, r, false);
+    TEST_ASSERT_EQUAL(1, R.nact);
+    TEST_ASSERT_EQUAL(DUI_A_PICK0 + 1, R.action[0]);
+
+    /* the same name at another address is another Companion */
+    rig(PID_M32, b);
+    TEST_ASSERT_TRUE(find_label("FOH-PC", &c, &r));
+    key(c, r, true);
+    strcpy(R.b.sat.comp[1].ip, "192.168.8.41");
+    dui_nav_box_changed(&R.n, &o);
+    apply(&o);
+    R.now += 100;
+    key(c, r, false);
+    TEST_ASSERT_EQUAL(0, R.nact);
+}
+
 /* + : dial turn = page +/- n, press = Back. Neo: the touch keys. */
 static void test_dials_and_touch_keys(void)
 {
@@ -1128,6 +1188,7 @@ int main(void)
     RUN_TEST(test_choose_page_picks);
     RUN_TEST(test_pager_wraps);
     RUN_TEST(test_tap_to_page_on_the_mini);
+    RUN_TEST(test_choice_held_while_the_list_moves_picks_nobody);
     RUN_TEST(test_dials_and_touch_keys);
     RUN_TEST(test_idle_goes_home);
     RUN_TEST(test_idle_closes_on_demand);
