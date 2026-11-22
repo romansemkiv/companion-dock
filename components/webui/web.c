@@ -66,9 +66,10 @@ static char s_etag[24]; /* "<app ELF SHA-256 prefix>": new with every build */
 #define BODY_MAX 16384
 #define RECV_TIMEOUT_S 5     /* one receive may wait this long (IDF's default) */
 #define BODY_DEADLINE_US (5 * 1000000LL) /* a whole request body (<= 16 KB) must arrive within this */
-#define SEND_TIMEOUT_S 2      /* one send may wait this long: what a client that vanished costs the server task */
+#define SEND_TIMEOUT_S 5      /* one send may wait this long: what a client that vanished costs the server task; 2 s
+                               * cut a page off on a weak Wi-Fi link (a lost segment sent again twice is 3 s) */
 #define SEND_PIECE 4096       /* a longer reply goes out in pieces of this size, each within SEND_TIMEOUT_S... */
-#define REPLY_DEADLINE_US (15 * 1000000LL) /* ...and all of it within this */
+#define REPLY_DEADLINE_US (20 * 1000000LL) /* ...and all of it within this */
 #define OTA_STALL_TIMEOUTS 3 /* OTA: consecutive receive timeouts (5 s each) before giving up */
 #define OTA_MIN_BYTES_PER_S 8192 /* OTA: overall deadline 30 s + size at this rate (slow-trickle guard) */
 #define TOKEN_CAP 72
