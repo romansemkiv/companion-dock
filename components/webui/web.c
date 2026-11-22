@@ -18,6 +18,7 @@
  * WebSocket table needs no lock; web_ws_listening is a plain counter. A firmware upload is the exception: it runs on
  * its own task (ota_task), and the OTA state is shared under s_ota_mux. */
 #include <ctype.h>
+#include <errno.h>
 #include <stdatomic.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -63,6 +64,9 @@ static char s_etag[24]; /* "<app ELF SHA-256 prefix>": new with every build */
 #define BODY_MAX 16384
 #define RECV_TIMEOUT_S 5     /* one receive may wait this long (IDF's default) */
 #define BODY_DEADLINE_US (5 * 1000000LL) /* a whole request body (<= 16 KB) must arrive within this */
+#define SEND_TIMEOUT_S 2      /* one send may wait this long: what a client that vanished costs the server task */
+#define SEND_PIECE 4096       /* a longer reply goes out in pieces of this size, each within SEND_TIMEOUT_S... */
+#define REPLY_DEADLINE_US (15 * 1000000LL) /* ...and all of it within this */
 #define OTA_STALL_TIMEOUTS 3 /* OTA: consecutive receive timeouts (5 s each) before giving up */
 #define OTA_MIN_BYTES_PER_S 8192 /* OTA: overall deadline 30 s + size at this rate (slow-trickle guard) */
 #define TOKEN_CAP 72
@@ -182,13 +186,51 @@ static bool cross_site(httpd_req_t *req)
                          hdr_get(req, "Host", host, sizeof host));
 }
 
+/* A socket's send from its first reply on (send_long): all of buf, or a failure. When SO_SNDTIMEO runs out
+ * midway, lwIP returns the bytes it wrote, and httpd sends the rest again for as long as each call writes anything:
+ * a client that left costs two timeouts, and one that takes a byte now and then holds the server's only task as long
+ * as it likes. A blocking send comes back short only when its time ran out, so that ends the reply. No state: the
+ * upload's task (ota_task) may reply on such a socket too. */
+static int send_whole(httpd_handle_t hd, int fd, const char *buf, size_t n, int flags)
+{
+    (void)hd;
+    const int r = send(fd, buf, n, flags);
+    if (r < 0) return errno == EAGAIN || errno == EINTR ? HTTPD_SOCK_ERR_TIMEOUT : HTTPD_SOCK_ERR_FAIL;
+    return (size_t)r == n ? r : HTTPD_SOCK_ERR_TIMEOUT;
+}
+
+/* The reply's body (status, type and headers are set): one of at most SEND_PIECE bytes as ever, with its
+ * Content-Length; a longer one (the page, a Log.Get) chunked, SEND_PIECE bytes at a time. It no longer fits the
+ * socket's send buffer, so httpd_resp_send would wait for the client, up to the send timeout for every part it gets
+ * out: a phone that left the Wi-Fi mid-page held the server task, the API and the pushes with it. Here a piece that
+ * isn't out within SEND_TIMEOUT_S ends the reply (send_whole), and so does REPLY_DEADLINE_US for all of it; a client
+ * reading slower than that is cut off, and the caller's ESP_FAIL closes the socket: it never takes the cut reply for
+ * a whole one. */
+static esp_err_t send_long(httpd_req_t *req, const char *p, size_t n)
+{
+    httpd_sess_set_send_override(req->handle, httpd_req_to_sockfd(req), send_whole);
+    if (n <= SEND_PIECE) return httpd_resp_send(req, p, (ssize_t)n);
+    const int64_t deadline = esp_timer_get_time() + REPLY_DEADLINE_US;
+    for (size_t left = n; left > 0;) {
+        const size_t k = left < SEND_PIECE ? left : SEND_PIECE;
+        if (esp_timer_get_time() > deadline || httpd_resp_send_chunk(req, p, (ssize_t)k) != ESP_OK) {
+            ESP_LOGW(TAG, "%.40s: the client stopped reading %u bytes before the end of %u: connection closed", req->uri,
+                     (unsigned)left, (unsigned)n);
+            return ESP_FAIL;
+        }
+        p += k;
+        left -= k;
+    }
+    return httpd_resp_send_chunk(req, NULL, 0);
+}
+
 static esp_err_t send_body(httpd_req_t *req, const char *status, const char *type, const char *body)
 {
     httpd_resp_set_status(req, status);
     httpd_resp_set_type(req, type);
     httpd_resp_set_hdr(req, "Cache-Control", "no-store");
     httpd_resp_set_hdr(req, "X-Content-Type-Options", "nosniff");
-    return httpd_resp_sendstr(req, body);
+    return send_long(req, body, strlen(body));
 }
 
 static esp_err_t send_json(httpd_req_t *req, const char *status, const char *body)
@@ -349,7 +391,7 @@ static esp_err_t h_index(httpd_req_t *req)
     }
     httpd_resp_set_type(req, "text/html; charset=utf-8");
     httpd_resp_set_hdr(req, "Content-Encoding", "gzip");
-    return httpd_resp_send(req, index_gz_start, index_gz_end - index_gz_start);
+    return send_long(req, index_gz_start, (size_t)(index_gz_end - index_gz_start));
 }
 
 /* ---------- JSON-RPC over HTTP ---------- */
@@ -1274,7 +1316,7 @@ esp_err_t web_start(void)
     c.max_open_sockets = 8;
     c.lru_purge_enable = true;
     c.recv_wait_timeout = RECV_TIMEOUT_S;
-    c.send_wait_timeout = 10;
+    c.send_wait_timeout = SEND_TIMEOUT_S;
     c.close_fn = on_close;
     esp_err_t e = httpd_start(&s_srv, &c);
     if (e != ESP_OK) {
