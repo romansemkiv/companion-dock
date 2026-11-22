@@ -33,6 +33,12 @@ sel_result_t discovery_select(const box_config_t *cfg, const companion_instance_
 bool discovery_pin_posted(box_config_t *cfg, const companion_instance_t *list, int n, const char *host,
                           uint16_t port);
 
+/* Pure. Which of a Companion's IPv4 addresses the box connects to (its PC may have several: a VPN, a
+ * virtual adapter): the first on the subnet (ip, mask) of the box's interface the mDNS answer came in on,
+ * else the first, as when the subnet is not known (ip or mask 0). All in one byte order. Returns its
+ * index; -1 when n is 0. */
+int discovery_pick_addr(const uint32_t *addrs, int n, uint32_t ip, uint32_t mask);
+
 #ifdef ESP_PLATFORM
 #include "esp_err.h"
 /* Starts mDNS (hostname and instance from the box name), then the _companion-satellite._tcp

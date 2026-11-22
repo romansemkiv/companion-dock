@@ -62,3 +62,11 @@ bool discovery_pin_posted(box_config_t *cfg, const companion_instance_t *list, i
     }
     return false;
 }
+
+int discovery_pick_addr(const uint32_t *addrs, int n, uint32_t ip, uint32_t mask)
+{
+    if (!addrs || n <= 0) return -1;
+    for (int i = 0; ip && mask && i < n; i++)
+        if ((addrs[i] & mask) == (ip & mask)) return i;
+    return 0;
+}
