@@ -18,6 +18,7 @@
  * WebSocket table needs no lock; web_ws_listening is a plain counter. A firmware upload is the exception: it runs on
  * its own task (ota_task), and the OTA state is shared under s_ota_mux. */
 #include <ctype.h>
+#include <errno.h>
 #include <stdatomic.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -60,9 +61,14 @@ static char s_etag[24]; /* "<app ELF SHA-256 prefix>": new with every build */
 #define MAX_WS WST_MAX
 #define WS_SEND_TIMEOUT_S 2 /* a push to one client may hold up the server task this long */
 #define WS_FRAME_MAX 8192
+#define WS_RECV_POLL_MS 250 /* a WebSocket's receive wakes this often to look at the frame's deadline */
+#define WS_FRAME_DEADLINE_US (2 * 1000000LL) /* a frame (<= 8 KB), once begun, must be in within this */
 #define BODY_MAX 16384
 #define RECV_TIMEOUT_S 5     /* one receive may wait this long (IDF's default) */
 #define BODY_DEADLINE_US (5 * 1000000LL) /* a whole request body (<= 16 KB) must arrive within this */
+#define SEND_TIMEOUT_S 2      /* one send may wait this long: what a client that vanished costs the server task */
+#define SEND_PIECE 4096       /* a longer reply goes out in pieces of this size, each within SEND_TIMEOUT_S... */
+#define REPLY_DEADLINE_US (15 * 1000000LL) /* ...and all of it within this */
 #define OTA_STALL_TIMEOUTS 3 /* OTA: consecutive receive timeouts (5 s each) before giving up */
 #define OTA_MIN_BYTES_PER_S 8192 /* OTA: overall deadline 30 s + size at this rate (slow-trickle guard) */
 #define TOKEN_CAP 72
@@ -182,13 +188,51 @@ static bool cross_site(httpd_req_t *req)
                          hdr_get(req, "Host", host, sizeof host));
 }
 
+/* A socket's send from its first reply on (send_long): all of buf, or a failure. When SO_SNDTIMEO runs out
+ * midway, lwIP returns the bytes it wrote, and httpd sends the rest again for as long as each call writes anything:
+ * a client that left costs two timeouts, and one that takes a byte now and then holds the server's only task as long
+ * as it likes. A blocking send comes back short only when its time ran out, so that ends the reply. No state: the
+ * upload's task (ota_task) may reply on such a socket too. */
+static int send_whole(httpd_handle_t hd, int fd, const char *buf, size_t n, int flags)
+{
+    (void)hd;
+    const int r = send(fd, buf, n, flags);
+    if (r < 0) return errno == EAGAIN || errno == EINTR ? HTTPD_SOCK_ERR_TIMEOUT : HTTPD_SOCK_ERR_FAIL;
+    return (size_t)r == n ? r : HTTPD_SOCK_ERR_TIMEOUT;
+}
+
+/* The reply's body (status, type and headers are set): one of at most SEND_PIECE bytes as ever, with its
+ * Content-Length; a longer one (the page, a Log.Get) chunked, SEND_PIECE bytes at a time. It no longer fits the
+ * socket's send buffer, so httpd_resp_send would wait for the client, up to the send timeout for every part it gets
+ * out: a phone that left the Wi-Fi mid-page held the server task, the API and the pushes with it. Here a piece that
+ * isn't out within SEND_TIMEOUT_S ends the reply (send_whole), and so does REPLY_DEADLINE_US for all of it; a client
+ * reading slower than that is cut off, and the caller's ESP_FAIL closes the socket: it never takes the cut reply for
+ * a whole one. */
+static esp_err_t send_long(httpd_req_t *req, const char *p, size_t n)
+{
+    httpd_sess_set_send_override(req->handle, httpd_req_to_sockfd(req), send_whole);
+    if (n <= SEND_PIECE) return httpd_resp_send(req, p, (ssize_t)n);
+    const int64_t deadline = esp_timer_get_time() + REPLY_DEADLINE_US;
+    for (size_t left = n; left > 0;) {
+        const size_t k = left < SEND_PIECE ? left : SEND_PIECE;
+        if (esp_timer_get_time() > deadline || httpd_resp_send_chunk(req, p, (ssize_t)k) != ESP_OK) {
+            ESP_LOGW(TAG, "%.40s: the client stopped reading %u bytes before the end of %u: connection closed", req->uri,
+                     (unsigned)left, (unsigned)n);
+            return ESP_FAIL;
+        }
+        p += k;
+        left -= k;
+    }
+    return httpd_resp_send_chunk(req, NULL, 0);
+}
+
 static esp_err_t send_body(httpd_req_t *req, const char *status, const char *type, const char *body)
 {
     httpd_resp_set_status(req, status);
     httpd_resp_set_type(req, type);
     httpd_resp_set_hdr(req, "Cache-Control", "no-store");
     httpd_resp_set_hdr(req, "X-Content-Type-Options", "nosniff");
-    return httpd_resp_sendstr(req, body);
+    return send_long(req, body, strlen(body));
 }
 
 static esp_err_t send_json(httpd_req_t *req, const char *status, const char *body)
@@ -349,7 +393,7 @@ static esp_err_t h_index(httpd_req_t *req)
     }
     httpd_resp_set_type(req, "text/html; charset=utf-8");
     httpd_resp_set_hdr(req, "Content-Encoding", "gzip");
-    return httpd_resp_send(req, index_gz_start, index_gz_end - index_gz_start);
+    return send_long(req, index_gz_start, (size_t)(index_gz_end - index_gz_start));
 }
 
 /* ---------- JSON-RPC over HTTP ---------- */
@@ -453,6 +497,27 @@ static void ws_close(wst_slot_t *w)
     else if (e != ESP_OK) shutdown(w->fd, SHUT_RDWR);
 }
 
+/* A WebSocket's receive (ws_pre_handshake). httpd_ws_recv_frame reads a frame's header and payload with one receive
+ * after another, each waiting the socket's whole timeout (5 s) and none counting the time gone: anyone on the network,
+ * no sign-in needed, could declare an 8 KB frame and send a byte every few seconds, and hold the server's only task
+ * for hours. Here the receives of one frame share a deadline, set by h_ws when the frame begins: a wait that ends
+ * empty (WS_RECV_POLL_MS) is taken up again until then, so a frame that comes in parts loses nothing, and past it the
+ * receive fails, httpd_ws_recv_frame with it, and the socket is closed. Outside h_ws (httpd's own read of a frame's
+ * first byte, and of a PING or CLOSE it answers itself) the deadline is the last frame's, past or nearly: one short
+ * wait a receive. */
+static int64_t s_ws_rx_deadline; /* server task only */
+
+static int ws_recv(httpd_handle_t hd, int fd, char *buf, size_t n, int flags)
+{
+    (void)hd;
+    for (;;) {
+        const int r = recv(fd, buf, n, flags);
+        if (r >= 0) return r;
+        if (errno != EAGAIN && errno != EINTR) return HTTPD_SOCK_ERR_FAIL;
+        if (esp_timer_get_time() > s_ws_rx_deadline) return HTTPD_SOCK_ERR_TIMEOUT;
+    }
+}
+
 /* Before the 101 reply (IDF calls the URI handler only for frames, never for the handshake). The
  * upgrade needs no credentials (browsers cannot add headers to it), but it must come from this box's
  * own page or a non-browser client; ESP_FAIL closes the socket. */
@@ -471,6 +536,10 @@ static esp_err_t ws_pre_handshake(httpd_req_t *req)
     /* pushes run on the one server task: a client that stops reading holds it up this long */
     const struct timeval tv = {.tv_sec = WS_SEND_TIMEOUT_S};
     setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof tv);
+    /* and a frame is read by a deadline (ws_recv) */
+    const struct timeval rtv = {.tv_usec = WS_RECV_POLL_MS * 1000};
+    setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &rtv, sizeof rtv);
+    httpd_sess_set_recv_override(req->handle, fd, ws_recv);
     char tok[TOKEN_CAP];
     if (bearer(req, tok, sizeof tok)) ws_sign_in(w, tok);
     notify_kick();
@@ -518,11 +587,24 @@ static esp_err_t ws_send_text(httpd_handle_t hd, int fd, const char *text, size_
     return e;
 }
 
+/* Every live WebSocket counted as just used. When the sockets run out (max_open_sockets, lru_purge_enable) httpd
+ * closes the one used longest ago, and for it a socket is used only when a request or a frame comes in on it, never
+ * when a push goes out: a page that mostly listens was the oldest, and lost its WebSocket to a few tabs loading.
+ * Called when a connection opens and when an HTTP request is served, so a plain HTTP socket is always older than any
+ * WebSocket, and there is always one to close (MAX_WS is below max_open_sockets). Server task only; hd, as s_srv is
+ * not set yet when the first connection may open. */
+static void ws_keep(httpd_handle_t hd)
+{
+    for (int i = 0; i < MAX_WS; i++)
+        if (s_ws.s[i].fd && !s_ws.s[i].closing) httpd_sess_update_lru_counter(hd, s_ws.s[i].fd);
+}
+
 /* A frame on a WebSocket that passed ws_pre_handshake. */
 static esp_err_t h_ws(httpd_req_t *req)
 {
     const int fd = httpd_req_to_sockfd(req);
     httpd_ws_frame_t f = {0};
+    s_ws_rx_deadline = esp_timer_get_time() + WS_FRAME_DEADLINE_US; /* for the header and the payload (ws_recv) */
     esp_err_t e = httpd_ws_recv_frame(req, &f, 0);
     if (e != ESP_OK) return e;
     if (f.type == HTTPD_WS_TYPE_CLOSE) {
@@ -530,6 +612,13 @@ static esp_err_t h_ws(httpd_req_t *req)
         return ESP_OK;
     }
     if (f.len == 0) return ESP_OK;
+    /* a PONG nobody asked for is allowed (RFC 6455, 5.5.3), a browser's keepalive: its payload (125 bytes at most,
+     * as any control frame's) is read and dropped */
+    if (f.type == HTTPD_WS_TYPE_PONG && f.len <= 125) {
+        uint8_t pong[125];
+        f.payload = pong;
+        return httpd_ws_recv_frame(req, &f, sizeof pong);
+    }
     /* the payload is still in the socket: returning without reading it would make httpd parse it as
      * the next frame's header, so anything else closes the socket */
     if (f.type != HTTPD_WS_TYPE_TEXT || f.len > WS_FRAME_MAX) {
@@ -1205,6 +1294,7 @@ static esp_err_t h_captive(httpd_req_t *req) { return redirect_root(req); }
 static esp_err_t h_bounded(httpd_req_t *req)
 {
     const httpd_uri_t *u = req->user_ctx;
+    ws_keep(req->handle);
     /* POST /ota's body is read on its own task (ota_task, with OTA_DRAIN_MAX); on the server only a refused sign-in
      * leaves it, and gets BODY_MAX's time like any other: no client can hold the server task for long */
     return drop_rest(req, u->handler(req), BODY_MAX);
@@ -1213,8 +1303,16 @@ static esp_err_t h_bounded(httpd_req_t *req)
 static esp_err_t h_404(httpd_req_t *req, httpd_err_code_t code)
 {
     (void)code;
+    ws_keep(req->handle);
     const esp_err_t e = req->method == HTTP_GET && on_ap(req) ? redirect_root(req) : send_text(req, "404 Not Found", "Not found");
     return drop_rest(req, e, BODY_MAX);
+}
+
+static esp_err_t on_open(httpd_handle_t hd, int fd)
+{
+    (void)fd;
+    ws_keep(hd);
+    return ESP_OK;
 }
 
 static void on_close(httpd_handle_t hd, int fd)
@@ -1274,7 +1372,8 @@ esp_err_t web_start(void)
     c.max_open_sockets = 8;
     c.lru_purge_enable = true;
     c.recv_wait_timeout = RECV_TIMEOUT_S;
-    c.send_wait_timeout = 10;
+    c.send_wait_timeout = SEND_TIMEOUT_S;
+    c.open_fn = on_open;
     c.close_fn = on_close;
     esp_err_t e = httpd_start(&s_srv, &c);
     if (e != ESP_OK) {
