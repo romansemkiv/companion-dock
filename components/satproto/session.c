@@ -233,6 +233,8 @@ void sat_session_tick(sat_session_t *s, uint32_t now_ms)
     emit(s, 6);
 }
 
+void sat_session_rx(sat_session_t *s, uint32_t now_ms) { s->last_rx_ms = now_ms; }
+
 bool sat_session_alive(const sat_session_t *s, uint32_t now_ms)
 {
     return (uint32_t)(now_ms - s->last_rx_ms) < DEAD_AFTER_MS;
