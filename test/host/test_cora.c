@@ -138,33 +138,34 @@ static void test_garbage_before_magic_skipped(void)
     TEST_ASSERT_EQUAL_UINT32(sizeof noise, p.resync);
 }
 
-static void test_oversize_payload_skipped_next_parses(void)
+/* A header announcing more than the buffer holds (up to 4 GiB): the stream can't be followed from there, and
+ * skipping that much would swallow everything the host sends after it. The caller ends the connection. */
+static void test_oversize_header_is_fatal(void)
 {
-    uint8_t big[100], small[4] = {9, 8, 7, 6}, wire[256], buf[64];
-    memset(big, 0x43, sizeof big); /* looks like magic starts: must be skipped by length, not scanned */
-    size_t n = make(wire, sizeof wire, CORA_F_VERBATIM, CORA_OP_WRITE, 1, big, sizeof big);
-    n += make(wire + n, sizeof wire - n, CORA_F_VERBATIM, CORA_OP_WRITE, 2, small, 4);
+    uint8_t small[4] = {9, 8, 7, 6}, wire[64], buf[64];
+    size_t n = make(wire, sizeof wire, CORA_F_VERBATIM, CORA_OP_WRITE, 1, small, 4);
+    wire[12] = wire[13] = wire[14] = wire[15] = 0xff; /* its length: 4 GiB - 1 */
     cora_parser_t p;
     cora_parser_init(&p, buf, sizeof buf);
     cora_msg_t m;
     size_t used = 0;
-    /* fed in two parts that split the oversize payload */
-    TEST_ASSERT_EQUAL_INT(0, cora_feed(&p, wire, 60, &used, &m));
-    TEST_ASSERT_EQUAL_size_t(60, used);
-    TEST_ASSERT_EQUAL_INT(1, cora_feed(&p, wire + 60, n - 60, &used, &m));
-    TEST_ASSERT_EQUAL_size_t(n - 60, used);
-    TEST_ASSERT_EQUAL_UINT32(2, m.msg_id);
-    TEST_ASSERT_EQUAL_UINT8_ARRAY(small, m.payload, 4);
+    TEST_ASSERT_EQUAL_INT(-1, cora_feed(&p, wire, n, &used, &m));
+    TEST_ASSERT_EQUAL_size_t(CORA_HDR_LEN, used); /* stopped at the header: nothing after it taken */
+    TEST_ASSERT_EQUAL_UINT32(0xffffffffu, p.len);  /* what it announced, for the log */
     TEST_ASSERT_EQUAL_UINT32(1, p.oversize);
+    /* split across feeds: the same, at the header's last byte */
+    cora_parser_init(&p, buf, sizeof buf);
+    TEST_ASSERT_EQUAL_INT(0, cora_feed(&p, wire, 10, &used, &m));
+    TEST_ASSERT_EQUAL_INT(-1, cora_feed(&p, wire + 10, n - 10, &used, &m));
+    TEST_ASSERT_EQUAL_size_t(CORA_HDR_LEN - 10, used);
 }
 
-static void test_payload_at_cap_taken_above_skipped(void)
+static void test_payload_at_cap_taken_above_fatal(void)
 {
     uint8_t pl[33], wire[128], buf[32];
     memset(pl, 0x11, sizeof pl);
     size_t n = make(wire, sizeof wire, 0, CORA_OP_WRITE, 1, pl, 32);          /* exactly cap */
     n += make(wire + n, sizeof wire - n, 0, CORA_OP_WRITE, 2, pl, 33);        /* cap + 1 */
-    n += make(wire + n, sizeof wire - n, 0, CORA_OP_WRITE, 3, pl, 1);
     cora_parser_t p;
     cora_parser_init(&p, buf, sizeof buf);
     cora_msg_t m;
@@ -173,8 +174,7 @@ static void test_payload_at_cap_taken_above_skipped(void)
     TEST_ASSERT_EQUAL_UINT32(1, m.msg_id);
     TEST_ASSERT_EQUAL_UINT32(32, m.len);
     at += used;
-    TEST_ASSERT_EQUAL_INT(1, cora_feed(&p, wire + at, n - at, &used, &m));
-    TEST_ASSERT_EQUAL_UINT32(3, m.msg_id);
+    TEST_ASSERT_EQUAL_INT(-1, cora_feed(&p, wire + at, n - at, &used, &m));
     TEST_ASSERT_EQUAL_UINT32(1, p.oversize);
 }
 
@@ -204,8 +204,8 @@ int main(void)
     RUN_TEST(test_two_messages_in_one_feed);
     RUN_TEST(test_empty_payload);
     RUN_TEST(test_garbage_before_magic_skipped);
-    RUN_TEST(test_oversize_payload_skipped_next_parses);
-    RUN_TEST(test_payload_at_cap_taken_above_skipped);
+    RUN_TEST(test_oversize_header_is_fatal);
+    RUN_TEST(test_payload_at_cap_taken_above_fatal);
     RUN_TEST(test_magic_split_across_feeds);
     return UNITY_END();
 }
