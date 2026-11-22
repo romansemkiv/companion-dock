@@ -44,7 +44,7 @@ void fx_status(dui_screen_t *s, const fx_box_t *b)
         [FX_DOCK] = {"Waiting for Companion", "Waiting", NULL},
         [FX_RECON] = {"Reconnecting", NULL, "Reconnecting"},
         [FX_CONNECTED] = {"Connected", NULL, "Companion connected"},
-        [FX_NODOCK] = {"No free dock", "No dock", NULL},
+        [FX_NODOCK] = {"No Net Dock", "No NetDock", "No free Net Dock"},
     };
     dui_status_words(s, scen_state(b->scen), W[b->scen].words, W[b->scen].short_words, W[b->scen].text);
     dui_status_t *st = &s->status;
@@ -215,7 +215,7 @@ void fx_companion(dui_screen_t *s, const fx_box_t *b)
     dui_word(s, "Mode", DUI_ROLE_LABEL);
     for (int m = 0; m < 2; m++) { /* Satellite, Dock: the other one is hold-to-switch, "restarts" */
         const bool is_dock = m == 1, sel = is_dock == dock;
-        dui_tile_t *t = dui_button(s, is_dock ? DUI_ICON_DOCK : DUI_ICON_SAT, is_dock ? "Dock" : "Satellite",
+        dui_tile_t *t = dui_button(s, is_dock ? DUI_ICON_DOCK : DUI_ICON_SAT, is_dock ? "Net Dock" : "Satellite",
                                    is_dock ? FX_ACT_DOCK : FX_ACT_SAT);
         if (sel) t->flags |= DUI_F_SELECTED;
         else {
@@ -227,7 +227,7 @@ void fx_companion(dui_screen_t *s, const fx_box_t *b)
     dui_group(s, DUI_ZONE_MAIN, 0);
     if (dock) {
         dui_port(s, "Port", "5343");
-        if (b->scen == FX_NODOCK) dui_word(s, "No dock", DUI_ROLE_BAD);
+        if (b->scen == FX_NODOCK) dui_word(s, "No Net Dock", DUI_ROLE_BAD);
         else dui_word(s, "Waiting", DUI_ROLE_WAIT);
     } else {
         static const char *FIRST[FX_SCENS] = {"No", "Finding", "Choose", "Companion", "Waiting", "Reconnecting", "Connected", "No"};

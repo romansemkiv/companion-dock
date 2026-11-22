@@ -294,11 +294,11 @@ static void buttons(dui_screen_t *s, const fx_box_t *b)
     t->flags |= DUI_F_DANGER | DUI_F_DOWN | DUI_F_ON;
     t->hold_ms = 1500;
     t->hold = 128;
-    t = dui_button(s, DUI_ICON_DOCK, "Dock", 1);
+    t = dui_button(s, DUI_ICON_DOCK, "Net Dock", 1);
     t->hold_ms = 1500;
     t->hold = 200;
     t->flags |= DUI_F_DOWN;
-    t = dui_button(s, DUI_ICON_DOCK, "Dock", 1);
+    t = dui_button(s, DUI_ICON_DOCK, "Net Dock", 1);
     t->hold_ms = 1500;
     t->hint = dui_str(s, "restarts");
     t->flags |= DUI_F_HINT;
@@ -867,7 +867,7 @@ static int hint_renders(const char *dir)
     } B[] = {
         {DUI_ICON_RESTART, "Restart", "restarts", DUI_HOLD_RESTART_MS, DUI_F_DANGER},
         {DUI_ICON_RESTART, "Boot other", "restarts", DUI_HOLD_BOOT_MS, DUI_F_DANGER},
-        {DUI_ICON_DOCK, "Dock", "restarts", DUI_HOLD_MODE_MS, 0},
+        {DUI_ICON_DOCK, "Net Dock", "restarts", DUI_HOLD_MODE_MS, 0},
         {DUI_ICON_POWER, "Turn off", "cuts users", DUI_HOLD_AP_OFF_MS, DUI_F_DANGER | DUI_F_ON},
         {DUI_ICON_WIFI, "Use", "Wi-Fi blips", DUI_HOLD_USE_MS, 0},
         {DUI_ICON_POWER, "Wi-Fi", "Wi-Fi off", DUI_HOLD_WIFI_MS, DUI_F_ON | DUI_F_SELECTED},

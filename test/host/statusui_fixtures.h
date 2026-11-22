@@ -20,7 +20,7 @@ void fx_screen_looking(sui_content_t *c, const char *ip, const char *target,
 void fx_screen_choose(sui_content_t *c, const char *ip, const char *ap_ssid, const char *ap_pass);
 // "Companion too old"; main "Needs 5.0+" and "Has <ver>".
 void fx_screen_too_old(sui_content_t *c, const char *ver, const char *ap_ssid, const char *ap_pass);
-// Dock mode, a deck past the sixth: "No free dock"; main "Max 6 decks".
+// Dock mode, a deck past the sixth: "No Net Dock"; main "Max 6 decks".
 void fx_screen_no_dock(sui_content_t *c);
 // Network Dock mode (no Companion connection to this deck's dock): "Waiting for Companion"; main
 // "Remote surface" and "<ip> port <port>". Every screen that shows the hotspot keeps "WiFi <ssid>" with

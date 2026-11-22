@@ -90,7 +90,7 @@ static const char *act_words(uint16_t a, bool *colon)
     case DUI_A_SYNC: return "sync";
     case DUI_A_BOOT_OTHER: return "boot other";
     case DUI_A_MODE_SAT: return "use Satellite";
-    case DUI_A_MODE_DOCK: return "use Dock";
+    case DUI_A_MODE_DOCK: return "use Net Dock";
     case DUI_A_USE_MAIN: return "use Primary"; /* as the web page calls it */
     case DUI_A_USE_BACKUP: return "use Backup";
     case DUI_A_ETH_DHCP: return "use DHCP";
@@ -113,7 +113,7 @@ static const char *act_short(uint16_t a)
 {
     switch (a) {
     case DUI_A_MODE_SAT: return "Satellite";
-    case DUI_A_MODE_DOCK: return "Dock";
+    case DUI_A_MODE_DOCK: return "Net Dock";
     case DUI_A_USE_MAIN: return "Primary";
     case DUI_A_USE_BACKUP: return "Backup";
     case DUI_A_ETH_DHCP: return "DHCP";

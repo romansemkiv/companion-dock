@@ -515,8 +515,8 @@ static void test_home_no_free_dock(void)
     b.deck_limit = 2;
     build(DUI_PAGE_HOME, &b);
     TEST_ASSERT_EQUAL_STRING("Max 2 decks|Unplug one / " HOTSPOT, content(&S));
-    TEST_ASSERT_EQUAL_STRING("No free dock", words(&S, false));
-    TEST_ASSERT_EQUAL_STRING("No dock", words(&S, true));
+    TEST_ASSERT_EQUAL_STRING("No Net Dock", words(&S, false));
+    TEST_ASSERT_EQUAL_STRING("No NetDock", words(&S, true));
     TEST_ASSERT_EQUAL(DUI_STATE_BAD, S.status.state);
 }
 
@@ -717,7 +717,7 @@ static void test_pin_titles(void)
     } A[] = {
         {DUI_A_RESTART, "PIN to restart", "PIN to restart"},           {DUI_A_SYNC, "PIN to sync", "PIN to sync"},
         {DUI_A_BOOT_OTHER, "PIN to boot other", "PIN to boot other"},  {DUI_A_MODE_SAT, "PIN to use Satellite", "PIN to Satellite"},
-        {DUI_A_MODE_DOCK, "PIN to use Dock", "PIN to Dock"},           {DUI_A_USE_MAIN, "PIN to use Primary", "PIN to Primary"},
+        {DUI_A_MODE_DOCK, "PIN to use Net Dock", "PIN to Net Dock"},           {DUI_A_USE_MAIN, "PIN to use Primary", "PIN to Primary"},
         {DUI_A_USE_BACKUP, "PIN to use Backup", "PIN to Backup"},      {DUI_A_ETH_DHCP, "PIN to use DHCP", "PIN to DHCP"},
         {DUI_A_ETH_STATIC, "PIN to make static", "PIN to static"},     {DUI_A_ETH_EDIT, "PIN to edit address", "PIN to edit IP"},
         {DUI_A_ETH_SAVE, "PIN to save address", "PIN to save IP"},     {DUI_A_AP_OFF, "PIN: hotspot off", "PIN: hotspot"},
@@ -1389,9 +1389,9 @@ static void test_companion(void)
 {
     dui_box_t b = box_default();
     build(DUI_PAGE_COMPANION, &b);
-    TEST_ASSERT_EQUAL_STRING("Mode|[Satellite]|[Dock] / Port:5343|Waiting", content(&S));
+    TEST_ASSERT_EQUAL_STRING("Mode|[Satellite]|[Net Dock] / Port:5343|Waiting", content(&S));
     TEST_ASSERT_EQUAL_STRING("Companion", S.status.title[0]);
-    const dui_tile_t *t = button(&S, "Dock");
+    const dui_tile_t *t = button(&S, "Net Dock");
     TEST_ASSERT_TRUE(t->flags & DUI_F_SELECTED);
     TEST_ASSERT_EQUAL(0, t->hold_ms);
     TEST_ASSERT_EQUAL(DUI_A_NONE, t->action);
@@ -1401,16 +1401,16 @@ static void test_companion(void)
     TEST_ASSERT_EQUAL_STRING("restarts", t->hint); /* "Hold 1.5 s" / "restarts" */
     TEST_ASSERT_EQUAL(DUI_A_MODE_SAT, t->action);
     TEST_ASSERT_EQUAL(DUI_ICON_SAT, t->icon); /* the satellite glyph; Dock keeps its icon */
-    TEST_ASSERT_EQUAL(DUI_ICON_DOCK, button(&S, "Dock")->icon);
+    TEST_ASSERT_EQUAL(DUI_ICON_DOCK, button(&S, "Net Dock")->icon);
     TEST_ASSERT_EQUAL(DUI_ROLE_WAIT, find(&S, NULL, "Waiting")->role);
     strcpy(b.dock.peer, "192.168.8.155");
     build(DUI_PAGE_COMPANION, &b);
-    TEST_ASSERT_EQUAL_STRING("Mode|[Satellite]|[Dock] / Port:5343|Connected", content(&S));
+    TEST_ASSERT_EQUAL_STRING("Mode|[Satellite]|[Net Dock] / Port:5343|Connected", content(&S));
     b.dock.no_free = true;
     b.dock.port = 0;
     b.dock.peer[0] = '\0';
     build(DUI_PAGE_COMPANION, &b);
-    TEST_ASSERT_EQUAL_STRING("Mode|[Satellite]|[Dock] / No dock", content(&S));
+    TEST_ASSERT_EQUAL_STRING("Mode|[Satellite]|[Net Dock] / No Net Dock", content(&S));
     /* dock mode has neither Set IP nor Auto find, a manual Companion or not, locked or not */
     for (int manual = 0; manual < 2; manual++) {
         b.sat.auto_disc = !manual;
@@ -1423,7 +1423,7 @@ static void test_companion(void)
 
     b = sat(DUI_SAT_FINDING);
     build(DUI_PAGE_COMPANION, &b);
-    TEST_ASSERT_EQUAL_STRING("Mode|[Satellite]|[Dock] / Companion:Studio-Mac|IP:192|168|8|155|Finding / "
+    TEST_ASSERT_EQUAL_STRING("Mode|[Satellite]|[Net Dock] / Companion:Studio-Mac|IP:192|168|8|155|Finding / "
                              "[Retry now]|[Choose]|[Set IP]",
                              content(&S));
     /* Set IP, always there in Satellite mode, a tap that opens the editor (DUI_A_COMP_EDIT) */
@@ -1434,7 +1434,7 @@ static void test_companion(void)
     TEST_ASSERT_FALSE(t->flags & DUI_F_LOCKED);
     TEST_ASSERT_NULL(maybe_button(&S, "Auto find")); /* auto-discovery on: Choose, no Auto find */
     TEST_ASSERT_TRUE(button(&S, "Satellite")->flags & DUI_F_SELECTED);
-    t = button(&S, "Dock");
+    t = button(&S, "Net Dock");
     TEST_ASSERT_EQUAL(DUI_HOLD_MODE_MS, t->hold_ms);
     TEST_ASSERT_EQUAL(DUI_A_MODE_DOCK, t->action);
     TEST_ASSERT_EQUAL(DUI_A_RETRY, button(&S, "Retry now")->action);
@@ -1444,7 +1444,7 @@ static void test_companion(void)
     /* a manual address (no auto-discovery): no Choose */
     b.sat.auto_disc = false;
     build(DUI_PAGE_COMPANION, &b);
-    TEST_ASSERT_EQUAL_STRING("Mode|[Satellite]|[Dock] / Companion:Studio-Mac|IP:192|168|8|155|Finding / "
+    TEST_ASSERT_EQUAL_STRING("Mode|[Satellite]|[Net Dock] / Companion:Studio-Mac|IP:192|168|8|155|Finding / "
                              "[Retry now]|[Auto find]|[Set IP]",
                              content(&S));
     TEST_ASSERT_NULL(maybe_button(&S, "Choose"));
@@ -1465,18 +1465,18 @@ static void test_companion(void)
     TEST_ASSERT_EQUAL(DUI_ROLE_OK, find(&S, NULL, "Connected")->role);
     /* connected, nothing to retry */
     TEST_ASSERT_NULL(maybe_button(&S, "Retry now"));
-    TEST_ASSERT_EQUAL_STRING("Mode|[Satellite]|[Dock] / Companion:Studio-Mac|IP:192|168|8|155|Connected / [Choose]|[Set IP]",
+    TEST_ASSERT_EQUAL_STRING("Mode|[Satellite]|[Net Dock] / Companion:Studio-Mac|IP:192|168|8|155|Connected / [Choose]|[Set IP]",
                              content(&S));
     b.sat.auto_disc = false;
     build(DUI_PAGE_COMPANION, &b);
-    TEST_ASSERT_EQUAL_STRING("Mode|[Satellite]|[Dock] / Companion:Studio-Mac|IP:192|168|8|155|Connected / "
+    TEST_ASSERT_EQUAL_STRING("Mode|[Satellite]|[Net Dock] / Companion:Studio-Mac|IP:192|168|8|155|Connected / "
                              "[Auto find]|[Set IP]",
                              content(&S));
     b.sat.auto_disc = true;
     b.sat.target.name[0] = b.sat.target.ip[0] = '\0'; /* none picked yet */
     b.sat.state = DUI_SAT_CHOOSE;
     build(DUI_PAGE_COMPANION, &b);
-    TEST_ASSERT_EQUAL_STRING("Mode|[Satellite]|[Dock] / Companion:None|Choose / [Retry now]|[Choose]|[Set IP]", content(&S));
+    TEST_ASSERT_EQUAL_STRING("Mode|[Satellite]|[Net Dock] / Companion:None|Choose / [Retry now]|[Choose]|[Set IP]", content(&S));
 }
 
 /* ---- Hotspot and Scan to join ---- */
@@ -1814,7 +1814,7 @@ static void test_lock_rules(void)
 
 static void test_locks(void)
 {
-    static const char *LOCKABLE[] = {"Satellite", "Dock",     "Turn off",    "Restart", "Sync now", "Boot other", "Use",
+    static const char *LOCKABLE[] = {"Satellite", "Net Dock",    "Turn off",    "Restart", "Sync now", "Boot other", "Use",
                                      "Use DHCP",  "Make static", "Edit", "Wi-Fi", "Sync", "Set IP",   "Auto find",
                                      "Always on"};
     for (int pw = 0; pw < 2; pw++)
@@ -1843,7 +1843,7 @@ static void test_locks(void)
     dui_box_t b = sat(DUI_SAT_CHOOSE);
     b.locked = true;
     build(DUI_PAGE_COMPANION, &b);
-    TEST_ASSERT_TRUE(button(&S, "Dock")->flags & DUI_F_LOCKED);
+    TEST_ASSERT_TRUE(button(&S, "Net Dock")->flags & DUI_F_LOCKED);
     TEST_ASSERT_FALSE(button(&S, "Satellite")->flags & DUI_F_LOCKED); /* the current mode: nothing to lock */
     TEST_ASSERT_FALSE(button(&S, "Retry now")->flags & DUI_F_LOCKED);
     build(DUI_PAGE_HOTSPOT, &b);

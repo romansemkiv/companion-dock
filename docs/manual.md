@@ -386,7 +386,7 @@ satellite (Phosphor has none), drawn in Phosphor's stroke.
   the setup page's address, then its QR code; the Mini shows the join code on the page after its words),
   finding Companion, choose
   Companion (one button per Companion found: a tap pins it), Companion too old, reconnecting, waiting for
-  Companion (dock mode: the box's IP and the deck's port to add in Companion), no free dock, and
+  Companion (dock mode: the box's IP and the deck's port to add in Companion), no free Net Dock ("No Net Dock"), and
   "Companion connected" (on demand only: a grey *Connected Companion* label, then the Companion's *IP*, and
   in dock mode its *PORT*; where the label can't share a page with the address, as on the Mini in
   dock mode, there is no label and the address's first key says *COMPANION IP*). The hotspot's name (captioned *HOTSPOT*) and password
@@ -438,7 +438,7 @@ satellite (Phosphor has none), drawn in Phosphor's stroke.
   hotspot stays on either way if it is enabled. The row not in use has **Use**
   (hold 1.5 s, "Wi-Fi blips"; locked under the settings PIN, which the PIN pad unlocks): the box joins
   that network now and keeps it as the one in use, as `Wifi.Use` does. **Companion**: the mode (Satellite
-  with the satellite icon, Dock; hold the other one 1.5 s to switch; the box restarts), the port (dock mode) or the target (captioned
+  with the satellite icon, Net Dock; hold the other one 1.5 s to switch; the box restarts), the port (dock mode) or the target (captioned
   *COMPANION*) with
   *Retry now* (while not connected) and *Choose*. *Choose* is there only with automatic discovery on: it
   opens the list of Companions found on the deck, and opening it changes nothing; a tap on one pins it, as

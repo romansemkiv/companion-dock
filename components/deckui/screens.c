@@ -24,7 +24,7 @@ static const struct {
     [H_RECON] = {DUI_STATE_WAIT, "Reconnecting", NULL, "Reconnecting", "Reconnecting"}, /* one word, whole */
     [H_CONNECTED] = {DUI_STATE_OK, "Connected", NULL, "Companion connected", "Connected"},
     [H_DOCK] = {DUI_STATE_WAIT, "Waiting for Companion", "Waiting", NULL, "Waiting"},
-    [H_NODOCK] = {DUI_STATE_BAD, "No free dock", "No dock", NULL, "No dock"},
+    [H_NODOCK] = {DUI_STATE_BAD, "No Net Dock", "No NetDock", "No free Net Dock", "No Net Dock"},
 };
 
 /* The box's address: Ethernet's when it has one (it takes the route), else the station's. */
@@ -527,7 +527,7 @@ void dui_build_companion(dui_screen_t *s, const dui_box_t *b)
     for (int m = 0; m < 2; m++) { /* Satellite, Dock: the current one selected, the other hold-to-switch */
         const bool is_dock = m == 1;
         const int icon = is_dock ? DUI_ICON_DOCK : DUI_ICON_SAT;
-        const char *label = is_dock ? "Dock" : "Satellite";
+        const char *label = is_dock ? "Net Dock" : "Satellite";
         if (is_dock == dock)
             dui_button(s, icon, label, DUI_A_NONE)->flags |= DUI_F_SELECTED;
         else

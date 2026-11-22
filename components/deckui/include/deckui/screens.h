@@ -132,7 +132,7 @@ typedef struct {
     struct { // this deck's dock (dock mode: the snapshot is per deck)
         uint16_t port;  // its port; 0 when it has none
         char peer[16];  // the address of the Companion connected to it; "" when none
-        bool no_free;   // every dock taken (the deck limit's): "No free dock"
+        bool no_free;   // every dock taken (the deck limit's): "No Net Dock" (the strip: "No free Net Dock")
     } dock;
     struct {
         bool eth_link;

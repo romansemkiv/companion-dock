@@ -198,16 +198,16 @@ static void test_plan_status_row(void)
     TEST_ASSERT_EQUAL(DUI_TINT_OK, at(0, 1, 0)->tint);
     TEST_ASSERT_EQUAL(DUI_STATE_OK, at(0, 0, 0)->state);
     TEST_ASSERT_EQUAL(DUI_ROLE_OK, at(0, 1, 0)->role);
-    /* No free dock: red, today's hint; the Mini's short form */
+    /* No Net Dock: red, today's hint; the Mini's short form */
     b = fx_box_default();
     b.scen = FX_NODOCK;
     plan(PID_M32, fx_home, &b);
-    TEST_ASSERT_EQUAL_STRING("@|No|free|dock|_|_|~hot|~wifi", row_text(0, 0));
+    TEST_ASSERT_EQUAL_STRING("@|No|Net|Dock|_|_|~hot|~wifi", row_text(0, 0));
     TEST_ASSERT_EQUAL_STRING("Max|6|decks|.|.|.|.|.", row_text(0, 1));
     TEST_ASSERT_EQUAL(DUI_TINT_BAD, at(0, 1, 0)->tint);
     TEST_ASSERT_EQUAL(DUI_STATE_BAD, at(0, 1, 3)->state); /* the Companion menu button's dot */
     plan(PID_MINI, fx_home, &b);
-    TEST_ASSERT_EQUAL_STRING("No|dock|[Menu]", row_text(0, 0));
+    TEST_ASSERT_EQUAL_STRING("No|NetDock|[Menu]", row_text(0, 0));
     /* a sub-screen: Back, the title, the indicators, on the neutral tint */
     b = fx_box_default();
     plan(PID_M32, fx_network, &b);

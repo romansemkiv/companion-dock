@@ -133,7 +133,7 @@ void fx_screen_no_dock(sui_content_t *c)
 {
     size_t u = 0;
     init(c);
-    add_status(c, &u, SUI_STATE_BAD, "No free dock");
+    add_status(c, &u, SUI_STATE_BAD, "No Net Dock");
     add_line(c, &u, SUI_GROUP_MAIN, "L", "Max 6 decks");
 }
 

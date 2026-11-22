@@ -1115,7 +1115,7 @@ static void test_roles_per_screen(void)
     sui_screen_reconnecting(&c, "192.168.8.10");
     TEST_ASSERT_EQUAL_STRING("Reconnecting:S 192:A 168:A 8:A 10:A", roles_text(&c, 8, 4, 96));
     fx_screen_no_dock(&c);
-    TEST_ASSERT_EQUAL_STRING("No:S free:S dock:S Max:L 6:L decks:L", roles_text(&c, 8, 4, 96));
+    TEST_ASSERT_EQUAL_STRING("No:S Net:S Dock:S Max:L 6:L decks:L", roles_text(&c, 8, 4, 96));
     sui_screen_message(&c, "Back at 10.0.0.12\nport 5343");
     TEST_ASSERT_EQUAL_STRING("Back:F at:F 10:F 0:F 0:F 12:F port:F 5343:F", roles_text(&c, 8, 4, 96));
 
@@ -1290,7 +1290,7 @@ static void test_screen_word_counts(void)
     sui_screen_reconnecting(&c[n++], NULL);                                           /* Reconnecting */
     fx_screen_dock(&c[n++], "192.168.8.225", 5343, NULL, NULL);                      /* Waiting for Companion, Remote surface, port */
     fx_screen_dock(&c[n++], "192.168.8.225", 5343, "CompanionDock-ABCD", "p");        /* + WiFi, Pass */
-    fx_screen_no_dock(&c[n++]);                                                      /* No free dock, Max 6 decks */
+    fx_screen_no_dock(&c[n++]);                                                      /* No Net Dock, Max 6 decks */
     static sui_layout_t L;
     for (int i = 0; i < n; i++) {
         sui_layout(8, 4, 96, &c[i], &L);
