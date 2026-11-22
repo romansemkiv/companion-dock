@@ -54,7 +54,7 @@
 static const char *TAG = "supervisor";
 
 #define TICK_MS 1000
-#define STACK 4096 /* internal: it writes flash (config, otadata) */
+#define STACK 6144 /* internal: it writes flash (config, otadata); 4096 left 724 bytes after an OTA start (self-check) */
 #define PRIO 4
 #define MAX_INSTANCES 8
 #define OTA_MIN_INTERNAL_FREE (12 * 1024)
