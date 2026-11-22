@@ -648,7 +648,7 @@ a Wi-Fi scan or a broadcast flood never holds up a key press, an image or the co
 
 Core 0 takes the Ethernet receive task, which a broadcast flood keeps busy; core 1 has the decks' coordinator, the web
 server, mDNS and the speaker. The other tasks are not pinned: they use both cores, and core 1 while core 0 is busy.
-The tasks that feed the watchdog (`supervisor`, `satclient`, `imgwork`, `usb_daemon`, `usb_client`) are all in the
+The tasks that feed the watchdog (`supervisor`, `satclient`, `surfaces`, `imgwork`, `usb_daemon`, `usb_client`) are all in the
 bands a show needs. The Performance page lists every task with its priority and core.
 
 **First flash of a board.** `./build.sh -p PORT` writes everything. To give the box its Wi-Fi network

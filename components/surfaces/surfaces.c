@@ -1674,6 +1674,7 @@ static void dock_dim(int slot)
             if (snap) {
                 const uint8_t k = hws[c] < SURF_SNAP_KEYS ? snap->kind[hws[c]] : DC_NONE;
                 uint8_t *img = snap_key_rgb(m, snap, hws[c]); /* NULL: black under the word */
+                esp_task_wdt_reset(); /* a JPEG decode each, 100 ms a step when the engine doesn't answer, 32 keys */
                 images += k == DC_IMAGE;
                 fills += k == DC_FILL;
                 drawn += img != NULL;
@@ -1770,7 +1771,13 @@ static void surf_task(void *arg)
 {
     (void)arg;
     surf_ev_t ev;
+    /* On the task watchdog: every deck's task posts to this task's queue and waits for room (post_event), so
+     * with this task stuck all the decks would go dead while the box stayed up. It wakes at least every TICK_MS
+     * and nothing it calls waits on I/O (its locks are held for copies only, Companion and the decks are sent
+     * to through their own tasks' queues); fed each turn, between the events and the pass, and in dock_dim. */
+    if (esp_task_wdt_add(NULL) != ESP_OK) ESP_LOGW(TAG, "surfaces: not on the task watchdog");
     for (;;) {
+        esp_task_wdt_reset();
         if (xQueueReceive(surf.evq, &ev, task_wait()) == pdTRUE) {
             handle_event(&ev);
             /* ... and the decks' input queued behind it, before the pass. A hold is timed by the passes
@@ -1783,6 +1790,7 @@ static void surf_task(void *arg)
                             xQueueReceive(surf.evq, &ev, 0) == pdTRUE; n++)
                 handle_event(&ev);
         }
+        esp_task_wdt_reset(); /* a queue's worth of events, each drawing its deck, then the pass */
         const int64_t now = esp_timer_get_time();
         s_corner_due_us = corner_step(now); /* before the screens: a gesture may open one */
         process_ready();
