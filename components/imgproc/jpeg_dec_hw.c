@@ -23,7 +23,7 @@ bool img_jpeg_decode(const uint8_t *jpg, size_t len, int w, int h, uint8_t *rgb)
 {
     if (!jpg || !len || !rgb || w <= 0 || h <= 0 || w > 512 || h > 512) return false;
     static int warned; /* the first few failures logged, with why */
-    jpeg_decode_picture_info_t info;
+    jpeg_decode_picture_info_t info = {0}; /* logged below also when the header was not read */
     if (jpeg_decoder_get_info(jpg, (uint32_t)len, &info) != ESP_OK || info.width != (uint32_t)w ||
         info.height != (uint32_t)h) {
         if (warned++ < 3)
