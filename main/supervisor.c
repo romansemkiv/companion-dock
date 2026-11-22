@@ -65,6 +65,7 @@ static StaticSemaphore_t s_cfg_mtx_buf;
 static TaskHandle_t s_task;
 static bool s_dock; /* Network Dock mode (as main read it at boot): no Companion to pick */
 static atomic_bool s_cfg_dirty, s_net_dirty;
+static atomic_bool s_ticked; /* supervisor_running */
 static char s_ap_ssid[33];
 
 /* Supervisor task only. */
@@ -94,6 +95,8 @@ static void wake(void)
     TaskHandle_t t = s_task;
     if (t) xTaskNotifyGive(t);
 }
+
+bool supervisor_running(void) { return atomic_load(&s_ticked); }
 
 void supervisor_config_changed(void)
 {
@@ -423,6 +426,7 @@ static void supervisor_task(void *arg)
     for (;;) {
         esp_task_wdt_reset();
         tick();
+        atomic_store(&s_ticked, true);
         esp_task_wdt_reset();
         ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(TICK_MS));
     }
