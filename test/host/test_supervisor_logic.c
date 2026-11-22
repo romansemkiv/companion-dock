@@ -47,6 +47,18 @@ static void test_c6_ready_or_no_radio_wanted_never_restarts(void)
     TEST_ASSERT_EQUAL_INT64(-1, run(&w, in, 0, 10 * MIN, 0));
 }
 
+/* The radio is wanted for what netmgr would run on it: the station only with Wi-Fi switched on and an SSID
+ * (netpolicy_sta_on), or the hotspot. A stored SSID with Wi-Fi off asks for nothing. */
+static void test_radio_wanted_as_netmgr_runs_it(void)
+{
+    TEST_ASSERT_TRUE(c6w_radio_wanted(true, true, false));
+    TEST_ASSERT_FALSE(c6w_radio_wanted(false, true, false));
+    TEST_ASSERT_FALSE(c6w_radio_wanted(true, false, false));
+    TEST_ASSERT_FALSE(c6w_radio_wanted(false, false, false));
+    TEST_ASSERT_TRUE(c6w_radio_wanted(false, true, true));
+    TEST_ASSERT_TRUE(c6w_radio_wanted(false, false, true));
+}
+
 /* "3 minutes in a row": Ethernet coming up starts the count again. */
 static void test_ethernet_up_in_between_restarts_the_count(void)
 {
@@ -227,6 +239,7 @@ int main(void)
     RUN_TEST(test_c6_lost_without_ethernet_restarts_after_3_min);
     RUN_TEST(test_ethernet_up_keeps_todays_behaviour);
     RUN_TEST(test_c6_ready_or_no_radio_wanted_never_restarts);
+    RUN_TEST(test_radio_wanted_as_netmgr_runs_it);
     RUN_TEST(test_ethernet_up_in_between_restarts_the_count);
     RUN_TEST(test_c6_lost_late_restarts_at_once);
     RUN_TEST(test_rate_limit_after_three);

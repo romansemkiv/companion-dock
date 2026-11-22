@@ -346,7 +346,7 @@ static void c6_watch(void)
     netmgr_status_t ns;
     netmgr_get_status(&ns);
     supervisor_cfg_lock();
-    const bool wanted = s_cfg->wifi_ssid[0] != '\0' || s_cfg->ap_enabled;
+    const bool wanted = c6w_radio_wanted(s_cfg->wifi_enabled, s_cfg->wifi_ssid[0] != '\0', s_cfg->ap_enabled);
     supervisor_cfg_unlock();
     const c6w_in_t in = {.c6_ready = netmgr_c6_ready(), .radio_wanted = wanted, .eth_up = ns.eth_link && ns.eth_ip};
     const uint32_t n = c6w_rec_count(&s_c6_rec);

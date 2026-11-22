@@ -26,9 +26,13 @@ typedef struct {
 
 typedef struct {
     bool c6_ready;     /* the C6 answers and runs a firmware Wi-Fi can use */
-    bool radio_wanted; /* the config has a Wi-Fi station (SSID) or the hotspot on */
+    bool radio_wanted; /* c6w_radio_wanted */
     bool eth_up;       /* Ethernet has link and an IPv4 address */
 } c6w_in_t;
+
+/* The config asks for the radio: the station as netmgr runs it (Wi-Fi switched on and an SSID set,
+ * netpolicy_sta_on; an SSID kept with Wi-Fi off asks for nothing) or the hotspot. */
+bool c6w_radio_wanted(bool wifi_enabled, bool has_ssid, bool ap_enabled);
 
 void c6w_init(c6w_t *w);
 /* Every supervisor tick. now_us: time since this start; restarts: "C6 lost" restarts since power-on.

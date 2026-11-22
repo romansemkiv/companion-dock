@@ -5,6 +5,11 @@
 
 /* ---- C6 lost ---- */
 
+bool c6w_radio_wanted(bool wifi_enabled, bool has_ssid, bool ap_enabled)
+{
+    return (wifi_enabled && has_ssid) || ap_enabled;
+}
+
 void c6w_init(c6w_t *w) { memset(w, 0, sizeof *w); }
 
 bool c6w_step(c6w_t *w, const c6w_in_t *in, int64_t now_us, uint32_t restarts)
