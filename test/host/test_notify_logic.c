@@ -35,7 +35,7 @@ static char *old_key(const cJSON *st)
 static char *frame_of(cJSON *st)
 {
     cJSON *frame = cJSON_CreateObject();
-    cJSON_AddStringToObject(frame, "src", "companionbox-80f1b2d68d1c");
+    cJSON_AddStringToObject(frame, "src", "companiondock-80f1b2d68d1c");
     cJSON_AddStringToObject(frame, "dst", "user");
     cJSON_AddStringToObject(frame, "method", "NotifyStatus");
     cJSON *params = cJSON_AddObjectToObject(frame, "params");
@@ -85,7 +85,7 @@ static cJSON *rand_status(void)
 {
     if (rnd() % 4 == 0) return rand_object(0);
     cJSON *st = cJSON_CreateObject();
-    cJSON_AddStringToObject(st, "name", "CompanionBox-8D1C");
+    cJSON_AddStringToObject(st, "name", "CompanionDock-8D1C");
     if (rnd() % 8) cJSON_AddNumberToObject(st, "uptime_s", rnd() % 100000);
     for (int i = (int)(rnd() % 4); i > 0; i--) cJSON_AddItemToObject(st, NAMES[rnd() % NNAMES], rand_value(1));
     if (rnd() % 8) {

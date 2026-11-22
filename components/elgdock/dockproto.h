@@ -154,7 +154,7 @@ typedef struct {
 dock_act_t dockproto_dock_reconcile(const dock_want_t *want, const dock_now_t *now);
 
 /* The mDNS instance name of a dock: "<short model> @ <box name>", e.g. "Module 32 @
- * CompanionBox-8D1C" ("Stream Deck" when model is NULL or ""). The short model is the name without
+ * CompanionDock-8D1C" ("Stream Deck" when model is NULL or ""). The short model is the name without
  * "Stream Deck " when what remains starts with a letter or digit ("Stream Deck +" stays). dup: another
  * dock of the box would have the same name; " (dock <dock + 1>)" follows the model, counting docks from
  * 1 as the web page does, as instance names must differ. At most DOCK_MDNS_NAME_MAX bytes: the model part is cut first, the box

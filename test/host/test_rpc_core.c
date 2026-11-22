@@ -53,7 +53,7 @@ static cJSON *m_public(const cJSON *p, rpc_err_t *err)
 void setUp(void)
 {
     rpc_reset();
-    rpc_set_device_id("companionbox-test");
+    rpc_set_device_id("companiondock-test");
     rpc_set_auth(auth_enabled, token_ok);
     rpc_set_lock(lock, unlock);
     rpc_register("Test.Echo", m_echo, 0);
@@ -94,7 +94,7 @@ static void test_parse_error(void)
 {
     cJSON *r = parse(rpc_handle_frame("{\"id\":1,\"method\":", NULL, NULL));
     TEST_ASSERT_EQUAL_INT(RPC_E_PARSE, err_code(r));
-    TEST_ASSERT_EQUAL_STRING("companionbox-test", cJSON_GetObjectItem(r, "src")->valuestring);
+    TEST_ASSERT_EQUAL_STRING("companiondock-test", cJSON_GetObjectItem(r, "src")->valuestring);
     cJSON_Delete(r);
 
     r = parse(rpc_handle_frame("[1,2]", NULL, NULL)); /* valid JSON but not a frame */
@@ -187,7 +187,7 @@ static void test_result_framed(void)
     cJSON *r = parse(rpc_handle_frame(
         "{\"id\":\"abc\",\"src\":\"webui\",\"method\":\"Test.Echo\",\"params\":{\"v\":42}}", NULL, "10.0.0.9"));
     TEST_ASSERT_EQUAL_STRING("abc", cJSON_GetObjectItem(r, "id")->valuestring);
-    TEST_ASSERT_EQUAL_STRING("companionbox-test", cJSON_GetObjectItem(r, "src")->valuestring);
+    TEST_ASSERT_EQUAL_STRING("companiondock-test", cJSON_GetObjectItem(r, "src")->valuestring);
     TEST_ASSERT_EQUAL_STRING("webui", cJSON_GetObjectItem(r, "dst")->valuestring);
     TEST_ASSERT_NULL(cJSON_GetObjectItem(r, "error"));
     const cJSON *res = cJSON_GetObjectItem(r, "result");

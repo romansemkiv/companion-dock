@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build (and optionally flash) the Companion Box firmware on macOS / Linux.
+# Build (and optionally flash) the Companion Dock firmware on macOS / Linux.
 # This tree has one board, the Waveshare ESP32-P4-WIFI6-POE-ETH (ESP-IDF 5.5.6).
 #   ./build.sh                  development build (build/), version <version.txt>-dev+g<commit>[.dirty]
 #                               (a CBX_VERSION in the environment is ignored, and said so)

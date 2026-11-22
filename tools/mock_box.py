@@ -31,11 +31,11 @@ def deck(model, serial, hub, menu=False, screen=True, ignored=False):
 
 def base():
     return {
-        "name": "CompanionBox-8D1C", "uptime_s": 3600, "mode": "satellite",
+        "name": "CompanionDock-8D1C", "uptime_s": 3600, "mode": "satellite",
         "net": {"route": "wifi", "ip": "192.168.8.225", "eth_addr": "", "sta_addr": "192.168.8.225", "eth_dhcp": True,
                 "eth_link": False, "wifi_connected": True, "wifi_enabled": True,
                 "sta_net": "main", "sta_ssid": "Studio WiFi", "sta_rssi": -58, "ap_on": True, "ap_forced": False,
-                "ap_ssid": "CompanionBox-8D1C", "ap_ip": "192.168.4.1", "ap_clients": 0},
+                "ap_ssid": "CompanionDock-8D1C", "ap_ip": "192.168.4.1", "ap_clients": 0},
         "companion": {"state": "connected", "version": "5.1.1", "api_version": "1.14.0", "host": "192.168.8.155",
                       "port": 16622, "auto": True, "pinned_id": "x", "selection": "connect", "instances": 1},
         "dock": [], "decks": [deck("Stream Deck Module 32", "AB1CD2345678EF", False)], "problems": [],
@@ -57,7 +57,7 @@ def states():
     n.update(net={"route": "none", "ip": "", "eth_addr": "", "sta_addr": "", "eth_dhcp": True, "eth_link": False,
                   "wifi_connected": False, "wifi_enabled": True,
                   "sta_net": "none", "sta_ssid": "", "sta_rssi": 0, "ap_on": True, "ap_forced": True,
-                  "ap_ssid": "CompanionBox-8D1C", "ap_ip": "192.168.4.1", "ap_clients": 1}, decks=[], maintenanceDeck=None)
+                  "ap_ssid": "CompanionDock-8D1C", "ap_ip": "192.168.4.1", "ap_clients": 1}, decks=[], maintenanceDeck=None)
     s["nonet"] = n
     c = base()
     c["companion"] = {"state": "connecting", "host": "", "port": 16622, "auto": True, "selection": "ambiguous", "instances": 2}
@@ -139,7 +139,7 @@ def answer(method):
     st = STATES[CUR["name"]]
     return {
         "Sys.GetStatus": st,
-        "Device.GetInfo": {"id": "companionbox-8d1c", "name": st["name"], "version": st["firmware"]["version"],
+        "Device.GetInfo": {"id": "companiondock-8d1c", "name": st["name"], "version": st["firmware"]["version"],
                            "model": "ESP32-P4-WIFI6-POE-ETH", "auth_en": False, "lastReset": "power-on"},
         "Auth.GetStatus": {"auth_en": False, "pin": True, "authed": True, "locked_s": 0},
         "Companion.GetConfig": {"companionAuto": st["companion"].get("auto", True), "companionHost": "192.168.8.155",
@@ -152,7 +152,7 @@ def answer(method):
         "Wifi.Scan": {"results": [{"ssid": "Studio WiFi", "rssi": -52, "auth": "WPA2", "channel": 6},
                                   {"ssid": "Office 5G", "rssi": -67, "auth": "WPA2", "channel": 36},
                                   {"ssid": "Cafe", "rssi": -80, "auth": "open", "channel": 1}]},
-        "Ap.GetConfig": {"apEnabled": True, "apSecured": True, "apPass": "k7m2p9xqwe", "apSsid": "CompanionBox-8D1C"},
+        "Ap.GetConfig": {"apEnabled": True, "apSecured": True, "apPass": "k7m2p9xqwe", "apSsid": "CompanionDock-8D1C"},
         "Ota.GetStatus": {"state": "idle", "running": "ota_0", "version": st["firmware"]["version"], "next": "ota_1",
                           "pending_verify": False,
                           "sync": {"state": "in_sync", "pct": 100, "other": {"label": "ota_1", "project": "companion_box",

@@ -286,10 +286,10 @@ static void test_deck_firmware_builder(void)
 static void test_mdns_name(void)
 {
     char out[DOCK_MDNS_NAME_MAX + 1];
-    dockproto_mdns_name(out, "Stream Deck Module 32", 0, false, "CompanionBox-8D1C");
-    TEST_ASSERT_EQUAL_STRING("Module 32 @ CompanionBox-8D1C", out);
-    dockproto_mdns_name(out, NULL, 0, false, "CompanionBox-8D1C"); /* never announced without a deck */
-    TEST_ASSERT_EQUAL_STRING("Stream Deck @ CompanionBox-8D1C", out);
+    dockproto_mdns_name(out, "Stream Deck Module 32", 0, false, "CompanionDock-8D1C");
+    TEST_ASSERT_EQUAL_STRING("Module 32 @ CompanionDock-8D1C", out);
+    dockproto_mdns_name(out, NULL, 0, false, "CompanionDock-8D1C"); /* never announced without a deck */
+    TEST_ASSERT_EQUAL_STRING("Stream Deck @ CompanionDock-8D1C", out);
     dockproto_mdns_name(out, "", 3, false, "Box");
     TEST_ASSERT_EQUAL_STRING("Stream Deck @ Box", out);
     dockproto_mdns_name(out, "Stream Deck MK.2", 1, false, "Box");
@@ -341,12 +341,12 @@ static void test_docks_wanted(void)
     const dock_in_t in[4] = {{true, "Stream Deck Module 32", "AB1CD2345678EF"}, {false, "", ""},
                              {true, "Stream Deck MK.2", "MK2"}, {false, NULL, NULL}};
     dock_want_t w[4];
-    dockproto_docks_wanted(in, 4, true, "CompanionBox-8D1C", w);
+    dockproto_docks_wanted(in, 4, true, "CompanionDock-8D1C", w);
     TEST_ASSERT_TRUE(w[0].listen);
     TEST_ASSERT_TRUE(w[0].announce);
-    TEST_ASSERT_EQUAL_STRING("Module 32 @ CompanionBox-8D1C", w[0].name);
+    TEST_ASSERT_EQUAL_STRING("Module 32 @ CompanionDock-8D1C", w[0].name);
     TEST_ASSERT_EQUAL_STRING("AB1CD2345678EF", w[0].sn);
-    TEST_ASSERT_EQUAL_STRING("MK.2 @ CompanionBox-8D1C", w[2].name);
+    TEST_ASSERT_EQUAL_STRING("MK.2 @ CompanionDock-8D1C", w[2].name);
     for (int i = 1; i < 4; i += 2) { /* no deck, dock 0 included elsewhere: closed and unannounced */
         TEST_ASSERT_FALSE(w[i].listen);
         TEST_ASSERT_FALSE(w[i].announce);
@@ -423,7 +423,7 @@ static void test_docks_wanted_matches_old(void)
                                         NULL, "Stream Deck Plus XL Long Model Name A", "Stream Deck Plus XL Long Model Name B",
                                         "Stream Deck Neo"};
     static const char *const SERIAL[] = {"X1", "", NULL, "AB1CD2345678EF"};
-    static const char *const BOX[] = {"Box", "CompanionBox-8D1C", "", NULL,
+    static const char *const BOX[] = {"Box", "CompanionDock-8D1C", "", NULL,
                                       "A-very-long-box-name-that-leaves-the-model-only-a-few-bytes-x"};
     dock_in_t in[8];
     dock_want_t a[8], b[8];

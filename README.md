@@ -170,7 +170,7 @@ Plug in the network cable (or USB-C power) and a deck. With no network yet, the 
 first to join the box's hotspot, the second to open the setup page, and join your network from there. With
 Ethernet and DHCP the box is on the network straight away, and the deck shows its address.
 
-The web page is at `http://<box IP>/` or `http://companionbox-xxxx.local/`.
+The web page is at `http://<box IP>/` or `http://companiondock-xxxx.local/`.
 
 ### 3. Add it in Companion
 

@@ -5,8 +5,8 @@
 #include <string.h>
 
 /* The simulated box (S). */
-static const char *IP = "192.168.8.225", *AP_IP = "192.168.4.1", *AP_SSID = "CompanionBox-8D1C",
-                  *AP_PASS = "k7m2p9xq", *NAME = "CompanionBox-8D1C", *VER = "0.1.0", *TARGET = "Studio-Mac",
+static const char *IP = "192.168.8.225", *AP_IP = "192.168.4.1", *AP_SSID = "CompanionDock-8D1C",
+                  *AP_PASS = "k7m2p9xq", *NAME = "CompanionDock-8D1C", *VER = "0.1.0", *TARGET = "Studio-Mac",
                   *TARGET_IP = "192.168.8.155";
 static const struct { const char *ssid; int rssi; } MAIN = {"Simbox-Home", -58}, BACKUP = {"Office-5G", -66};
 static const struct { const char *name, *ip; } COMPS[] = {{"Studio-Mac", "192.168.8.155"}, {"FOH-PC", "192.168.8.40"}};

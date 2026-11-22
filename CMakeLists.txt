@@ -35,12 +35,12 @@ if(ver_len GREATER 31)
     message(FATAL_ERROR "firmware version '${PROJECT_VER}' is longer than 31 characters")
 endif()
 if(cbx_ver_from STREQUAL "-DCBX_VERSION")
-    message(NOTICE "-- Companion Box firmware ${PROJECT_VER}: release version from -DCBX_VERSION, not from git")
+    message(NOTICE "-- Companion Dock firmware ${PROJECT_VER}: release version from -DCBX_VERSION, not from git")
 elseif(cbx_ver_from)
-    message(WARNING "Companion Box firmware ${PROJECT_VER}: release version from CBX_VERSION in the "
+    message(WARNING "Companion Dock firmware ${PROJECT_VER}: release version from CBX_VERSION in the "
                     "environment, not from git. Unset CBX_VERSION for a development build.")
 else()
-    message(STATUS "Companion Box firmware ${PROJECT_VER}")
+    message(STATUS "Companion Dock firmware ${PROJECT_VER}")
 endif()
 # The version is worked out at configure time: configure again when version.txt or the checked-out
 # commit changes, not only on a clean build. HEAD's reflog changes at every commit, checkout and reset,

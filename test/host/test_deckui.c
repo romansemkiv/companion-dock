@@ -367,7 +367,7 @@ static void test_flow_optional_step(void)
     TEST_ASSERT_EQUAL_STRING("Box IP:192.168.|:8.225|Port:5343", row_text(0, 1));
     b.scen = FX_NONET; /* "1 Join" + the name and the password, each on one key */
     plan(PID_MK2, fx_home, &b);
-    TEST_ASSERT_EQUAL_STRING("#1 Join|Hotspot:CompanionBox-8D1C|Password:k7m2p9xq|.|.", row_text(0, 1));
+    TEST_ASSERT_EQUAL_STRING("#1 Join|Hotspot:CompanionDock-8D1C|Password:k7m2p9xq|.|.", row_text(0, 1));
     TEST_ASSERT_EQUAL_STRING("#2 Open|Setup page:192.168.4.1|.|.|.", row_text(1, 1));
 }
 
@@ -454,18 +454,18 @@ static void test_flow_anchor(void)
     fx_box_t b = fx_box_default();
     plan(PID_M32, fx_home, &b);
     TEST_ASSERT_EQUAL(1, L.pages);
-    TEST_ASSERT_EQUAL_STRING("Hotspot:Companion|Box-8D1C|Password:k7m2p9xq|.|.|.|.|.", row_text(0, 2)); /* the password on one key */
+    TEST_ASSERT_EQUAL_STRING("Hotspot:Companion|Dock-8D1C|Password:k7m2p9xq|.|.|.|.|.", row_text(0, 2)); /* the password on one key */
     TEST_ASSERT_EQUAL(DUI_TINT_SVC, at(0, 0, 2)->tint);
     TEST_ASSERT_EQUAL(DUI_TINT_MAIN, at(0, 1, 1)->tint);
     /* + XL: 3 content rows; the service zone in the bottom one, a blank row between */
     plan(PID_PLUSXL, fx_home, &b);
     TEST_ASSERT_EQUAL(1, L.pages);
     TEST_ASSERT_EQUAL_STRING(".|.|.|.|.|.|.|.|.", row_text(0, 1));
-    TEST_ASSERT_EQUAL_STRING("Hotspot:Companion|Box-8D1C|Password:k7m2p9xq|.|.|.|.|.|.", row_text(0, 2)); /* 112 px: whole */
+    TEST_ASSERT_EQUAL_STRING("Hotspot:Companion|Dock-8D1C|Password:k7m2p9xq|.|.|.|.|.|.", row_text(0, 2)); /* 112 px: whole */
     /* MK.2: one content row, full: a page of its own; each value on one key */
     plan(PID_MK2, fx_home, &b);
     TEST_ASSERT_EQUAL(2, L.pages);
-    TEST_ASSERT_EQUAL_STRING("Hotspot:CompanionBox-8D1C|Password:k7m2p9xq|.|.|.", row_text(1, 1));
+    TEST_ASSERT_EQUAL_STRING("Hotspot:CompanionDock-8D1C|Password:k7m2p9xq|.|.|.", row_text(1, 1));
 }
 
 /* On the big decks: a row of 4 or more holds the 4 octets together, the port beside them or on the next
@@ -478,10 +478,10 @@ static void test_flow_octets(void)
     TEST_ASSERT_EQUAL_STRING("#1 Add|Box IP:192|168|8|225|Port:5343|.|.", row_text(0, 1));
     /* the small decks: one key, its port beside it */
     plan(PID_NEO, fx_home, &b);
-    TEST_ASSERT_EQUAL_STRING("#1 Add|Box IP:192.168.8.225|Port:5343|.\nHotspot:CompanionBox-8D1C|Password:k7m2p9xq|.|[Menu]",
+    TEST_ASSERT_EQUAL_STRING("#1 Add|Box IP:192.168.8.225|Port:5343|.\nHotspot:CompanionDock-8D1C|Password:k7m2p9xq|.|[Menu]",
                              page_text(0));
     plan(PID_PLUS, fx_home, &b);
-    TEST_ASSERT_EQUAL_STRING("#1 Add|Box IP:192.168.8.225|Port:5343|.\nHotspot:CompanionBox-8D1C|Password:k7m2p9xq|.|[Menu]",
+    TEST_ASSERT_EQUAL_STRING("#1 Add|Box IP:192.168.8.225|Port:5343|.\nHotspot:CompanionDock-8D1C|Password:k7m2p9xq|.|[Menu]",
                              page_text(0));
     plan(PID_MINI, fx_home, &b); /* on 80 px it doesn't fit one key on one line: two keys, then its port */
     TEST_ASSERT_EQUAL_STRING("Box IP:192.168.|:8.225|Port:5343", row_text(0, 1));
@@ -525,7 +525,7 @@ static void test_flow_value_pieces(void)
     plan(PID_M32, fx_network, &b);
     TEST_ASSERT_EQUAL_STRING("(Main)|Simbox-|Home|Signal:-58|IP:192|168|8|225", row_text(0, 2)); /* the reference fixture */
     TEST_ASSERT_EQUAL_STRING("(Backup)|Office-5G|Standby|.|.|.|.|>", row_text(0, 3));
-    TEST_ASSERT_EQUAL_STRING("Name:Companion|Box-8D1C|.local|.|.|.|.|.", row_text(1, 1));
+    TEST_ASSERT_EQUAL_STRING("Name:Companion|Dock-8D1C|.local|.|.|.|.|.", row_text(1, 1));
     plan(PID_MK2, fx_network, &b); /* 72 px: "Simbox-Home" on one key, "Simbox-" / "Home" */
     const dui_tile_t *v = NULL;
     for (int j = 0; j < L.ntiles; j++)
@@ -536,7 +536,7 @@ static void test_flow_value_pieces(void)
     TEST_ASSERT_GREATER_OR_EQUAL(DUI_TEXT_MIN_PX, v->fit.px);
     /* the Mini's hotspot: each value on its key */
     plan(PID_MINI, fx_hotspot, &b);
-    TEST_ASSERT_EQUAL_STRING("[<Hotspot]|Hotspot:CompanionBox-8D1C|.", row_text(0, 0));
+    TEST_ASSERT_EQUAL_STRING("[<Hotspot]|Hotspot:CompanionDock-8D1C|.", row_text(0, 0));
     TEST_ASSERT_EQUAL_STRING("Password:k7m2p9xq", first_key(row_text(0, 1)));
 }
 
@@ -889,11 +889,11 @@ static void test_align_two_lines(void)
     T[0] = mk(DUI_TILE_WORD, NULL, "k7m2p9xqzzzwr", DUI_ROLE_VALUE); /* a value: never an added '-' */
     dui_align_row(one_of(&T[0]), 1, 72);
     TEST_ASSERT_EQUAL(0, T[0].fit.hyph);
-    T[0] = mk(DUI_TILE_CAP, "Wi-Fi", "CompanionBox-8D1C", DUI_ROLE_VALUE);
+    T[0] = mk(DUI_TILE_CAP, "Wi-Fi", "CompanionDock-8D1C", DUI_ROLE_VALUE);
     dui_tile_t *one[] = {&T[0]};
     dui_align_row(one, 1, 72);
     TEST_ASSERT_EQUAL(2, T[0].fit.nl);
-    TEST_ASSERT_EQUAL(9, T[0].fit.cut); /* "Companion" / "Box-8D1C": before the capital */
+    TEST_ASSERT_EQUAL(9, T[0].fit.cut); /* "Companion" / "Dock-8D1C": before the capital */
     TEST_ASSERT_GREATER_OR_EQUAL(DUI_TEXT_MIN_PX, T[0].fit.px);
     T[0] = mk(DUI_TILE_CAP, "IP", "192.168.", DUI_ROLE_ACCENT); /* an address's key: one line */
     T[0].flags |= DUI_F_IP;
@@ -1423,8 +1423,8 @@ static int qr_version(const uint8_t *qr) { return (dui_qr_size(qr) - 17) / 4; }
 static void test_qr_join_and_setup_url(void)
 {
     char join[128];
-    dui_wifi_join(join, sizeof join, "CompanionBox-8D1C", "k7m2xq9fhd"); /* the 10-char hotspot password */
-    TEST_ASSERT_EQUAL_STRING("WIFI:T:WPA;S:CompanionBox-8D1C;P:k7m2xq9fhd;;", join);
+    dui_wifi_join(join, sizeof join, "CompanionDock-8D1C", "k7m2xq9fhd"); /* the 10-char hotspot password */
+    TEST_ASSERT_EQUAL_STRING("WIFI:T:WPA;S:CompanionDock-8D1C;P:k7m2xq9fhd;;", join);
     static const char *PAY[2];
     PAY[0] = join;
     PAY[1] = "http://192.168.4.1/";

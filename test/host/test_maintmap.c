@@ -30,7 +30,7 @@ static surf_maint_in_t in_default(void)
     strcpy(NS.sta_ssid, "Simbox-Home");
     NS.sta_rssi = -58;
     NS.ap_on = true;
-    strcpy(NS.ap_ssid, "CompanionBox-8D1C");
+    strcpy(NS.ap_ssid, "CompanionDock-8D1C");
     strcpy(NS.ap_ip, "192.168.4.1");
     memset(&SS, 0, sizeof SS);
     SS.state = SLOTSYNC_IN_SYNC;
@@ -47,7 +47,7 @@ static surf_maint_in_t in_default(void)
     strcpy(COMPS[1].id, "id-b");
     strcpy(COMPS[1].host, "192.168.8.40");
     return (surf_maint_in_t){
-        .dock = true, .ns = &NS, .ss = &SS, .box_name = "CompanionBox-8D1C", .wifi_main = "Simbox-Home",
+        .dock = true, .ns = &NS, .ss = &SS, .box_name = "CompanionDock-8D1C", .wifi_main = "Simbox-Home",
         .wifi_backup = "Office-5G", .ap_shown = true, .ap_open = false, .ap_ssid = "", .ap_pass = "k7m2p9xq",
         .brightness = 70, .sound = true, .version = "0.1.0", .uptime_s = 123, .sel = SEL_NONE,
         .target_host = "", .companion_version = "", .comps = COMPS, .ncomps = 2, .dock_port = 5343,
@@ -72,11 +72,11 @@ static void test_network_and_settings(void)
     TEST_ASSERT_EQUAL_STRING("Simbox-Home", B.net.wifi_main);
     TEST_ASSERT_EQUAL_STRING("Office-5G", B.net.wifi_backup);
     TEST_ASSERT_TRUE(B.net.ap_on);
-    TEST_ASSERT_EQUAL_STRING("CompanionBox-8D1C", B.net.ap_ssid); /* netmgr's when surfaces has none */
+    TEST_ASSERT_EQUAL_STRING("CompanionDock-8D1C", B.net.ap_ssid); /* netmgr's when surfaces has none */
     TEST_ASSERT_EQUAL_STRING("k7m2p9xq", B.net.ap_pass);
     TEST_ASSERT_TRUE(B.net.ap_secured);
     TEST_ASSERT_EQUAL_STRING("192.168.4.1", B.net.ap_ip);
-    TEST_ASSERT_EQUAL_STRING("CompanionBox-8D1C", B.net.name);
+    TEST_ASSERT_EQUAL_STRING("CompanionDock-8D1C", B.net.name);
     TEST_ASSERT_EQUAL(70, B.brightness);
     TEST_ASSERT_TRUE(B.sound);
     TEST_ASSERT_FALSE(B.locked);

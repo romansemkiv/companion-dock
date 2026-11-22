@@ -15,7 +15,7 @@ typedef struct {
 
 static method_t s_methods[RPC_MAX_METHODS];
 static int s_n_methods;
-static char s_device_id[48] = "companionbox";
+static char s_device_id[48] = "companiondock";
 static bool (*s_auth_enabled)(void);
 static bool (*s_token_ok)(const char *);
 static void (*s_lock)(void);
@@ -151,7 +151,7 @@ void rpc_reset(void)
     s_lock = s_unlock = NULL;
     s_overflow = NULL;
     s_cur = NULL;
-    rpc_set_device_id("companionbox");
+    rpc_set_device_id("companiondock");
 }
 
 /* Runs a known method behind the lock. params NULL = {}. */

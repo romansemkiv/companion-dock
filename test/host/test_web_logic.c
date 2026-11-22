@@ -14,8 +14,8 @@ static const wg_hdr_t ABSENT = {0};
 static const wg_hdr_t BAD = {.bad = true}; /* present but too long to read (or any read error) */
 static wg_hdr_t H(const char *v) { return (wg_hdr_t){.v = v}; }
 
-#define HN "companionbox-8d1c"
-#define DEV "companionbox-80f1b2d68d1c"
+#define HN "companiondock-8d1c"
+#define DEV "companiondock-80f1b2d68d1c"
 
 /* only "not in the request" is absent; a truncated value (or any read failure) is bad */
 static void test_header_read_mapping(void)
@@ -40,16 +40,16 @@ static void test_host_allowed_names(void)
     TEST_ASSERT_TRUE(wg_host_ok(H("192.168.8.225"), HN, DEV));
     TEST_ASSERT_TRUE(wg_host_ok(H("192.168.8.225:80"), HN, DEV));
     TEST_ASSERT_TRUE(wg_host_ok(H("[fe80::1]:80"), HN, DEV));
-    TEST_ASSERT_TRUE(wg_host_ok(H("CompanionBox-8D1C.local"), HN, DEV));
-    TEST_ASSERT_TRUE(wg_host_ok(H("companionbox-8d1c"), HN, DEV));
-    TEST_ASSERT_TRUE(wg_host_ok(H("COMPANIONBOX-80F1B2D68D1C:80"), HN, DEV));
+    TEST_ASSERT_TRUE(wg_host_ok(H("CompanionDock-8D1C.local"), HN, DEV));
+    TEST_ASSERT_TRUE(wg_host_ok(H("companiondock-8d1c"), HN, DEV));
+    TEST_ASSERT_TRUE(wg_host_ok(H("COMPANIONDOCK-80F1B2D68D1C:80"), HN, DEV));
     TEST_ASSERT_TRUE(wg_host_ok(ABSENT, HN, DEV)); /* HTTP/1.0 tool */
 }
 
 static void test_host_refused(void)
 {
     TEST_ASSERT_FALSE(wg_host_ok(H("evil.example"), HN, DEV));
-    TEST_ASSERT_FALSE(wg_host_ok(H("companionbox-8d1c.evil.example"), HN, DEV));
+    TEST_ASSERT_FALSE(wg_host_ok(H("companiondock-8d1c.evil.example"), HN, DEV));
     TEST_ASSERT_FALSE(wg_host_ok(H("192.168.8.225.evil.example"), HN, DEV));
     TEST_ASSERT_FALSE(wg_host_ok(H("1.2.3"), HN, DEV));
     TEST_ASSERT_FALSE(wg_host_ok(H("1.2.3.256"), HN, DEV));
@@ -109,8 +109,8 @@ static void test_host_only(void)
 static void test_hostname(void)
 {
     char h[40];
-    boxcfg_hostname("CompanionBox-8D1C", h, sizeof h); /* boxconfig's, once web_hostname */
-    TEST_ASSERT_EQUAL_STRING("companionbox-8d1c", h);
+    boxcfg_hostname("CompanionDock-8D1C", h, sizeof h); /* boxconfig's, once web_hostname */
+    TEST_ASSERT_EQUAL_STRING("companiondock-8d1c", h);
     boxcfg_hostname("Rack 2 / Left", h, sizeof h);
     TEST_ASSERT_EQUAL_STRING("rack-2---left", h);
     boxcfg_hostname("abcdefgh", h, 5);
@@ -207,8 +207,8 @@ static void test_api_host(void)
         bool ok;
     } H_[] = {
         {"192.168.1.50", true},      {"192.168.1.50:80", true},  {"[fe80::1]", true},         {"[fe80::1]:80", true},
-        {"companionbox-8d1c.local", true}, {"anything.local", true}, {HN, true},              {DEV, true},
-        {"CompanionBox-8D1C", true}, {"evil.example", false},     {"box.evil.example", false}, {"rebind.attacker.example", false},
+        {"companiondock-8d1c.local", true}, {"anything.local", true}, {HN, true},              {DEV, true},
+        {"CompanionDock-8D1C", true}, {"evil.example", false},     {"box.evil.example", false}, {"rebind.attacker.example", false},
         {"", false},                 {"192.168.1.50.evil.example", false}, {"local", false},   {"x.local.evil.example", false},
     };
     for (size_t i = 0; i < sizeof H_ / sizeof H_[0]; i++) {
@@ -317,7 +317,7 @@ static void test_api_body(void)
     TEST_ASSERT_TRUE(ok);
     TEST_ASSERT_EQUAL_STRING("10.0.0.7", c.companion_host);
     TEST_ASSERT_EQUAL_UINT16(16623, c.companion_port);
-    TEST_ASSERT_EQUAL_STRING("CompanionBox-A1B2", c.box_name);
+    TEST_ASSERT_EQUAL_STRING("CompanionDock-A1B2", c.box_name);
     TEST_ASSERT_TRUE(c.mdns_enabled);
     free(s);
     /* ... signed in, the same body applies whole: here its protocol is refused */

@@ -23,7 +23,7 @@ static box_config_t fresh(void)
 static void test_defaults(void)
 {
     box_config_t c = fresh();
-    TEST_ASSERT_EQUAL_STRING("CompanionBox-A1B2", c.box_name);
+    TEST_ASSERT_EQUAL_STRING("CompanionDock-A1B2", c.box_name);
     TEST_ASSERT_EQUAL_UINT16(16622, c.companion_port);
     TEST_ASSERT_TRUE(c.companion_auto);
     TEST_ASSERT_TRUE(c.eth_dhcp);
@@ -37,7 +37,7 @@ static void test_defaults(void)
         TEST_ASSERT_NOT_NULL(strchr("abcdefghjkmnpqrstuvwxyz23456789", c.ap_pass[i]));
     char ssid[33];
     boxcfg_ap_ssid(MAC, ssid);
-    TEST_ASSERT_EQUAL_STRING("CompanionBox-A1B2", ssid);
+    TEST_ASSERT_EQUAL_STRING("CompanionDock-A1B2", ssid);
 }
 
 static void test_json_partial_update(void)
@@ -211,7 +211,7 @@ static void test_satellite_config_get(void)
     box_config_t c = fresh();
     char *s = boxcfg_satellite_config_json(&c);
     TEST_ASSERT_NOT_NULL(strstr(s, "\"httpPort\":80"));
-    TEST_ASSERT_NOT_NULL(strstr(s, "\"installationName\":\"CompanionBox-A1B2\""));
+    TEST_ASSERT_NOT_NULL(strstr(s, "\"installationName\":\"CompanionDock-A1B2\""));
     TEST_ASSERT_NOT_NULL(strstr(s, "\"protocol\":\"tcp\""));
     TEST_ASSERT_NOT_NULL(strstr(s, "\"port\":16622"));
     TEST_ASSERT_NOT_NULL(strstr(s, "\"mdnsEnabled\":true"));
@@ -1232,8 +1232,8 @@ static void test_setconfig_near_integers(void)
 static void test_hostname(void)
 {
     char h[40];
-    boxcfg_hostname("CompanionBox-8D1C", h, sizeof h);
-    TEST_ASSERT_EQUAL_STRING("companionbox-8d1c", h);
+    boxcfg_hostname("CompanionDock-8D1C", h, sizeof h);
+    TEST_ASSERT_EQUAL_STRING("companiondock-8d1c", h);
     boxcfg_hostname("Rack 2 / Left", h, sizeof h);
     TEST_ASSERT_EQUAL_STRING("rack-2---left", h);
     boxcfg_hostname("caf\xc3\xa9_\x01X", h, sizeof h);

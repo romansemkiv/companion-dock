@@ -50,11 +50,11 @@ static dui_box_t box_default(void)
     b.net.eth_link = true;
     strcpy(b.net.eth_ip, "192.168.8.226");
     b.net.ap_on = true;
-    strcpy(b.net.ap_ssid, "CompanionBox-8D1C");
+    strcpy(b.net.ap_ssid, "CompanionDock-8D1C");
     strcpy(b.net.ap_pass, "k7m2p9xq");
     b.net.ap_secured = true;
     strcpy(b.net.ap_ip, "192.168.4.1");
-    strcpy(b.net.name, "CompanionBox-8D1C");
+    strcpy(b.net.name, "CompanionDock-8D1C");
     strcpy(b.box.version, "0.1.0");
     b.box.uptime_s = 8040;
     b.box.slot = DUI_SLOT_DIFFERS;

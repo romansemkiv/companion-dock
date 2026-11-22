@@ -1,4 +1,4 @@
-/* Companion Box: USB Stream Decks to Bitfocus Companion over the Satellite API, on the Waveshare
+/* Companion Dock: USB Stream Decks to Bitfocus Companion over the Satellite API, on the Waveshare
  * ESP32-P4-WIFI6-POE-ETH.
  *
  * Boot order (each stage logs one line when done): NVS -> quick-reset count -> config ->

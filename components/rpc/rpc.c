@@ -28,7 +28,7 @@ esp_err_t rpc_init(void)
     uint8_t m[6] = {0};
     esp_read_mac(m, ESP_MAC_ETH);
     char id[32];
-    snprintf(id, sizeof id, "companionbox-%02x%02x%02x%02x%02x%02x", m[0], m[1], m[2], m[3], m[4], m[5]);
+    snprintf(id, sizeof id, "companiondock-%02x%02x%02x%02x%02x%02x", m[0], m[1], m[2], m[3], m[4], m[5]);
     rpc_set_device_id(id);
     rpc_set_overflow_hook(overflow);
     rpc_set_lock(lock, unlock);

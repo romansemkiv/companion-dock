@@ -18,7 +18,7 @@ static const char AP_ALPHABET[] = "abcdefghjkmnpqrstuvwxyz23456789";
 
 void boxcfg_ap_ssid(const uint8_t mac[6], char out[33])
 {
-    snprintf(out, 33, "CompanionBox-%02X%02X", mac[4], mac[5]);
+    snprintf(out, 33, "CompanionDock-%02X%02X", mac[4], mac[5]);
 }
 
 void boxcfg_hostname(const char *box_name, char *out, size_t n)

@@ -43,11 +43,11 @@ static dui_box_t box_default(void)
     b.net.rssi = -58;
     strcpy(b.net.wifi_ip, "192.168.8.225");
     b.net.ap_on = true;
-    strcpy(b.net.ap_ssid, "CompanionBox-8D1C");
+    strcpy(b.net.ap_ssid, "CompanionDock-8D1C");
     strcpy(b.net.ap_pass, "k7m2p9xq");
     b.net.ap_secured = true;
     strcpy(b.net.ap_ip, "192.168.4.1");
-    strcpy(b.net.name, "CompanionBox-8D1C");
+    strcpy(b.net.name, "CompanionDock-8D1C");
     strcpy(b.box.version, "0.1.0");
     b.box.uptime_s = 2 * 3600 + 14 * 60 + 5;
     b.box.slot = DUI_SLOT_IN_SYNC;
@@ -204,7 +204,7 @@ static int tile_with(const char *text)
 
 /* ---- home ---- */
 
-#define HOTSPOT "^S Hotspot:CompanionBox-8D1C|Password:k7m2p9xq|QR" /* its join code after it */
+#define HOTSPOT "^S Hotspot:CompanionDock-8D1C|Password:k7m2p9xq|QR" /* its join code after it */
 
 static void test_home_dock_waiting(void)
 {
@@ -229,7 +229,7 @@ static void test_home_dock_waiting(void)
     b.net.ap_secured = false;
     b.net.ap_pass[0] = '\0';
     build(DUI_PAGE_HOME, &b);
-    TEST_ASSERT_EQUAL_STRING("#1 Add|Box IP:192|168|8|225|Port:5343 / ^S Hotspot:CompanionBox-8D1C|Open|QR", content(&S));
+    TEST_ASSERT_EQUAL_STRING("#1 Add|Box IP:192|168|8|225|Port:5343 / ^S Hotspot:CompanionDock-8D1C|Open|QR", content(&S));
     TEST_ASSERT_EQUAL(DUI_ROLE_LABEL, find(&S, NULL, "Open")->role);
     b.net.ap_on = false;
     build(DUI_PAGE_HOME, &b);
@@ -351,18 +351,18 @@ static void test_home_no_network(void)
     b.net.wifi_ip[0] = '\0';
     build(DUI_PAGE_HOME, &b); /* dock mode: no address */
     /* each step's QR code after its words (the join code in the service zone, the URL code in the main one) */
-    TEST_ASSERT_EQUAL_STRING("S #1 Join|Hotspot:CompanionBox-8D1C|Password:k7m2p9xq / S QR / #2 Open|Setup page:192|168|4|1 / QR",
+    TEST_ASSERT_EQUAL_STRING("S #1 Join|Hotspot:CompanionDock-8D1C|Password:k7m2p9xq / S QR / #2 Open|Setup page:192|168|4|1 / QR",
                              content(&S));
     TEST_ASSERT_EQUAL_STRING("No network", words(&S, false));
     TEST_ASSERT_EQUAL(DUI_STATE_BAD, S.status.state);
     TEST_ASSERT_EQUAL(DUI_NET_NONE, S.status.net);
     b = sat(DUI_SAT_NONET); /* satellite: the same */
     build(DUI_PAGE_HOME, &b);
-    TEST_ASSERT_EQUAL_STRING("S #1 Join|Hotspot:CompanionBox-8D1C|Password:k7m2p9xq / S QR / #2 Open|Setup page:192|168|4|1 / QR",
+    TEST_ASSERT_EQUAL_STRING("S #1 Join|Hotspot:CompanionDock-8D1C|Password:k7m2p9xq / S QR / #2 Open|Setup page:192|168|4|1 / QR",
                              content(&S));
     b.net.ap_secured = false; /* open */
     build(DUI_PAGE_HOME, &b);
-    TEST_ASSERT_EQUAL_STRING("S #1 Join|Hotspot:CompanionBox-8D1C|Open / S QR / #2 Open|Setup page:192|168|4|1 / QR", content(&S));
+    TEST_ASSERT_EQUAL_STRING("S #1 Join|Hotspot:CompanionDock-8D1C|Open / S QR / #2 Open|Setup page:192|168|4|1 / QR", content(&S));
     b.net.ap_on = false; /* hotspot off */
     build(DUI_PAGE_HOME, &b);
     TEST_ASSERT_EQUAL_STRING("Plug in cable", content(&S)); /* one key */
@@ -389,13 +389,13 @@ static void test_setup_screen_qr(void)
     const char *q[4];
     TEST_ASSERT_EQUAL(2, qr_payloads(q));
     char join[256];
-    dui_wifi_join(join, sizeof join, "CompanionBox-8D1C", "k7m2p9xq");
+    dui_wifi_join(join, sizeof join, "CompanionDock-8D1C", "k7m2p9xq");
     TEST_ASSERT_EQUAL_STRING(join, q[0]);
     TEST_ASSERT_EQUAL_STRING("http://192.168.4.1/", q[1]);
     b.net.ap_secured = false; /* open: no password in the join code */
     build(DUI_PAGE_HOME, &b);
     TEST_ASSERT_EQUAL(2, qr_payloads(q));
-    dui_wifi_join(join, sizeof join, "CompanionBox-8D1C", NULL);
+    dui_wifi_join(join, sizeof join, "CompanionDock-8D1C", NULL);
     TEST_ASSERT_EQUAL_STRING(join, q[0]);
     TEST_ASSERT_NULL(strstr(q[0], "k7m2p9xq"));
     TEST_ASSERT_NULL(strstr(q[0], "P:"));
@@ -404,7 +404,7 @@ static void test_setup_screen_qr(void)
     build(DUI_PAGE_HOME, &b);
     TEST_ASSERT_EQUAL(0, qr_payloads(q));
     /* every other home with the hotspot on: its join code, once (each Satellite state, dock mode, open or not) */
-    dui_wifi_join(join, sizeof join, "CompanionBox-8D1C", "k7m2p9xq");
+    dui_wifi_join(join, sizeof join, "CompanionDock-8D1C", "k7m2p9xq");
     static const int SAT[] = {DUI_SAT_FINDING, DUI_SAT_CHOOSE, DUI_SAT_TOO_OLD, DUI_SAT_RECON, DUI_SAT_CONNECTED};
     for (size_t i = 0; i < sizeof SAT / sizeof SAT[0]; i++) {
         b = sat(SAT[i]);
@@ -576,7 +576,7 @@ static void test_home_connected_label(void)
             }
             for (int j = 0; j < S.ntiles; j++) /* the old caption is gone */
                 TEST_ASSERT_FALSE_MESSAGE(S.tile[j].caption && !strcmp(S.tile[j].caption, "Target"), msg);
-            const int hs = tile_with("CompanionBox-8D1C");
+            const int hs = tile_with("CompanionDock-8D1C");
             TEST_ASSERT_TRUE_MESSAGE(hs >= 0 && L.tile[hs].caption && !strcmp(L.tile[hs].caption, "Hotspot"), msg);
             fit_layout(&L.deck, &L, msg);
         }
@@ -951,7 +951,7 @@ static void test_menu_buttons_and_dots(void)
 
 /* ---- Network ---- */
 
-#define NAME_ROW " / Name:CompanionBox-8D1C|.local"
+#define NAME_ROW " / Name:CompanionDock-8D1C|.local"
 
 static void test_network_wifi_rows(void)
 {
@@ -1253,7 +1253,7 @@ static void test_wifi_words(void)
     char w[8][24];
     const char *cases[][5] = {
         {"Simbox Home", "Simbox", "Home", NULL},
-        {"CompanionBox-8D1C", "CompanionBox-8D1C", NULL},
+        {"CompanionDock-8D1C", "CompanionDock-8D1C", NULL},
         {"My Wifi 5G", "My", "Wifi", "5G", NULL},
         {"  a_b.c  Home\tX", "a_b.c", "Home", "X", NULL},
         {"Simbox-Home", "Simbox-Home", NULL},
@@ -1273,7 +1273,7 @@ static void test_wifi_words(void)
     const char *many = "a b c d"; /* more words than places: the last takes the rest */
     TEST_ASSERT_EQUAL(2, dui_split_words(many, 7, st, ln, 2));
     TEST_ASSERT_EQUAL(5, ln[1]);
-    /* the screens, on every model: the hotspot name "CompanionBox-8D1C" one key ("Companion" / "Box-8D1C"),
+    /* the screens, on every model: the hotspot name "CompanionDock-8D1C" one key ("Companion" / "Dock-8D1C"),
      * never pieces over keys, the big decks too; "Simbox Home" two keys; a password whole */
     static const uint16_t PIDS[] = {0x00BA, 0x00C6, 0x0080, 0x0084, 0x009A, 0x0063};
     dui_box_t b = box_default();
@@ -1289,14 +1289,14 @@ static void test_wifi_words(void)
             for (int j = 0; j < L.ntiles; j++) {
                 const dui_tile_t *t = &L.tile[j];
                 const int n = t->text ? (t->len ? t->len : (int)strlen(t->text)) : 0;
-                if (n == 17 && !strncmp(t->text, "CompanionBox-8D1C", 17)) {
+                if (n == 18 && !strncmp(t->text, "CompanionDock-8D1C", 18)) {
                     ssid_whole = true;
                     TEST_ASSERT_LESS_OR_EQUAL_MESSAGE(2, t->fit.nl, msg);
                 }
                 if (n == 6 && !strncmp(t->text, "Simbox", 6)) word1 = true;
                 if (n == 4 && !strncmp(t->text, "Home", 4)) word2 = true;
                 if (PAGES[p] == DUI_PAGE_HOTSPOT) /* no piece of the hotspot's name (Network has the box's name) */
-                    TEST_ASSERT_FALSE_MESSAGE(n > 0 && n < 17 && !strncmp(t->text, "CompanionBox", 12), msg);
+                    TEST_ASSERT_FALSE_MESSAGE(n > 0 && n < 18 && !strncmp(t->text, "CompanionDock", 13), msg);
             }
             if (PAGES[p] == DUI_PAGE_HOTSPOT) TEST_ASSERT_TRUE_MESSAGE(ssid_whole, msg);
             if (PAGES[p] == DUI_PAGE_NETWORK) {
@@ -1510,7 +1510,7 @@ static void test_hotspot(void)
 {
     dui_box_t b = box_default();
     build(DUI_PAGE_HOTSPOT, &b);
-    TEST_ASSERT_EQUAL_STRING("S Hotspot:CompanionBox-8D1C / S Password:k7m2p9xq|QR / [Turn off]|[Show QR]", content(&S));
+    TEST_ASSERT_EQUAL_STRING("S Hotspot:CompanionDock-8D1C / S Password:k7m2p9xq|QR / [Turn off]|[Show QR]", content(&S));
     const dui_tile_t *t = button(&S, "Turn off");
     TEST_ASSERT_TRUE(t->flags & DUI_F_DANGER);
     TEST_ASSERT_TRUE(t->flags & DUI_F_ON);
@@ -1520,7 +1520,7 @@ static void test_hotspot(void)
     TEST_ASSERT_EQUAL(DUI_A_GO_QR, button(&S, "Show QR")->action);
     b.net.ap_secured = false;
     build(DUI_PAGE_HOTSPOT, &b);
-    TEST_ASSERT_EQUAL_STRING("S Hotspot:CompanionBox-8D1C / S No|password|QR / [Turn off]|[Show QR]", content(&S));
+    TEST_ASSERT_EQUAL_STRING("S Hotspot:CompanionDock-8D1C / S No|password|QR / [Turn off]|[Show QR]", content(&S));
     b.net.ap_on = false;
     build(DUI_PAGE_HOTSPOT, &b);
     TEST_ASSERT_EQUAL_STRING("Hotspot|is off / [Always on]", content(&S));
@@ -1548,7 +1548,7 @@ static void test_qr_payloads(void)
     dui_box_t b = box_default();
     build(DUI_PAGE_QR, &b);
     TEST_ASSERT_EQUAL_STRING("QR|#1 Join / QR|#2 Open", content(&S)); /* no "Point your ..." row */
-    TEST_ASSERT_EQUAL_STRING("WIFI:T:WPA;S:CompanionBox-8D1C;P:k7m2p9xq;;", qr_payload(0));
+    TEST_ASSERT_EQUAL_STRING("WIFI:T:WPA;S:CompanionDock-8D1C;P:k7m2p9xq;;", qr_payload(0));
     TEST_ASSERT_EQUAL_STRING("http://192.168.4.1/", qr_payload(1));
     TEST_ASSERT_EQUAL_STRING("Scan", S.status.title[0]);
     TEST_ASSERT_EQUAL_STRING("join", S.status.title[2]);
@@ -1578,7 +1578,7 @@ static void test_box_screen(void)
 {
     dui_box_t b = box_default();
     build(DUI_PAGE_BOX, &b);
-    TEST_ASSERT_EQUAL_STRING("Name:CompanionBox-8D1C|Uptime:2h 14m / Version:0.1.0|Slot A:Running|Slot B:In sync|[Sync/In sync] / "
+    TEST_ASSERT_EQUAL_STRING("Name:CompanionDock-8D1C|Uptime:2h 14m / Version:0.1.0|Slot A:Running|Slot B:In sync|[Sync/In sync] / "
                              "[Dimmer]|Bright:70%|[Brighter]|[Sound on]|[Light]|[Restart]",
                              content(&S));
     TEST_ASSERT_EQUAL(DUI_ROLE_OK, find(&S, "Slot B", NULL)->role);
@@ -1600,7 +1600,7 @@ static void test_box_screen(void)
     b.box.running_b = true;
     b.box.uptime_s = 59;
     build(DUI_PAGE_BOX, &b);
-    TEST_ASSERT_EQUAL_STRING("Name:CompanionBox-8D1C|Uptime:59s / Version:0.1.0|Slot B:Running|Slot A:In sync|[Sync/In sync] / "
+    TEST_ASSERT_EQUAL_STRING("Name:CompanionDock-8D1C|Uptime:59s / Version:0.1.0|Slot B:Running|Slot A:In sync|[Sync/In sync] / "
                              "[Dimmer]|Bright:10%|[Brighter]|[Sound off]|[Light]|[Restart]",
                              content(&S));
     t = button(&S, "Sound off");
@@ -1709,7 +1709,7 @@ static void test_box_slot_buttons(void)
         b.box.pending = C[i].pending;
         build(DUI_PAGE_BOX, &b);
         char want[512], msg[16];
-        snprintf(want, sizeof want, "Name:CompanionBox-8D1C|Uptime:2h 14m / %s / [Dimmer]|Bright:70%%|[Brighter]|[Sound on]|[Light]|[Restart]",
+        snprintf(want, sizeof want, "Name:CompanionDock-8D1C|Uptime:2h 14m / %s / [Dimmer]|Bright:70%%|[Brighter]|[Sound on]|[Light]|[Restart]",
                  C[i].row);
         snprintf(msg, sizeof msg, "case %d", (int)i);
         TEST_ASSERT_EQUAL_STRING_MESSAGE(want, content(&S), msg);

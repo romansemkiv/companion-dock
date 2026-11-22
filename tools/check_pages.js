@@ -234,7 +234,7 @@ async function smoke(file) {
   const deck = (model, serial, hub, menu = false, screen = true, ignored = false) => ({ device_id: 'streamdeck:' + serial, model, serial, fw: '1.01.000', high_speed: !hub, hub_depth: hub ? 1 : 0, port: hub ? 2 : 0, menu, screen, ignored });
   const base = () => ({ name: 'Box', uptime_s: 3600, mode: 'satellite',
     net: { route: 'wifi', ip: '192.168.8.225', eth_addr: '', sta_addr: '192.168.8.225', eth_dhcp: true, eth_link: false, wifi_connected: true, wifi_enabled: true, wifi_set: true,
-      sta_net: 'main', sta_ssid: 'Studio', sta_rssi: -58, ap_on: false, ap_forced: false, ap_ssid: 'CompanionBox-A1B2', ap_ip: '', ap_clients: 0 },
+      sta_net: 'main', sta_ssid: 'Studio', sta_rssi: -58, ap_on: false, ap_forced: false, ap_ssid: 'CompanionDock-A1B2', ap_ip: '', ap_clients: 0 },
     companion: { state: 'connected', version: '5.1.1', api_version: '1.14.0', host: '10.0.0.5', port: 16622, auto: true, pinned_id: 'x', selection: 'connect', instances: 1 },
     dock: [], decks: [deck('Stream Deck XL', 'CL1', false), deck('Stream Deck Mini', 'MINI1', true)], problems: ['a problem'],
     maintenance: false, maintenanceDeck: { serial: 'CL1', model: 'Stream Deck XL' }, // kept, the page no longer reads it
@@ -268,13 +268,13 @@ async function smoke(file) {
   // the hotspot: the default, a password, without network (on) and in dock mode; the open option in
   // Satellite mode (off)
   const apSec = (st) => st.mode === 'dock' || st.net.route === 'none';
-  const apCfg = (st) => ({ apEnabled: apSec(st), apSecured: apSec(st), apPass: apSec(st) ? 'secret123' : '', apSsid: 'CompanionBox-A1B2' });
+  const apCfg = (st) => ({ apEnabled: apSec(st), apSecured: apSec(st), apPass: apSec(st) ? 'secret123' : '', apSsid: 'CompanionDock-A1B2' });
   if (!apCfg(states.nonet).apSecured || !apCfg(states.dock).apSecured || apCfg(states.satellite).apSecured)
     throw new Error('apCfg: the default (a password) and the open option');
   let st = null;
   const asked = new Set();
   ctx.rpc = async (m) => (asked.add(m), {
-    'Sys.GetStatus': st, 'Device.GetInfo': { id: 'companionbox-1', name: 'Box', version: 'v1', auth_en: st.mode === 'dock' },
+    'Sys.GetStatus': st, 'Device.GetInfo': { id: 'companiondock-1', name: 'Box', version: 'v1', auth_en: st.mode === 'dock' },
     'Auth.GetStatus': { auth_en: st.mode === 'dock', authed: true, locked_s: 0 },
     'Companion.GetConfig': { companionAuto: st.companion.auto, companionHost: '10.0.0.5', companionPort: 16622, companionPinId: '', mode: st.mode },
     'Companion.List': [{ id: 'a', host: '10.0.0.5', port: 16622, version: '5.1.1', pinned: true }, { id: 'b', host: '10.0.0.9', port: 16623, version: '5.2.0', pinned: false }],
@@ -578,9 +578,9 @@ async function smoke(file) {
     const logName = vm.runInContext('typeof logName === "function" ? logName : null', ctx);
     if (!logName) errs.push('R129: logName(name, date) is missing');
     else for (const [n, d, want] of [
-      ['CompanionBox-8D1C', new Date(2026, 10, 4, 15, 30, 5), 'CompanionBox-8D1C-2026-11-04-153005.log'],
+      ['CompanionDock-8D1C', new Date(2026, 10, 4, 15, 30, 5), 'CompanionDock-8D1C-2026-11-04-153005.log'],
       ['Studio / FOH box', new Date(2026, 0, 2, 3, 4, 5), 'Studio-FOH-box-2026-01-02-030405.log'],
-      ['', new Date(2026, 0, 2, 3, 4, 5), 'companion-box-2026-01-02-030405.log']]) {
+      ['', new Date(2026, 0, 2, 3, 4, 5), 'companion-dock-2026-01-02-030405.log']]) {
       const got = logName(n, d);
       if (got !== want) errs.push(`R129: logName(${JSON.stringify(n)}) gives ${got}, not ${want}`);
     }
@@ -658,7 +658,7 @@ async function smoke(file) {
     const cases = [
       ['satellite', states.satellite.net, [['#wifi', '192.168.8.225', ['rt'], /Wi-Fi Studio \(primary network\), -58 dBm: 192\.168\.8\.225/], ['#ap', 'Off', ['x', 'off'], /^Hotspot off$/]]],
       ['ethboth', states.ethboth.net, [['#ethernet', '192.168.100.200', ['rt'], /^Ethernet, static: 192\.168\.100\.200 · carries the route$/],
-        ['#wifi', '192.168.8.225', [], /Wi-Fi Studio \(primary network\), -58 dBm/], ['#ap', '192.168.4.1', [], /Hotspot CompanionBox-A1B2: 192\.168\.4\.1, 2 devices joined/]]],
+        ['#wifi', '192.168.8.225', [], /Wi-Fi Studio \(primary network\), -58 dBm/], ['#ap', '192.168.4.1', [], /Hotspot CompanionDock-A1B2: 192\.168\.4\.1, 2 devices joined/]]],
       ['wifioff', states.wifioff.net, [['#ethernet', '192.168.100.200', ['rt'], /Ethernet, DHCP/], ['#wifi', 'Off', ['x', 'off'], /^Wi-Fi off$/], ['#ap', 'Off', ['x', 'off'], /Hotspot off/]]],
       ['wifinojoin', states.wifinojoin.net, [['#ethernet', 'No address', [], /Ethernet, DHCP: no address$/], ['#wifi', 'Not connected', ['x', 'bad'], /^Wi-Fi not connected$/],
         ['#ap', '192.168.4.1', [], /0 devices joined/]]],

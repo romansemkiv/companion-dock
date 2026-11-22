@@ -2,7 +2,7 @@
 
 The full reference for the firmware. The [README](../README.md) is the short tour, and
 [flashing.md](flashing.md) covers putting the firmware on a new board. On the network and on the decks the
-device calls itself **Companion Box** (its default name and hotspot are `CompanionBox-XXXX`), and this manual
+device calls itself **Companion Dock** (its default name and hotspot are `CompanionDock-XXXX`), and this manual
 calls it "the box".
 
 **Companion Dock** connects USB Elgato Stream Decks to a [Bitfocus Companion](https://bitfocus.io/companion)
@@ -293,7 +293,7 @@ has reserved (a reserved one only when all others are taken).
 
 - **Discovery.** Each listening dock is announced over mDNS as `_elg._tcp` with TXT `dt=215` (Companion's
   discovery lists only Network Docks and Studios, so the box keeps that type) and `sn=<deck serial>`.
-  The name is `<model> @ <box name>`, e.g. `Module 32 @ CompanionBox-8D1C`; a second deck of the same model
+  The name is `<model> @ <box name>`, e.g. `Module 32 @ CompanionDock-8D1C`; a second deck of the same model
   makes both say their dock, `XL (dock 1) @ …` and `XL (dock 3) @ …`. A dock without a deck isn't announced. Companion's
   discovered list groups the box's docks by address and shows the first one's name, with the description
   "Stream Deck Network Dock".
@@ -478,9 +478,9 @@ satellite (Phosphor has none), drawn in Phosphor's stroke.
   longest; a deck with room for one shows that one. The strip shows all three, the Neo's info bar two.
 - **Readability**: on the small decks (15 keys or fewer: MK.2, Module 15, the Original, +, Neo,
   Mini, Module 6) no word, value or address is split over keys: a name, password or version stays on one key,
-  on 2 lines at its natural break ("Companion" / "Box-8D1C"). A Wi-Fi name (the main, the backup, the hotspot's)
+  on 2 lines at its natural break ("Companion" / "Dock-8D1C"). A Wi-Fi name (the main, the backup, the hotspot's)
   is one word a key on every deck, its words separated by spaces only: "Studio
-  WiFi" takes 2 keys, "My Wifi 5G" 3, "CompanionBox-8D1C" 1 ("Companion" / "Box-8D1C" on 2 lines inside it). The
+  WiFi" takes 2 keys, "My Wifi 5G" 3, "CompanionDock-8D1C" 1 ("Companion" / "Dock-8D1C" on 2 lines inside it). The
   hotspot's password is one key on every deck too: on 1 line, or on 2 inside the key on the big decks ("k7m2" /
   "p9xq"). A word is never split over keys, unless it can't read at 16 px on 2 lines (the last resort); a word with no
   natural break wraps inside its key with nothing added (no '-' is ever added to a value: an SSID, a password,
@@ -739,7 +739,7 @@ box's hotspot and the second to open the setup page, then set up Ethernet or Wi-
    the web page; the box restarts): with one Companion 5 on the subnet, the decks appear in Companion within
    seconds with no configuration, and they show "Finding Companion" until then. With several, choose
    one on the web page.
-3. **The web page:** `http://<box IP>/` or `http://companionbox-xxxx.local/` (the box name as a host
+3. **The web page:** `http://<box IP>/` or `http://companiondock-xxxx.local/` (the box name as a host
    name). It covers status, the Companion choice or a manual address, Ethernet (DHCP or static), Wi-Fi,
    the hotspot, the box name, the settings password, messages to the decks, the speaker and the status
    light, Find my box, firmware upload and the log.
@@ -750,8 +750,12 @@ or that can cut you off (network changes, the settings password).
 
 ## Setup hotspot
 
-- SSID `CompanionBox-XXXX` (XXXX = the last 4 hex digits of the Ethernet MAC, uppercase). The box's default
+- SSID `CompanionDock-XXXX` (XXXX = the last 4 hex digits of the Ethernet MAC, uppercase). The box's default
   name is the SSID.
+  Before 0.2.9 both were `CompanionBox-XXXX`. A box updated from an earlier version has the new SSID at once,
+  with the same password: a phone or laptop that had joined the old one joins again. Its name, and with it its
+  `.local` address, stays as stored (`CompanionBox-XXXX` unless it was changed) until it is renamed on the web
+  page or the box is factory-reset.
 - **Password-protected by default** (WPA2). A random 10-character password (letters and digits without
   look-alikes) is generated at first start and after a factory reset; you can change it (8-63 characters).
   It can be made open on the web page (*Hotspot → Hotspot password* off); switched off, the password is

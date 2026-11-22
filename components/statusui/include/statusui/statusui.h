@@ -84,7 +84,7 @@ const uint8_t *sui_line_bg(const sui_content_t *c, int line);
 // It stays on one line unless that is smaller than SUI_MIN_PX; then it takes 2 text lines (never more),
 // broken after its own '-' or '.' when that reads; else a status or label word is hyphenated (an
 // added '-', 3 or more letters a side: "Recon-" / "necting") and a value is broken before a capital
-// that follows a small letter ("Companion|Box"); else as evenly as it can be. Nothing is ever added to a
+// that follows a small letter ("Companion|Dock"); else as evenly as it can be. Nothing is ever added to a
 // value (SSID, password, version, IP, port). In a line, the words of one role that fit on one line all
 // take the smallest of their sizes, so the line looks even; other roles keep theirs.
 // A value (SSID, password, version, host) that doesn't reach the comfortable size (sui_comfort_px) on

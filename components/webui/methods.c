@@ -852,7 +852,7 @@ static cJSON *m_device_info(const cJSON *p, rpc_err_t *err)
     cJSON_AddStringToObject(r, "name", name);
     cJSON_AddStringToObject(r, "id", rpc_device_id());
     cJSON_AddStringToObject(r, "mac", mac);
-    cJSON_AddStringToObject(r, "model", "Companion Box");
+    cJSON_AddStringToObject(r, "model", "Companion Dock");
     cJSON_AddStringToObject(r, "hw", "Waveshare ESP32-P4-WIFI6-POE-ETH");
     cJSON_AddStringToObject(r, "project", d->project_name);
     cJSON_AddStringToObject(r, "version", d->version);

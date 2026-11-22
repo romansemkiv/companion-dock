@@ -388,11 +388,11 @@ static dui_box_t real_box(void)
     b.net.rssi = -58;
     strcpy(b.net.wifi_ip, "192.168.8.225");
     b.net.ap_on = true;
-    strcpy(b.net.ap_ssid, "CompanionBox-8D1C");
+    strcpy(b.net.ap_ssid, "CompanionDock-8D1C");
     strcpy(b.net.ap_pass, "k7m2p9xq");
     b.net.ap_secured = true;
     strcpy(b.net.ap_ip, "192.168.4.1");
-    strcpy(b.net.name, "CompanionBox-8D1C");
+    strcpy(b.net.name, "CompanionDock-8D1C");
     strcpy(b.box.version, "0.1.0");
     b.box.uptime_s = 2 * 3600 + 14 * 60;
     b.box.slot = DUI_SLOT_IN_SYNC;
@@ -642,7 +642,7 @@ int main(int argc, char **argv)
     /* the QR module size of the hotspot's join string and the setup URL per key size (one key, a
      * 1-module quiet zone); the ECC level: M when it fits the version dui_qr_encode chose */
     char join[128];
-    dui_wifi_join(join, sizeof join, "CompanionBox-8D1C", "k7m2xq9fhd"); /* a 10-char hotspot password */
+    dui_wifi_join(join, sizeof join, "CompanionDock-8D1C", "k7m2xq9fhd"); /* a 10-char hotspot password */
     const char *PAY[] = {join, "http://192.168.4.1/"};
     for (int k = 0; k < 2; k++) {
         uint8_t qr[DUI_QR_BUF], tmp[DUI_QR_BUF];

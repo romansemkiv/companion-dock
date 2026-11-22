@@ -91,13 +91,13 @@ enum { BOXCFG_CORNER_TOP_LEFT, BOXCFG_CORNER_TOP_RIGHT, BOXCFG_CORNER_BOTTOM_LEF
 /* Corner k's name in the JSON ("topLeft" ...); "topRight" for anything else. */
 const char *boxcfg_corner_name(int k);
 
-/* box_name = "CompanionBox-XXXX" (last two MAC bytes), auto-discovery on,
+/* box_name = "CompanionDock-XXXX" (last two MAC bytes), auto-discovery on,
  * port 16622, DHCP on, AP on with a random 10-char WPA2 password (it can be switched off), mDNS on,
  * admin password empty (off), Network Dock mode (the value is stored, so a box keeps its mode
  * across updates, and only a fresh or factory-reset box starts as a Network Dock). */
 void boxcfg_defaults(box_config_t *c, const uint8_t mac[6], uint32_t (*rand32)(void));
 
-/* Hotspot SSID "CompanionBox-XXXX". */
+/* Hotspot SSID "CompanionDock-XXXX". */
 void boxcfg_ap_ssid(const uint8_t mac[6], char out[33]);
 
 /* The box's host name from its box name (DHCP option 12, mDNS, the web page's Host check: one rule): lower

@@ -106,7 +106,7 @@ void rpc_reset(void);
 
 #ifdef ESP_PLATFORM
 #include "esp_err.h"
-/* Creates the dispatcher lock and sets the device id ("companionbox-<Ethernet MAC>"). Call once,
+/* Creates the dispatcher lock and sets the device id ("companiondock-<Ethernet MAC>"). Call once,
  * before any method runs; idempotent. */
 esp_err_t rpc_init(void);
 #endif

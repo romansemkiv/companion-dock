@@ -301,13 +301,13 @@ static void test_layout_page_break_at_line_end(void)
     /* the finding screen on a Mini: one row under the status, a line split over pages only when it alone
      * needs more */
     sui_content_t e;
-    fx_screen_looking(&e, "192.168.100.200", NULL, "CompanionBox-ABCD", "abcdefghjk");
+    fx_screen_looking(&e, "192.168.100.200", NULL, "CompanionDock-ABCD", "abcdefghjk");
     sui_layout(3, 2, 80, &e, &L);
     TEST_ASSERT_EQUAL_INT(5, L.pages);
     TEST_ASSERT_EQUAL_STRING("Finding|Companion\nBox|IP", page_text(&L, &e, 3, 2, 0));
     TEST_ASSERT_EQUAL_STRING("Finding|Companion\n192|168", page_text(&L, &e, 3, 2, 1)); /* 2 + 2 */
     TEST_ASSERT_EQUAL_STRING("Finding|Companion\n100|200", page_text(&L, &e, 3, 2, 2));
-    TEST_ASSERT_EQUAL_STRING("Finding|Companion\nWiFi|Companion|Box-ABCD", page_text(&L, &e, 3, 2, 3));
+    TEST_ASSERT_EQUAL_STRING("Finding|Companion\nWiFi|Companion|Dock-ABCD", page_text(&L, &e, 3, 2, 3));
     TEST_ASSERT_EQUAL_STRING("Finding|Companion\nPass|abcde|fghjk", page_text(&L, &e, 3, 2, 4));
 }
 
@@ -397,9 +397,9 @@ static void test_fit_sizes_and_min_split(void)
     static const char *const W[] = {
         "No", "in", "Add", "for", "port", "Pass", "WiFi", "Remote", "surface", "network", "Finding",
         "Several", "Choose", "password", "Companion", "Companions", "Connecting", "Reconnecting",
-        "abcdefghjk", "CompanionBox-ABCD", "4.0.0-beta.2+7156-main-1234abcd", "4.2.0", "available",
+        "abcdefghjk", "CompanionDock-ABCD", "4.0.0-beta.2+7156-main-1234abcd", "4.2.0", "available",
         "companion-main.studio-b.example.internal", "WWWWWWWWWWWW", "iiiiiiiiiiiiiiiiiiii", "Tech-Desk",
-        "255.255.255.255:16622", "mmmmmmmmmmmmmmmmmmmmmmmmmmmmmm", "1234567890.1234567890", "CompanionBox-8D1C",
+        "255.255.255.255:16622", "mmmmmmmmmmmmmmmmmmmmmmmmmmmmmm", "1234567890.1234567890", "CompanionDock-8D1C",
         "studioBTechDeskCompanion", "aBcDeFgHjKmNpQrStUvW",
     };
     for (size_t k = 0; k < sizeof KEY_PX / sizeof KEY_PX[0]; k++)
@@ -437,15 +437,15 @@ static void test_fit_pinned(void)
     TEST_ASSERT_EQUAL_INT(6, f.cut[0]);
     TEST_ASSERT_TRUE(f.px > SUI_MIN_PX);
     TEST_ASSERT_EQUAL_INT(1, fit_of("Reconnecting", 120).nl);
-    f = fit_of("CompanionBox-8D1C", 96); /* the hotspot's name on a Module 32: at its own '-' */
+    f = fit_of("CompanionDock-8D1C", 96); /* the hotspot's name on a Module 32: at its own '-' */
     TEST_ASSERT_EQUAL_INT(2, f.nl);
-    TEST_ASSERT_EQUAL_INT(13, f.cut[0]);
+    TEST_ASSERT_EQUAL_INT(14, f.cut[0]);
     TEST_ASSERT_EQUAL_INT(4, f.cut[1]);
     TEST_ASSERT_TRUE(f.px >= SUI_MIN_PX);
-    f = fit_of("CompanionBox-8D1C", 72); /* "CompanionBox-" doesn't read on 72 px: Companion / Box-8D1C */
+    f = fit_of("CompanionDock-8D1C", 72); /* "CompanionDock-" doesn't read on 72 px: Companion / Dock-8D1C */
     TEST_ASSERT_EQUAL_INT(2, f.nl);
     TEST_ASSERT_EQUAL_INT(9, f.cut[0]);
-    TEST_ASSERT_EQUAL_INT(8, f.cut[1]);
+    TEST_ASSERT_EQUAL_INT(9, f.cut[1]);
     f = fit_of("abcdefghjk", 72); /* the hotspot password: one line */
     TEST_ASSERT_EQUAL_INT(1, f.nl);
     TEST_ASSERT_TRUE(f.px >= SUI_MIN_PX);
@@ -457,10 +457,10 @@ static void test_fit_pinned(void)
 static void test_fit_breaks(void)
 {
     static const char *const W[] = {
-        "Reconnecting", "CompanionBox-ABCD", "4.0.0-beta.2+7156-main-1234abcd", "abcdefghjkmnpqrstuvwxyz2",
+        "Reconnecting", "CompanionDock-ABCD", "4.0.0-beta.2+7156-main-1234abcd", "abcdefghjkmnpqrstuvwxyz2",
         "companion-main.studio-b.example.internal", "a.b-c.d-e.f-g.h-i.j-k.l-m.n-o.p", "Tech-Desk-Studio-B",
         "1234567890.1234567890", "WWWWWWWWWWWW", "mmmmmmmmmmmmmmmmmmmm-", "-mmmmmmmmmmmmmmmmmmmm", "Companions",
-        "CompanionBox-8D1C", "studioBTechDeskCompanion", "aBcDeFgHjKmNpQrStUvW",
+        "CompanionDock-8D1C", "studioBTechDeskCompanion", "aBcDeFgHjKmNpQrStUvW",
     };
     for (size_t k = 0; k < sizeof KEY_PX / sizeof KEY_PX[0]; k++)
         for (size_t w = 0; w < sizeof W / sizeof W[0]; w++) {
@@ -590,10 +590,10 @@ static void test_layout_one_size_per_line(void)
     for (size_t k = 0; k < sizeof keys / sizeof keys[0]; k++) {
         const int key = keys[k];
         sui_content_t c[5];
-        fx_screen_no_network(&c[0], "192.168.4.1", "CompanionBox-ABCD", NULL);         /* No network, No password */
-        fx_screen_no_network(&c[1], "192.168.4.1", "CompanionBox-ABCD", "abcdefghjk"); /* Pass <password> */
+        fx_screen_no_network(&c[0], "192.168.4.1", "CompanionDock-ABCD", NULL);         /* No network, No password */
+        fx_screen_no_network(&c[1], "192.168.4.1", "CompanionDock-ABCD", "abcdefghjk"); /* Pass <password> */
         fx_screen_dock(&c[2], "192.168.8.225", 5343, NULL, NULL);      /* the IP and port line */
-        fx_screen_dock(&c[3], "192.168.8.225", 5343, "CompanionBox-8D1C", "abcdefghjk");
+        fx_screen_dock(&c[3], "192.168.8.225", 5343, "CompanionDock-8D1C", "abcdefghjk");
         fx_screen_looking(&c[4], "10.0.0.7", NULL, NULL, NULL);
         static sui_layout_t L;
         for (int s = 0; s < 5; s++) {
@@ -631,7 +631,7 @@ static void test_layout_one_size_per_line(void)
     }
     /* the Plus: "WiFi" keeps its own size beside the hotspot's name, which goes over 2 keys */
     sui_content_t d;
-    fx_screen_no_network(&d, "192.168.4.1", "CompanionBox-ABCD", NULL);
+    fx_screen_no_network(&d, "192.168.4.1", "CompanionDock-ABCD", NULL);
     static sui_layout_t M;
     sui_layout(4, 2, 120, &d, &M);
     TEST_ASSERT_EQUAL_INT(hy_of("WiFi", 120).px, cell_of(&M, &d, "WiFi")->fit.px);
@@ -705,7 +705,7 @@ static int cut_kind(const char *s, int a)
 }
 
 /* a value that doesn't reach the comfortable size on one line goes over consecutive keys, one line
- * each, at one size: the SSID as [Companion][Box-8D1C], the 10-character password on 2 keys. */
+ * each, at one size: the SSID as [Companion][Dock-8D1C], the 10-character password on 2 keys. */
 static void test_value_across_keys(void)
 {
     static const struct { int cols, rows, px; } D[] = {{8, 4, 96}, {5, 3, 72}, {4, 2, 120}}; /* Module 32, MK.2, Plus */
@@ -716,11 +716,11 @@ static void test_value_across_keys(void)
         char msg[32];
         snprintf(msg, sizeof msg, "%d px", key);
         sui_content_t c;
-        fx_screen_no_network(&c, "192.168.4.1", "CompanionBox-8D1C", "abcdefghjk"); /* WiFi line 3, Pass line 4 */
+        fx_screen_no_network(&c, "192.168.4.1", "CompanionDock-8D1C", "abcdefghjk"); /* WiFi line 3, Pass line 4 */
         sui_layout(D[i].cols, D[i].rows, key, &c, &L);
         TEST_ASSERT_EQUAL_INT_MESSAGE(2, word_cells(&L, &c, 3, 1, got), msg);
-        TEST_ASSERT_EQUAL_STRING_MESSAGE("Companion|Box-8D1C", got, msg);
-        assert_value_pieces(&L, &c, 3, 1, key, "CompanionBox-8D1C");
+        TEST_ASSERT_EQUAL_STRING_MESSAGE("Companion|Dock-8D1C", got, msg);
+        assert_value_pieces(&L, &c, 3, 1, key, "CompanionDock-8D1C");
         /* the password: 2 keys when one can't reach the comfortable size, each piece comfortable */
         TEST_ASSERT_TRUE(one_line_px("abcdefghjk", 10, key) < sui_comfort_px(key));
         TEST_ASSERT_EQUAL_INT_MESSAGE(2, assert_value_pieces(&L, &c, 4, 1, key, "abcdefghjk"), msg);
@@ -794,7 +794,7 @@ static void test_value_pieces_wrap(void)
 static void test_word_cells(void)
 {
     static const struct { const char *w; int role, key; } T[] = {
-        {"CompanionBox-8D1C", SUI_ROLE_VALUE, 72},
+        {"CompanionDock-8D1C", SUI_ROLE_VALUE, 72},
         {"k7m2p9xq", SUI_ROLE_VALUE, 96},
         {"k7m2p9xq", SUI_ROLE_VALUE, 112},
         {"FOH-PC", SUI_ROLE_VALUE, 80},
@@ -823,11 +823,11 @@ static void test_word_cells(void)
         }
     }
     sui_cell_t out[4];
-    TEST_ASSERT_EQUAL_INT(2, sui_word_cells("CompanionBox-8D1C", 17, 72, SUI_ROLE_VALUE, out, 4));
+    TEST_ASSERT_EQUAL_INT(2, sui_word_cells("CompanionDock-8D1C", 18, 72, SUI_ROLE_VALUE, out, 4));
     TEST_ASSERT_EQUAL_INT(9, out[0].len); /* "Companion" */
     TEST_ASSERT_EQUAL_INT(9, out[1].start);
     TEST_ASSERT_EQUAL_INT(out[0].fit.px, out[1].fit.px); /* one size */
-    TEST_ASSERT_EQUAL_INT(1, sui_word_cells("CompanionBox-8D1C", 17, 72, SUI_ROLE_VALUE, out, 1)); /* max */
+    TEST_ASSERT_EQUAL_INT(1, sui_word_cells("CompanionDock-8D1C", 18, 72, SUI_ROLE_VALUE, out, 1)); /* max */
     TEST_ASSERT_EQUAL_INT(9, out[0].len);
     TEST_ASSERT_EQUAL_INT(1, sui_word_cells("FOH-PC", 6, 80, SUI_ROLE_VALUE, out, 4)); /* reads in one */
     TEST_ASSERT_EQUAL_INT(0, sui_word_cells("x", 0, 80, SUI_ROLE_VALUE, out, 4));
@@ -913,7 +913,7 @@ static void test_layout_long_word_continues(void)
     static const struct { int cols, rows, px; } D[] = {{5, 3, 72}, {8, 4, 96}, {4, 2, 120}}; /* MK.2, XL, Plus */
     for (size_t i = 0; i < sizeof D / sizeof D[0]; i++) {
         sui_content_t c;
-        fx_screen_looking(&c, "192.168.100.200", NULL, "CompanionBox-ABCD", pass);
+        fx_screen_looking(&c, "192.168.100.200", NULL, "CompanionDock-ABCD", pass);
         static sui_layout_t L;
         sui_layout(D[i].cols, D[i].rows, D[i].px, &c, &L);
         const int keys = line_back(&L, &c, D[i].cols, D[i].rows, D[i].px, 4, got); /* the Pass line (4) */
@@ -970,11 +970,11 @@ static void test_layout_keep_with_next(void)
 {
     sui_content_t c;
     static sui_layout_t L;
-    fx_screen_looking(&c, "192.168.8.225", NULL, "CompanionBox-ABCD", "abcdefghjk");
+    fx_screen_looking(&c, "192.168.8.225", NULL, "CompanionDock-ABCD", "abcdefghjk");
     sui_layout(5, 3, 72, &c, &L); /* MK.2: the hotspot name and password on one page, at the bottom */
     TEST_ASSERT_EQUAL_INT(2, L.pages);
     TEST_ASSERT_EQUAL_STRING("Finding|Companion\nBox|IP\n192|168|8|225", page_text(&L, &c, 5, 3, 0));
-    TEST_ASSERT_EQUAL_STRING("Finding|Companion\nWiFi|Companion|Box-ABCD\nPass|abcde|fghjk", page_text(&L, &c, 5, 3, 1));
+    TEST_ASSERT_EQUAL_STRING("Finding|Companion\nWiFi|Companion|Dock-ABCD\nPass|abcde|fghjk", page_text(&L, &c, 5, 3, 1));
 
     /* every screen that shows the hotspot marks its WiFi line */
     fx_screen_no_network(&c, "192.168.4.1", "S", "P"); /* and the label line with its value */
@@ -1029,20 +1029,20 @@ static void test_layout_real_words_fit_every_model(void)
         sui_content_t c[16];
         int n = 0;
         sui_screen_message(&c[n++], "Reconnecting Disconnected\nInternationalisation"); /* FG words: no '-' */
-        fx_screen_no_network(&c[n++], "192.168.4.1", "CompanionBox-ABCD", "abcdefghjk");
-        fx_screen_no_network(&c[n++], "192.168.4.1", "CompanionBox-ABCD", NULL); /* open hotspot */
-        fx_screen_looking(&c[n++], "192.168.100.200", NULL, "CompanionBox-ABCD", NULL);
-        fx_screen_dock(&c[n++], "192.168.100.200", 5353, "CompanionBox-ABCD", NULL);
-        fx_screen_looking(&c[n++], "192.168.100.200", NULL, "CompanionBox-ABCD", "abcdefghjk");
+        fx_screen_no_network(&c[n++], "192.168.4.1", "CompanionDock-ABCD", "abcdefghjk");
+        fx_screen_no_network(&c[n++], "192.168.4.1", "CompanionDock-ABCD", NULL); /* open hotspot */
+        fx_screen_looking(&c[n++], "192.168.100.200", NULL, "CompanionDock-ABCD", NULL);
+        fx_screen_dock(&c[n++], "192.168.100.200", 5353, "CompanionDock-ABCD", NULL);
+        fx_screen_looking(&c[n++], "192.168.100.200", NULL, "CompanionDock-ABCD", "abcdefghjk");
         fx_screen_looking(&c[n++], "10.0.0.7", "192.168.100.200", NULL, NULL);
         fx_screen_choose(&c[n++], "255.255.255.255", NULL, NULL);
         for (size_t v = 0; v < sizeof ver / sizeof ver[0]; v++) fx_screen_too_old(&c[n++], ver[v], NULL, NULL);
         sui_screen_reconnecting(&c[n++], NULL);
         fx_screen_dock(&c[n++], "192.168.100.200", 5353, NULL, NULL);
-        fx_screen_dock(&c[n++], "192.168.100.200", 5353, "CompanionBox-ABCD", "abcdefghjk");
+        fx_screen_dock(&c[n++], "192.168.100.200", 5353, "CompanionDock-ABCD", "abcdefghjk");
         fx_screen_no_dock(&c[n++]);
         fx_screen_looking(&c[n++], "192.168.100.200", "companion-main.studio-b.example.internal",
-                           "CompanionBox-ABCD", "abcdefghjkmnpqrstuvwxyz23456789abcdefghjkmnpqrstuvwxyz23456789a");
+                           "CompanionDock-ABCD", "abcdefghjkmnpqrstuvwxyz23456789abcdefghjkmnpqrstuvwxyz23456789a");
         static sui_layout_t L;
         for (int s = 0; s < n; s++) {
             sui_layout(m->cols, m->rows, m->key_px, &c[s], &L);
@@ -1086,17 +1086,17 @@ static void test_roles_per_screen(void)
     fx_screen_dock(&c, "192.168.8.225", 5343, NULL, NULL);
     TEST_ASSERT_EQUAL_STRING("Waiting:S for:S Companion:S Remote:L surface:L 192:A 168:A 8:A 225:A port:L 5343:A",
                              roles_text(&c, 8, 4, 96));
-    fx_screen_dock(&c, "10.0.0.7", 5345, "CompanionBox-ABCD", "abcdefghjk");
+    fx_screen_dock(&c, "10.0.0.7", 5345, "CompanionDock-ABCD", "abcdefghjk");
     TEST_ASSERT_EQUAL_STRING("Waiting:S for:S Companion:S Remote:L surface:L 10:A 0:A 0:A 7:A port:L 5345:A WiFi:L "
-                             "Companion:V Box-ABCD:V Pass:L abcde:V fghjk:V", roles_text(&c, 8, 4, 96));
+                             "Companion:V Dock-ABCD:V Pass:L abcde:V fghjk:V", roles_text(&c, 8, 4, 96));
     fx_screen_dock(&c, "10.0.0.7", 5345, "My Box", NULL); /* an SSID with a space; an open hotspot */
     TEST_ASSERT_EQUAL_STRING("Waiting:S for:S Companion:S Remote:L surface:L 10:A 0:A 0:A 7:A port:L 5345:A WiFi:L My:V "
                              "Box:V No:L password:L", roles_text(&c, 8, 4, 96));
     fx_screen_dock(&c, NULL, 5353, NULL, NULL); /* no IP yet: "port" is still the label */
     TEST_ASSERT_EQUAL_STRING("Waiting:S for:S Companion:S Remote:L surface:L port:L 5353:A", roles_text(&c, 8, 4, 96));
 
-    fx_screen_no_network(&c, "192.168.4.1", "CompanionBox-ABCD", "pass word");
-    TEST_ASSERT_EQUAL_STRING("No:S network:S Setup:L page:L 192:A 168:A 4:A 1:A WiFi:L Companion:V Box-ABCD:V Pass:L pass:V "
+    fx_screen_no_network(&c, "192.168.4.1", "CompanionDock-ABCD", "pass word");
+    TEST_ASSERT_EQUAL_STRING("No:S network:S Setup:L page:L 192:A 168:A 4:A 1:A WiFi:L Companion:V Dock-ABCD:V Pass:L pass:V "
                              "word:V", roles_text(&c, 8, 4, 96));
     fx_screen_no_network(&c, "192.168.4.1", NULL, NULL);
     TEST_ASSERT_EQUAL_STRING("No:S network:S Plug:L in:L network:L", roles_text(&c, 8, 4, 96));
@@ -1248,14 +1248,14 @@ static void test_palette_contrast(void)
     /* and what the screens really draw, the OK state included */
     sui_content_t c[10];
     int n = 0;
-    fx_screen_no_network(&c[n++], "192.168.4.1", "CompanionBox-ABCD", "abcdefghjk");
-    fx_screen_no_network(&c[n++], "192.168.4.1", "CompanionBox-ABCD", NULL);
-    fx_screen_looking(&c[n++], "192.168.8.225", NULL, "CompanionBox-ABCD", "abcdefghjk");
+    fx_screen_no_network(&c[n++], "192.168.4.1", "CompanionDock-ABCD", "abcdefghjk");
+    fx_screen_no_network(&c[n++], "192.168.4.1", "CompanionDock-ABCD", NULL);
+    fx_screen_looking(&c[n++], "192.168.8.225", NULL, "CompanionDock-ABCD", "abcdefghjk");
     fx_screen_looking(&c[n++], "192.168.8.225", "192.168.8.10", NULL, NULL);
     fx_screen_choose(&c[n++], "192.168.8.225", NULL, NULL);
     fx_screen_too_old(&c[n++], "4.2.0", NULL, NULL);
     sui_screen_reconnecting(&c[n++], NULL);
-    fx_screen_dock(&c[n++], "192.168.8.225", 5343, "CompanionBox-ABCD", "abcdefghjk");
+    fx_screen_dock(&c[n++], "192.168.8.225", 5343, "CompanionDock-ABCD", "abcdefghjk");
     fx_screen_no_dock(&c[n++]);
     fx_screen_looking(&c[n], "192.168.8.225", NULL, "S", "P");
     c[n++].state = SUI_STATE_OK;
@@ -1280,16 +1280,16 @@ static void test_screen_word_counts(void)
     static const int most[12] = {5, 6, 7, 4, 6, 3, 4, 5, 1, 6, 8, 6};
     int n = 0;
     fx_screen_no_network(&c[n++], "192.168.4.1", NULL, NULL);                        /* No network, Plug in network */
-    fx_screen_no_network(&c[n++], "192.168.4.1", "CompanionBox-ABCD", "abcdefghjk"); /* + Setup page, WiFi, Pass */
-    fx_screen_no_network(&c[n++], "192.168.4.1", "CompanionBox-ABCD", NULL);         /* + Setup page, WiFi, No password */
+    fx_screen_no_network(&c[n++], "192.168.4.1", "CompanionDock-ABCD", "abcdefghjk"); /* + Setup page, WiFi, Pass */
+    fx_screen_no_network(&c[n++], "192.168.4.1", "CompanionDock-ABCD", NULL);         /* + Setup page, WiFi, No password */
     fx_screen_looking(&c[n++], "192.168.8.225", NULL, NULL, NULL);                   /* Finding Companion, Box IP */
-    fx_screen_looking(&c[n++], "192.168.8.225", NULL, "CompanionBox-ABCD", "p");     /* + WiFi, Pass */
+    fx_screen_looking(&c[n++], "192.168.8.225", NULL, "CompanionDock-ABCD", "p");     /* + WiFi, Pass */
     fx_screen_looking(&c[n++], "192.168.8.225", "192.168.8.10", NULL, NULL);         /* Connecting, Box IP */
     fx_screen_choose(&c[n++], "192.168.8.225", NULL, NULL);                          /* Choose Companion, Web page */
     fx_screen_too_old(&c[n++], "4.2.0", NULL, NULL);                                 /* Companion too old, Needs, Has */
     sui_screen_reconnecting(&c[n++], NULL);                                           /* Reconnecting */
     fx_screen_dock(&c[n++], "192.168.8.225", 5343, NULL, NULL);                      /* Waiting for Companion, Remote surface, port */
-    fx_screen_dock(&c[n++], "192.168.8.225", 5343, "CompanionBox-ABCD", "p");        /* + WiFi, Pass */
+    fx_screen_dock(&c[n++], "192.168.8.225", 5343, "CompanionDock-ABCD", "p");        /* + WiFi, Pass */
     fx_screen_no_dock(&c[n++]);                                                      /* No free dock, Max 6 decks */
     static sui_layout_t L;
     for (int i = 0; i < n; i++) {
@@ -1319,12 +1319,12 @@ static const char *zones_of(const sui_content_t *c)
 static void test_zones_per_screen(void)
 {
     sui_content_t c;
-    fx_screen_no_network(&c, "192.168.4.1", "CompanionBox-8D1C", "abcdefghjk");
+    fx_screen_no_network(&c, "192.168.4.1", "CompanionDock-8D1C", "abcdefghjk");
     TEST_ASSERT_EQUAL_STRING("SMMVV", zones_of(&c));
     TEST_ASSERT_EQUAL_STRING("No network", c.lines[0]);
     TEST_ASSERT_EQUAL_STRING("Setup page", c.lines[1]);
     TEST_ASSERT_EQUAL_STRING("192.168.4.1", c.lines[2]);
-    TEST_ASSERT_EQUAL_STRING("WiFi CompanionBox-8D1C", c.lines[3]);
+    TEST_ASSERT_EQUAL_STRING("WiFi CompanionDock-8D1C", c.lines[3]);
     TEST_ASSERT_EQUAL_STRING("Pass abcdefghjk", c.lines[4]);
     fx_screen_no_network(&c, "192.168.4.1", NULL, NULL); /* the hotspot off: a hint, no service */
     TEST_ASSERT_EQUAL_STRING("SM", zones_of(&c));
@@ -1375,17 +1375,17 @@ static void test_zones_layout(void)
 {
     sui_content_t c;
     static sui_layout_t L;
-    fx_screen_no_network(&c, "192.168.4.1", "CompanionBox-8D1C", "abcdefghjk");
+    fx_screen_no_network(&c, "192.168.4.1", "CompanionDock-8D1C", "abcdefghjk");
     sui_layout(8, 4, 96, &c, &L); /* Module 32: everything on one page, the hotspot's lines in one row */
     TEST_ASSERT_EQUAL_INT(1, L.pages);
-    TEST_ASSERT_EQUAL_STRING("No|network\nSetup|page\n192|168|4|1\nWiFi|Companion|Box-8D1C|Pass|abcde|fghjk",
+    TEST_ASSERT_EQUAL_STRING("No|network\nSetup|page\n192|168|4|1\nWiFi|Companion|Dock-8D1C|Pass|abcde|fghjk",
                              page_text(&L, &c, 8, 4, 0));
 
-    fx_screen_no_network(&c, "192.168.4.1", "CompanionBox-8D1C", NULL);
+    fx_screen_no_network(&c, "192.168.4.1", "CompanionDock-8D1C", NULL);
     sui_layout(5, 3, 72, &c, &L); /* MK.2: status + main, then status + service at the bottom */
     TEST_ASSERT_EQUAL_INT(2, L.pages);
     TEST_ASSERT_EQUAL_STRING("No|network\nSetup|page\n192|168|4|1", page_text(&L, &c, 5, 3, 0));
-    TEST_ASSERT_EQUAL_STRING("No|network\n\nWiFi|Companion|Box-8D1C|No|password", page_text(&L, &c, 5, 3, 1)); /* a spacer row */
+    TEST_ASSERT_EQUAL_STRING("No|network\n\nWiFi|Companion|Dock-8D1C|No|password", page_text(&L, &c, 5, 3, 1)); /* a spacer row */
     for (int k = 0; k < 5; k++) TEST_ASSERT_NULL(sui_layout_cell(&L, 1, k, 1));
 
     /* a spare row on one page: status, one main line, the spacer, the service at the bottom */
@@ -1412,12 +1412,12 @@ static void test_zones_small_decks(void)
 {
     sui_content_t c;
     static sui_layout_t L;
-    fx_screen_dock(&c, "192.168.8.225", 5343, "CompanionBox-8D1C", "abcdefghjk");
+    fx_screen_dock(&c, "192.168.8.225", 5343, "CompanionDock-8D1C", "abcdefghjk");
     sui_layout(5, 3, 72, &c, &L); /* MK.2 */
     TEST_ASSERT_EQUAL_INT(3, L.pages);
     TEST_ASSERT_EQUAL_STRING("Waiting|for|Companion\nRemote|surface\n", page_text(&L, &c, 5, 3, 0));
     TEST_ASSERT_EQUAL_STRING("Waiting|for|Companion\n192|168|8|225\nport|5343", page_text(&L, &c, 5, 3, 1));
-    TEST_ASSERT_EQUAL_STRING("Waiting|for|Companion\nWiFi|Companion|Box-8D1C\nPass|abcde|fghjk", page_text(&L, &c, 5, 3, 2));
+    TEST_ASSERT_EQUAL_STRING("Waiting|for|Companion\nWiFi|Companion|Dock-8D1C\nPass|abcde|fghjk", page_text(&L, &c, 5, 3, 2));
 
     sui_layout(3, 2, 80, &c, &L); /* Mini: one row under the status */
     for (int p = 0; p < L.pages; p++) {
@@ -1425,7 +1425,7 @@ static void test_zones_small_decks(void)
         TEST_ASSERT_EQUAL_STRING_LEN("Waiting|for|Companion\n", page_text(&L, &c, 3, 2, p), 22);
     }
     TEST_ASSERT_EQUAL_STRING("Waiting|for|Companion\nRemote|surface", page_text(&L, &c, 3, 2, 0));
-    TEST_ASSERT_EQUAL_STRING("Waiting|for|Companion\nWiFi|Companion|Box-8D1C", page_text(&L, &c, 3, 2, L.pages - 2));
+    TEST_ASSERT_EQUAL_STRING("Waiting|for|Companion\nWiFi|Companion|Dock-8D1C", page_text(&L, &c, 3, 2, L.pages - 2));
     TEST_ASSERT_EQUAL_STRING("Waiting|for|Companion\nPass|abcde|fghjk", page_text(&L, &c, 3, 2, L.pages - 1));
 
     /* a deck of one key (the overlay's layout): the status word alone */
@@ -1443,15 +1443,15 @@ static void test_zones_keep_information(void)
     for (size_t d = 0; d < sizeof D / sizeof D[0]; d++) {
         sui_content_t c[6];
         static const char *const want[6][6] = {
-            {"No", "network", "192", "1", "CompanionBox-8D1C", "abcdefghjk"},
-            {"Finding", "Companion", "225", "CompanionBox-8D1C", "No", "password"},
+            {"No", "network", "192", "1", "CompanionDock-8D1C", "abcdefghjk"},
+            {"Finding", "Companion", "225", "CompanionDock-8D1C", "No", "password"},
             {"Connecting", "companion.local", "225", NULL},
             {"Choose", "Companion", "192", "225", NULL},
             {"too", "old", "5.0+", "4.2.0", NULL},
             {"Waiting", "Remote", "surface", "port", "5343", "abcdefghjk"},
         };
-        fx_screen_no_network(&c[0], "192.168.4.1", "CompanionBox-8D1C", "abcdefghjk");
-        fx_screen_looking(&c[1], "192.168.8.225", NULL, "CompanionBox-8D1C", NULL);
+        fx_screen_no_network(&c[0], "192.168.4.1", "CompanionDock-8D1C", "abcdefghjk");
+        fx_screen_looking(&c[1], "192.168.8.225", NULL, "CompanionDock-8D1C", NULL);
         fx_screen_looking(&c[2], "192.168.8.225", "companion.local", NULL, NULL);
         fx_screen_choose(&c[3], "192.168.8.225", NULL, NULL);
         fx_screen_too_old(&c[4], "4.2.0", NULL, NULL);
@@ -1486,14 +1486,14 @@ static void test_value_groups_together(void)
     sui_content_t c;
     static sui_layout_t L;
     /* Mini: the hotspot's address 2 + 2 over two pages, never "1" alone */
-    fx_screen_no_network(&c, "192.168.4.1", "CompanionBox-8D1C", "k7m2xq9fhd");
+    fx_screen_no_network(&c, "192.168.4.1", "CompanionDock-8D1C", "k7m2xq9fhd");
     sui_layout(3, 2, 80, &c, &L);
     TEST_ASSERT_EQUAL_INT(5, L.pages);
     TEST_ASSERT_EQUAL_STRING("No|network\nSetup|page", page_text(&L, &c, 3, 2, 0));
     TEST_ASSERT_EQUAL_STRING("No|network\n192|168", page_text(&L, &c, 3, 2, 1));
     TEST_ASSERT_EQUAL_STRING("No|network\n4|1", page_text(&L, &c, 3, 2, 2));
     /* MK.2 dock: the address on one row, "port" with its number on the next, on one page */
-    fx_screen_dock(&c, "192.168.8.225", 5343, "CompanionBox-8D1C", "k7m2xq9fhd");
+    fx_screen_dock(&c, "192.168.8.225", 5343, "CompanionDock-8D1C", "k7m2xq9fhd");
     sui_layout(5, 3, 72, &c, &L);
     TEST_ASSERT_EQUAL_INT(3, L.pages);
     TEST_ASSERT_EQUAL_STRING("Waiting|for|Companion\nRemote|surface\n", page_text(&L, &c, 5, 3, 0));
@@ -1527,8 +1527,8 @@ static void test_value_groups_together(void)
     static const struct { int cols, rows, px; } D[] = {{3, 2, 80}, {5, 3, 72}, {8, 4, 96}, {4, 2, 96}, {4, 2, 120}, {9, 4, 112}};
     for (size_t d = 0; d < sizeof D / sizeof D[0]; d++) {
         sui_content_t s[4];
-        fx_screen_dock(&s[0], "192.168.100.200", 5353, "CompanionBox-8D1C", "k7m2xq9fhd");
-        fx_screen_no_network(&s[1], "192.168.4.1", "CompanionBox-8D1C", NULL);
+        fx_screen_dock(&s[0], "192.168.100.200", 5353, "CompanionDock-8D1C", "k7m2xq9fhd");
+        fx_screen_no_network(&s[1], "192.168.4.1", "CompanionDock-8D1C", NULL);
         fx_screen_looking(&s[2], "10.0.0.7", "192.168.100.200", "S", NULL);
         fx_screen_choose(&s[3], "255.255.255.255", NULL, NULL);
         for (int i = 0; i < 4; i++) {
@@ -1887,16 +1887,16 @@ static void test_screen_dock_text(void)
     TEST_ASSERT_EQUAL_UINT8_ARRAY(black, c.bg, 3);
 
     /* hotspot on: SSID and password one line each, in the service zone */
-    fx_screen_dock(&c, "10.0.0.7", 5345, "CompanionBox-ABCD", "abcdefghjk");
+    fx_screen_dock(&c, "10.0.0.7", 5345, "CompanionDock-ABCD", "abcdefghjk");
     TEST_ASSERT_EQUAL_INT(5, c.n);
     TEST_ASSERT_EQUAL_STRING("10.0.0.7 port 5345", c.lines[2]);
-    TEST_ASSERT_EQUAL_STRING("WiFi CompanionBox-ABCD", c.lines[3]);
+    TEST_ASSERT_EQUAL_STRING("WiFi CompanionDock-ABCD", c.lines[3]);
     TEST_ASSERT_EQUAL_STRING("Pass abcdefghjk", c.lines[4]);
     /* an 8-column deck shows it all at once, the hotspot's lines together in the bottom row */
     static sui_layout_t L;
     sui_layout(8, 4, 96, &c, &L);
     TEST_ASSERT_EQUAL_INT(1, L.pages);
-    TEST_ASSERT_EQUAL_STRING("Waiting|for|Companion\nRemote|surface\n10|0|0|7|port|5345\nWiFi|Companion|Box-ABCD|Pass|abcde|fghjk",
+    TEST_ASSERT_EQUAL_STRING("Waiting|for|Companion\nRemote|surface\n10|0|0|7|port|5345\nWiFi|Companion|Dock-ABCD|Pass|abcde|fghjk",
                              page_text(&L, &c, 8, 4, 0));
 }
 
@@ -1934,37 +1934,37 @@ static void test_screen_credentials_whole(void)
 static void test_screen_hotspot_open(void)
 {
     sui_content_t c;
-    fx_screen_no_network(&c, "192.168.4.1", "CompanionBox-ABCD", NULL);
+    fx_screen_no_network(&c, "192.168.4.1", "CompanionDock-ABCD", NULL);
     TEST_ASSERT_EQUAL_INT(5, c.n);
     TEST_ASSERT_EQUAL_STRING("No network", c.lines[0]);
-    TEST_ASSERT_EQUAL_STRING("WiFi CompanionBox-ABCD", c.lines[3]);
+    TEST_ASSERT_EQUAL_STRING("WiFi CompanionDock-ABCD", c.lines[3]);
     TEST_ASSERT_EQUAL_STRING("No password", c.lines[4]);
     TEST_ASSERT_EQUAL_HEX8((1u << 1) | (1u << 3), c.keep_next);
 
-    fx_screen_looking(&c, "1.2.3.4", NULL, "CompanionBox-ABCD", NULL);
+    fx_screen_looking(&c, "1.2.3.4", NULL, "CompanionDock-ABCD", NULL);
     TEST_ASSERT_EQUAL_INT(5, c.n);
-    TEST_ASSERT_EQUAL_STRING("WiFi CompanionBox-ABCD", c.lines[3]);
+    TEST_ASSERT_EQUAL_STRING("WiFi CompanionDock-ABCD", c.lines[3]);
     TEST_ASSERT_EQUAL_STRING("No password", c.lines[4]);
     TEST_ASSERT_EQUAL_HEX8((1u << 1) | (1u << 3), c.keep_next);
 
-    fx_screen_dock(&c, "10.0.0.7", 5345, "CompanionBox-ABCD", NULL);
+    fx_screen_dock(&c, "10.0.0.7", 5345, "CompanionDock-ABCD", NULL);
     TEST_ASSERT_EQUAL_INT(5, c.n);
-    TEST_ASSERT_EQUAL_STRING("WiFi CompanionBox-ABCD", c.lines[3]);
+    TEST_ASSERT_EQUAL_STRING("WiFi CompanionDock-ABCD", c.lines[3]);
     TEST_ASSERT_EQUAL_STRING("No password", c.lines[4]);
     TEST_ASSERT_EQUAL_HEX8((1u << 1) | (1u << 3), c.keep_next);
 
     /* the same as a password: "No password" stays with the name, at the bottom */
     static sui_layout_t L;
-    fx_screen_looking(&c, "192.168.8.225", NULL, "CompanionBox-ABCD", NULL);
+    fx_screen_looking(&c, "192.168.8.225", NULL, "CompanionDock-ABCD", NULL);
     sui_layout(5, 3, 72, &c, &L); /* MK.2 */
     TEST_ASSERT_EQUAL_INT(2, L.pages);
     TEST_ASSERT_EQUAL_STRING("Finding|Companion\nBox|IP\n192|168|8|225", page_text(&L, &c, 5, 3, 0));
-    TEST_ASSERT_EQUAL_STRING("Finding|Companion\n\nWiFi|Companion|Box-ABCD|No|password", page_text(&L, &c, 5, 3, 1));
-    fx_screen_no_network(&c, "192.168.4.1", "CompanionBox-ABCD", NULL);
+    TEST_ASSERT_EQUAL_STRING("Finding|Companion\n\nWiFi|Companion|Dock-ABCD|No|password", page_text(&L, &c, 5, 3, 1));
+    fx_screen_no_network(&c, "192.168.4.1", "CompanionDock-ABCD", NULL);
     sui_layout(3, 2, 80, &c, &L); /* Mini: one row under the status */
     TEST_ASSERT_EQUAL_INT(5, L.pages);
     TEST_ASSERT_EQUAL_STRING("No|network\nSetup|page", page_text(&L, &c, 3, 2, 0));
-    TEST_ASSERT_EQUAL_STRING("No|network\nWiFi|Companion|Box-ABCD", page_text(&L, &c, 3, 2, 3));
+    TEST_ASSERT_EQUAL_STRING("No|network\nWiFi|Companion|Dock-ABCD", page_text(&L, &c, 3, 2, 3));
     TEST_ASSERT_EQUAL_STRING("No|network\nNo|password", page_text(&L, &c, 3, 2, 4));
 
     /* a password is shown as before; an empty one counts as none */
@@ -2021,7 +2021,7 @@ static void test_divider_marks_second_line(void)
 {
     sui_content_t c;
     static sui_layout_t L;
-    fx_screen_no_network(&c, "192.168.4.1", "CompanionBox-8D1C", "abcdefghjk");
+    fx_screen_no_network(&c, "192.168.4.1", "CompanionDock-8D1C", "abcdefghjk");
     sui_layout(8, 4, 96, &c, &L); /* Module 32: WiFi and Pass share the bottom row */
     const sui_cell_t *pass = line_start(&L, 4);
     TEST_ASSERT_NOT_NULL(pass);
@@ -2033,7 +2033,7 @@ static void test_divider_marks_second_line(void)
     TEST_ASSERT_EQUAL_INT(1, n);
     TEST_ASSERT_EQUAL_UINT8(1, pass->divider);
 
-    fx_screen_no_network(&c, "192.168.4.1", "CompanionBox-8D1C", NULL); /* "No password" */
+    fx_screen_no_network(&c, "192.168.4.1", "CompanionDock-8D1C", NULL); /* "No password" */
     sui_layout(8, 4, 96, &c, &L);
     const sui_cell_t *no = line_start(&L, 4);
     TEST_ASSERT_EQUAL_STRING_LEN("No", c.lines[4] + no->start, 2);
@@ -2049,8 +2049,8 @@ static void test_divider_not_at_row_start(void)
     for (size_t d = 0; d < sizeof D / sizeof D[0]; d++)
         for (int variant = 0; variant < 3; variant++) {
             sui_content_t c;
-            if (variant == 0) fx_screen_no_network(&c, "192.168.4.1", "CompanionBox-8D1C", "abcdefghjk");
-            else if (variant == 1) fx_screen_dock(&c, "192.168.8.225", 5343, "CompanionBox-8D1C", NULL);
+            if (variant == 0) fx_screen_no_network(&c, "192.168.4.1", "CompanionDock-8D1C", "abcdefghjk");
+            else if (variant == 1) fx_screen_dock(&c, "192.168.8.225", 5343, "CompanionDock-8D1C", NULL);
             else fx_screen_looking(&c, "192.168.8.225", NULL, "S", "p");
             sui_layout(D[d].cols, D[d].rows, D[d].px, &c, &L);
             for (int i = 0; i < L.n; i++) {
@@ -2070,7 +2070,7 @@ static void test_divider_not_at_row_start(void)
         }
     /* MK.2, service page: "WiFi ..." alone on a row of its own when Pass can't join it */
     sui_content_t c;
-    fx_screen_no_network(&c, "192.168.4.1", "CompanionBox-8D1C", "abcdefghjkmnpqrstuvwxyz23456789");
+    fx_screen_no_network(&c, "192.168.4.1", "CompanionDock-8D1C", "abcdefghjkmnpqrstuvwxyz23456789");
     sui_layout(5, 3, 72, &c, &L);
     for (int i = 0; i < L.n; i++)
         if (L.cell[i].col == 0) TEST_ASSERT_EQUAL_UINT8(0, L.cell[i].divider);
@@ -2082,7 +2082,7 @@ static void test_divider_render(void)
     sui_content_t c;
     static sui_layout_t L;
     static uint8_t buf[96 * 96 * 3];
-    fx_screen_no_network(&c, "192.168.4.1", "CompanionBox-8D1C", "abcdefghjk");
+    fx_screen_no_network(&c, "192.168.4.1", "CompanionDock-8D1C", "abcdefghjk");
     sui_layout(8, 4, 96, &c, &L);
     const sui_cell_t *pass = line_start(&L, 4);
     sui_render_key(8, 4, 96, &c, 0, pass->col, pass->row, buf);
@@ -2122,7 +2122,7 @@ static void test_divider_text_fits(void)
     static uint8_t buf[120 * 120 * 3];
     for (size_t d = 0; d < sizeof D / sizeof D[0]; d++) {
         sui_content_t c;
-        fx_screen_dock(&c, "192.168.8.225", 5343, "CompanionBox-8D1C", "abcdefghjk");
+        fx_screen_dock(&c, "192.168.8.225", 5343, "CompanionDock-8D1C", "abcdefghjk");
         sui_layout(D[d].cols, D[d].rows, D[d].px, &c, &L);
         for (int i = 0; i < L.n; i++) {
             const sui_cell_t *e = &L.cell[i];

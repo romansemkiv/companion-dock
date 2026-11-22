@@ -96,7 +96,7 @@ static int one_line_px(word_t *w, int key_px, int max_px)
 /* The word's own break after chars [0, cut) of s: after a '-' or '.'. */
 static bool own_break(const char *s, int cut) { return s[cut - 1] == '-' || s[cut - 1] == '.'; }
 
-/* Between a small letter and a capital ("Companion|Box"): the next best place to break a word. */
+/* Between a small letter and a capital ("Companion|Dock"): the next best place to break a word. */
 static bool case_break(const char *s, int cut)
 {
     return s[cut - 1] >= 'a' && s[cut - 1] <= 'z' && s[cut] >= 'A' && s[cut] <= 'Z';
