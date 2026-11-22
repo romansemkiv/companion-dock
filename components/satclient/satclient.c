@@ -397,6 +397,7 @@ static int connect_to(const char *host, uint16_t port, uint32_t seen)
     }
     int fd = socket(res->ai_family, res->ai_socktype, 0);
     if (fd < 0) {
+        ESP_LOGW(TAG, "socket failed (errno %d)", errno);
         freeaddrinfo(res);
         return -1;
     }
@@ -516,6 +517,9 @@ static void client_task(void *arg)
             if (s > 0 && FD_ISSET(g.fd, &r)) {
                 ssize_t n = recv(g.fd, g.chunk, RECV_CHUNK, 0);
                 if (n > 0) {
+                    /* before the lines: one long line (a big KEY-STATE over a weak link) may take more than the
+                     * 5 s of silence allowed to arrive */
+                    sat_session_rx(&g.sess, now_ms());
                     sat_lineasm_feed(&g.la, g.chunk, (size_t)n, on_line, NULL);
                 } else if (n == 0 || (errno != EAGAIN && errno != EWOULDBLOCK && errno != EINTR)) {
                     ESP_LOGW(TAG, "connection closed by peer (n=%d errno=%d)", (int)n, errno);

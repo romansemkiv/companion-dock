@@ -34,6 +34,9 @@ usb_host_client_handle_t usbdeck_client(void);
  *   device (it, or the hub above it) keeps its node and the port isn't recycled meanwhile. */
 bool usbdeck_bus_reset(usb_device_handle_t culprit);
 bool usbdeck_bus_resetting(void);
+/* USB can't work again without a restart (say why with usbdeck_problem first): restarts the box from a
+ * task of its own, half a second on. From a task that may block, never the host library's callbacks. */
+void usbdeck_restart(void);
 /* False from our root-port power-on (at start and after a bus reset) until a device has finished
  * enumerating since, or UPOL_ROOT_SETTLE_US later (upol_root_settled). */
 bool usbdeck_root_settled(void);

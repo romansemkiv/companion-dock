@@ -81,12 +81,14 @@ static RTC_NOINIT_ATTR struct {
 
 static portMUX_TYPE s_mux = portMUX_INITIALIZER_UNLOCKED; /* guards s_running */
 static atomic_bool s_updating; /* the C6's firmware is being written (c6fw_updating) */
+static atomic_bool s_confirm_first; /* c6fw_confirm_first_pending */
 typedef esp_err_t (*restart_fn_t)(const char *why);
 typedef bool (*pending_fn_t)(void);
 static _Atomic(restart_fn_t) s_restart; /* c6fw_set_restart's */
 static _Atomic(pending_fn_t) s_restart_pending;
 
 bool c6fw_updating(void) { return atomic_load(&s_updating); }
+bool c6fw_confirm_first_pending(void) { return atomic_load(&s_confirm_first); }
 void c6fw_set_restart(esp_err_t (*restart)(const char *why), bool (*restart_pending)(void))
 {
     atomic_store(&s_restart_pending, restart_pending);
@@ -213,7 +215,8 @@ esp_err_t c6fw_check(void)
     bool known = read_running(&r, was);
     bool usable = c6fw_usable(r, known, c);
     esp_err_t err = ESP_ERR_INVALID_VERSION;
-    switch (c6fw_decide(r, known, c, image_pending(), (int)s_rtc.tries, !C6FW_HAVE_IMAGE)) {
+    const c6fw_action_t act = c6fw_decide(r, known, c, image_pending(), (int)s_rtc.tries, !C6FW_HAVE_IMAGE);
+    switch (act) {
     case C6FW_OK:
         s_rtc.tries = 0;
         ESP_LOGI(TAG, "the C6 runs ESP-Hosted %s, the firmware this image carries", was);
@@ -225,10 +228,12 @@ esp_err_t c6fw_check(void)
         break;
     case C6FW_WAIT_CONFIRM:
 #if C6FW_HAVE_IMAGE
-        if (xTaskCreate(deferred_task, "c6fw", 4096, NULL, 3, NULL) == pdPASS)
+        if (xTaskCreate(deferred_task, "c6fw", 4096, NULL, 3, NULL) == pdPASS) {
             ESP_LOGW(TAG, "the C6 runs ESP-Hosted %s: it is updated to %d.%d.%d once this image is confirmed", was,
                      c.major, c.minor, c.patch);
-        else
+            /* only with the task that updates it: the self-check then confirms without Wi-Fi */
+            atomic_store(&s_confirm_first, c6fw_confirm_first(r, known, c, act));
+        } else
             ESP_LOGE(TAG, "no memory for the C6's deferred update: it waits for the next start");
 #endif
         break;

@@ -137,6 +137,7 @@ typedef struct {
     surf_settings_t set;
     companion_instance_t inst[UI_COMPS];
     char host[64], ap_ssid[33], ap_pass[65], version[32], toast[40];
+    char comp_version[32]; /* the Companion's version: kept here, in is read long after gather returned */
     uint8_t toast_state;
     dui_ipset_t eth_saved, eth_lease; /* the saved static set, Ethernet's address now */
     surf_maint_in_t in;
@@ -185,6 +186,7 @@ static void gather(snap_t *g, int64_t now)
     for (int i = 0; i < DUI_COMPS_MAX; i++) /* the pick index of each Companion offered */
         snprintf(s_comp_id[i], sizeof s_comp_id[i], "%s", i < ninst ? g->inst[i].id : "");
     snprintf(g->version, sizeof g->version, "%s", esp_app_get_description()->version);
+    snprintf(g->comp_version, sizeof g->comp_version, "%s", caps.companion_version);
     dui_ipset_t *sv = &g->eth_saved, *ls = &g->eth_lease;
     snprintf(sv->ip, sizeof sv->ip, "%s", g->set.eth_ip);
     snprintf(sv->mask, sizeof sv->mask, "%s", g->set.eth_mask);
@@ -199,7 +201,7 @@ static void gather(snap_t *g, int64_t now)
         .pending = pending_verify(now), .sel = sel, .companion_auto = g->set.companion_auto, .light = g->set.led_enabled,
         .companion_host = g->set.companion_host, .companion_port = g->set.companion_port, .deck_limit = (uint8_t)surf.limit,
         .too_old = st == SATC_TOO_OLD || (too_old_flag && !strcmp(too_old_host, g->host)), .live = live,
-        .target_host = g->host, .companion_version = caps.companion_version, .comps = g->inst, .ncomps = ninst,
+        .target_host = g->host, .companion_version = g->comp_version, .comps = g->inst, .ncomps = ninst,
         .toast = g->toast, .toast_state = g->toast_state, .eth_dhcp = g->set.eth_dhcp, .eth_saved = &g->eth_saved, .eth_lease = &g->eth_lease,
     };
 }

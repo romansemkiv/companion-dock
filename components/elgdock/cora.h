@@ -68,8 +68,8 @@ typedef struct {
 size_t cora_encode(const cora_msg_t *m, uint8_t *out, size_t cap);
 
 /* Streaming parser. buf (cap bytes) holds one payload; a message announcing more than cap bytes
- * is skipped whole (counted in `oversize`). Bytes that don't start a header are dropped until the
- * magic comes (counted in `resync`). */
+ * (counted in `oversize`) ends the stream: cora_feed returns -1 and the caller closes the connection.
+ * Bytes that don't start a header are dropped until the magic comes (counted in `resync`). */
 typedef struct {
     uint8_t *buf;
     size_t cap;
@@ -77,7 +77,6 @@ typedef struct {
     size_t hdr_have;
     uint32_t len;  /* payload length of the message being read */
     uint32_t have; /* payload bytes buffered */
-    uint32_t skip; /* bytes of an oversize payload still to drop */
     uint32_t oversize, resync;
 } cora_parser_t;
 
@@ -85,7 +84,9 @@ void cora_parser_init(cora_parser_t *p, uint8_t *buf, size_t cap);
 
 /* Consumes data[0..n) up to the end of the first message that completes. Returns 1 with that
  * message in *out (payload points into buf: valid until the next cora_feed), 0 when all n bytes
- * were taken without completing one. *used = bytes taken either way. */
+ * were taken without completing one, -1 at a header announcing more than cap bytes (p->len: how many):
+ * nothing after it can be told apart from its payload, so the connection is to be ended.
+ * *used = bytes taken in every case. */
 int cora_feed(cora_parser_t *p, const uint8_t *data, size_t n, size_t *used, cora_msg_t *out);
 
 #ifdef __cplusplus

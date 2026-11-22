@@ -1674,6 +1674,7 @@ static void dock_dim(int slot)
             if (snap) {
                 const uint8_t k = hws[c] < SURF_SNAP_KEYS ? snap->kind[hws[c]] : DC_NONE;
                 uint8_t *img = snap_key_rgb(m, snap, hws[c]); /* NULL: black under the word */
+                esp_task_wdt_reset(); /* a JPEG decode each, 100 ms a step when the engine doesn't answer, 32 keys */
                 images += k == DC_IMAGE;
                 fills += k == DC_FILL;
                 drawn += img != NULL;
@@ -1754,21 +1755,42 @@ static TickType_t task_wait(void)
     return wait;
 }
 
+static void handle_event(const surf_ev_t *ev)
+{
+    switch (ev->kind) {
+    case EV_ATTACHED: handle_attached(ev); break;
+    case EV_DETACHED: handle_detached(ev); break;
+    case EV_RESTORED: handle_restored(ev); break;
+    case EV_POKE: atomic_store(&surf.poke_pending, false); break;
+    case EV_INPUT: maintui_input(ev->slot, ev->gen, &ev->in); break;
+    case EV_PIN: maintui_pin_result(ev->slot, ev->gen, ev->pin_result, ev->wait_s); break;
+    }
+}
+
 static void surf_task(void *arg)
 {
     (void)arg;
     surf_ev_t ev;
+    /* On the task watchdog: every deck's task posts to this task's queue and waits for room (post_event), so
+     * with this task stuck all the decks would go dead while the box stayed up. It wakes at least every TICK_MS
+     * and nothing it calls waits on I/O (its locks are held for copies only, Companion and the decks are sent
+     * to through their own tasks' queues); fed each turn, between the events and the pass, and in dock_dim. */
+    if (esp_task_wdt_add(NULL) != ESP_OK) ESP_LOGW(TAG, "surfaces: not on the task watchdog");
     for (;;) {
+        esp_task_wdt_reset();
         if (xQueueReceive(surf.evq, &ev, task_wait()) == pdTRUE) {
-            switch (ev.kind) {
-            case EV_ATTACHED: handle_attached(&ev); break;
-            case EV_DETACHED: handle_detached(&ev); break;
-            case EV_RESTORED: handle_restored(&ev); break;
-            case EV_POKE: atomic_store(&surf.poke_pending, false); break;
-            case EV_INPUT: maintui_input(ev.slot, ev.gen, &ev.in); break;
-            case EV_PIN: maintui_pin_result(ev.slot, ev.gen, ev.pin_result, ev.wait_s); break;
-            }
+            handle_event(&ev);
+            /* ... and the decks' input queued behind it, before the pass. A hold is timed by the passes
+             * (dui_nav_tick): with a pass between every two events, a key-up waiting in a long queue let the hold
+             * fire (Restart, the mode, Save) after the finger was lifted. Input after input only: any other event
+             * (a deck attached or gone, a PIN's answer) gets its pass first, as it always did, and so does anything
+             * that asked for a new look at the screens (snap_dirty: the box menu closed on a deck, a deck changed
+             * hands). At most a queue's worth, so a spinning dial never keeps the pass away. */
+            for (int n = 0; ev.kind == EV_INPUT && n < EVQ_DEPTH && !atomic_load(&surf.snap_dirty) &&
+                            xQueueReceive(surf.evq, &ev, 0) == pdTRUE; n++)
+                handle_event(&ev);
         }
+        esp_task_wdt_reset(); /* a queue's worth of events, each drawing its deck, then the pass */
         const int64_t now = esp_timer_get_time();
         s_corner_due_us = corner_step(now); /* before the screens: a gesture may open one */
         process_ready();

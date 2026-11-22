@@ -644,11 +644,11 @@ a Wi-Fi scan or a broadcast flood never holds up a key press, an image or the co
 | Live input | 6-8 | `usb_daemon` 8, `usb_client` 7 (the USB host), `deckN` 6 (one per deck: keys in, images out), `docktx` 6 (key reports to Companion), `usbdeck_svc` 6 (USB recovery) | either |
 | Companion and images | 4-5 | `dockrx` 5 (Network Dock: from Companion), `satclient` 5 (Satellite), `surfaces` 5 (the decks' coordinator), `imgwork` 4 (image conversion, just below input so it never delays a key) | `surfaces` core 1 |
 | The connection | 4 | `supervisor` (Companion target, network decisions, the watchdog), `elgdock` (dock connections), `mdns` (answers: Companion finds the box), `mdns_browse` (the box finds Companion), `sta_retry` and `sta_work` (Wi-Fi reconnect, failover) | `mdns` core 1 |
-| Convenience | 1-3 | `httpd` and `ota` 3 (the web page, uploads), `notify` 3, `deckact` 3 (box-menu actions), `captive_dns` 3, `svcbtn_act` 3, `speaker` 3, `ap_force`, `scan_fin`, `c6fw` 3, `feedback` 2, `svcbtn` 2, `qreset` 2, `eth_log` 2 (the flood and storm log lines, kept off the receiving core), `slotsync` 1 | `httpd`, `ota`, `speaker`, `eth_log` core 1 |
+| Convenience | 1-3 | `httpd` and `ota` 3 (the web page, uploads), `notify` 3, `deckact` 3 (box-menu actions), `captive_dns` 3, `svcbtn_act` 3, `speaker` 3, `ap_force`, `wifi_retry` (a failed Wi-Fi start tried again every 30 s), `scan_fin`, `c6fw` 3, `feedback` 2, `svcbtn` 2, `qreset` 2, `ota_backstop` 2 (first start after an update only: restarts an image whose supervisor is not running after 3 min), `eth_log` 2 (the flood and storm log lines, kept off the receiving core), `slotsync` 1 | `httpd`, `ota`, `speaker`, `eth_log` core 1 |
 
 Core 0 takes the Ethernet receive task, which a broadcast flood keeps busy; core 1 has the decks' coordinator, the web
 server, mDNS and the speaker. The other tasks are not pinned: they use both cores, and core 1 while core 0 is busy.
-The tasks that feed the watchdog (`supervisor`, `satclient`, `imgwork`, `usb_daemon`, `usb_client`) are all in the
+The tasks that feed the watchdog (`supervisor`, `satclient`, `surfaces`, `imgwork`, `usb_daemon`, `usb_client`) are all in the
 bands a show needs. The Performance page lists every task with its priority and core.
 
 **First flash of a board.** `./build.sh -p PORT` writes everything. To give the box its Wi-Fi network
@@ -785,7 +785,7 @@ or that can cut you off (network changes, the settings password).
 | USB reflash after an OTA or a sync | `idf.py -p PORT flash` or `./build.sh -p PORT`; or `idf.py app-flash`, then **Boot other slot** | the box may run `ota_1` (the boot log's first line and the *Firmware* page name the slot); `app-flash` writes `ota_0` only, so the box keeps running `ota_1` and shows the new image as *Other slot newer*: start it with **Boot other slot**. `flash` also resets otadata, so the box starts `ota_0` |
 | Hung task | nothing to do | the task watchdog (10 s) restarts the box |
 | Wi-Fi chip (C6) lost | nothing to do | with Ethernet up the box goes on over the cable. Without it (no link or no address for 3 minutes in a row) and with Wi-Fi or the hotspot configured, the box restarts, which resets the C6: at most 3 times per power-on, then once every 30 minutes |
-| Wedged deck | nothing to do | the box retries, then resets the USB port (at most every 10 s box-wide). A deck that the reset doesn't cure is quarantined for 10 minutes (doubling up to 60), then retried |
+| Wedged deck | nothing to do | the box retries, then resets the USB port (at most every 10 s box-wide). A deck that the reset doesn't cure is quarantined for 10 minutes (doubling up to 60), then retried. If an unplugged deck leaves its USB port unusable (not freed within 10 s), the problem list says "USB port not freed after a Stream Deck was unplugged — restarting the box" and the box restarts (last reset: `USB power-on failed`) |
 
 > **Settings PIN warning.** If you set a settings PIN and forget it, the web page and the API stay locked,
 > and the page's factory reset needs that PIN too. The ways back are:
@@ -937,8 +937,11 @@ Companions found and the firmware slots (the copy's progress too) follow the sam
 row from one address lock it for 60 s; each further lock of that address is twice as long (120 s, 240 s, …,
 up to 1 h) until a right entry (a 4-digit PIN is short). The decks count as one more client ("deck")
 with the same rules; its entry is reserved, so the network can never crowd it out or hold it back.
-A box-wide budget slows a flood from many addresses (the decks are outside it: their own lockout bounds them). When the table of 16 addresses is full of locked
-ones, a new address is not refused: it is held to that box-wide budget (about one try a second). Tokens are kept
+A box-wide budget slows a flood from many addresses (the decks are outside it: their own lockout bounds them):
+after five wrong entries within 10 s, from anyone, one sign-in is checked a second and the others get "wait N s";
+each wrong entry that still comes doubles that gap (2 s, 4 s, …, up to 30 s), and it halves again for every
+minute without a wrong entry. A right entry waits its turn like the rest, 30 s at most. When the table of 16 addresses is full of locked
+ones, a new address is not refused: it is held to that box-wide budget (one try a second at best). Tokens are kept
 as SHA-256 hashes in RAM, so a restart signs everyone out. **Firmware:** `POST /ota` with the raw `.bin`
 (the page's *Firmware* page does this). An upload must finish within 30 s plus 1 s per 8 KB, or it is cut
 off (a slow hotspot link can hit this).

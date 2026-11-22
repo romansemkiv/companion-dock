@@ -149,7 +149,8 @@ typedef enum {
 bool boxcfg_should_store(boxcfg_load_t how, bool same);
 
 /* Caller frees with free() (cJSON_free). wifiPass/adminPass are "" when
- * include_secrets is false. apPass is always included. */
+ * include_secrets is false. apPass is always included. NULL without memory
+ * for all of it: never a JSON with keys left out. */
 char *boxcfg_to_json(const box_config_t *c, bool include_secrets);
 
 /* The key a refusal from boxcfg_from_json / boxcfg_apply_satellite_config names ("companionPort",

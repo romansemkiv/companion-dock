@@ -39,7 +39,11 @@
  *   applied with the config's settings plus the hotspot (apply_wifi), and
  *   s_wifi_ap remembers which hotspot setting is running, so netmgr_apply and
  *   the end of the force restart Wi-Fi only when that changes. The deadline's
- *   esp_timer hands the restart to a short-lived task: it blocks on the C6. */
+ *   esp_timer hands the restart to a short-lived task: it blocks on the C6.
+ * - A Wi-Fi apply that failed while the C6 answers (s_wifi_dirty) is tried
+ *   again every NETPOLICY_WIFI_RETRY_MS until one succeeds (wifi_applied_locked,
+ *   wifi_retry_task): the same timer-to-task hand-over, under s_cfg_lock like
+ *   every apply, and never on top of a scan. */
 #include <ctype.h>
 #include <stdatomic.h>
 #include <stdio.h>
@@ -80,8 +84,9 @@ static box_config_t s_cfg;
 static char s_ap_ssid[33];  /* fixed at start (Ethernet MAC) */
 static char s_hostname[NETMGR_HOSTNAME_LEN];  /* from s_cfg.box_name */
 static bool s_started;
-/* Set when applying that part failed, so the next netmgr_apply retries it. */
+/* Set when applying that part failed, so the next netmgr_apply retries it (Wi-Fi: s_wifi_retry_timer too). */
 static bool s_eth_dirty, s_wifi_dirty;
+static esp_timer_handle_t s_wifi_retry_timer; /* armed while s_wifi_dirty */
 /* s_cfg_lock: the hotspot is on until then whatever s_cfg says (netmgr_ap_force);
  * the hotspot setting Wi-Fi was last applied with. */
 static int64_t s_force_until_us;
@@ -89,6 +94,7 @@ static bool s_wifi_ap;
 static esp_timer_handle_t s_force_timer;
 
 #define FORCE_END_STACK 4096 /* Wi-Fi restart through esp_wifi_remote, like the svcbtn action */
+#define WIFI_RETRY_STACK FORCE_END_STACK /* the same restart */
 
 static const char *route_name(net_route_t r)
 {
@@ -338,6 +344,16 @@ static bool wifi_retry_needed(esp_err_t e)
     return e != ESP_OK && netmgr_hosted_ready();
 }
 
+/* After every apply_wifi (e: its result): a failed one is tried again in NETPOLICY_WIFI_RETRY_MS without waiting
+ * for a settings save, which a Wi-Fi-only box would never get (the apply stopped the radio first: no station, no
+ * hotspot); a good one ends the rounds. Caller holds s_cfg_lock. */
+static void wifi_applied_locked(esp_err_t e)
+{
+    s_wifi_dirty = wifi_retry_needed(e);
+    esp_timer_stop(s_wifi_retry_timer); /* from this apply on */
+    if (s_wifi_dirty) esp_timer_start_once(s_wifi_retry_timer, (uint64_t)NETPOLICY_WIFI_RETRY_MS * 1000);
+}
+
 /* Caller holds s_cfg_lock. */
 static void apply_hostname(const char *box_name)
 {
@@ -371,8 +387,43 @@ static void reconcile_ap_locked(void)
 {
     if (!s_wifi_dirty && s_wifi_ap == want_ap_locked(&s_cfg)) return;
     esp_err_t e = apply_wifi(&s_cfg, !s_wifi_dirty); /* the hotspot only, unless a failed apply waits */
-    s_wifi_dirty = wifi_retry_needed(e);
+    wifi_applied_locked(e);
     if (e != ESP_OK) ESP_LOGE(TAG, "wifi reconfigure failed: %s", esp_err_to_name(e));
+}
+
+static void wifi_retry_task(void *arg)
+{
+    (void)arg;
+    xSemaphoreTake(s_cfg_lock, portMAX_DELAY); /* after an apply under way: it may have left nothing to do */
+    /* a scan starts and ends under s_cfg_lock: not while this round runs */
+    switch (netpolicy_wifi_retry(s_wifi_dirty, netmgr_hosted_ready(), netmgr_wifi_scan_busy())) {
+    case NETPOLICY_RETRY_NOW: {
+        ESP_LOGW(TAG, "wifi: the last apply failed: trying again");
+        esp_err_t e = apply_wifi(&s_cfg, false);
+        wifi_applied_locked(e);
+        if (e != ESP_OK)
+            ESP_LOGE(TAG, "wifi apply failed again: %s%s", esp_err_to_name(e), s_wifi_dirty ? ", another try follows" : "");
+        break;
+    }
+    case NETPOLICY_RETRY_LATER:
+        esp_timer_stop(s_wifi_retry_timer);
+        esp_timer_start_once(s_wifi_retry_timer, (uint64_t)NETPOLICY_WIFI_RETRY_MS * 1000);
+        break;
+    case NETPOLICY_RETRY_NONE:
+        break;
+    }
+    xSemaphoreGive(s_cfg_lock);
+    vTaskDelete(NULL);
+}
+
+/* esp_timer task: as force_timer_cb, the apply blocks on the C6 and runs on a task of its own. */
+static void wifi_retry_timer_cb(void *arg)
+{
+    (void)arg;
+    if (xTaskCreate(wifi_retry_task, "wifi_retry", WIFI_RETRY_STACK, NULL, 3, NULL) != pdPASS) {
+        ESP_LOGE(TAG, "wifi retry: no memory for its task, the next round tries again");
+        esp_timer_start_once(s_wifi_retry_timer, (uint64_t)NETPOLICY_WIFI_RETRY_MS * 1000);
+    }
 }
 
 static void force_end_task(void *arg)
@@ -440,6 +491,9 @@ esp_err_t netmgr_start(const box_config_t *cfg)
     const esp_timer_create_args_t targs = {.callback = force_timer_cb, .name = "ap_force"};
     e = esp_timer_create(&targs, &s_force_timer);
     if (e != ESP_OK) return e;
+    const esp_timer_create_args_t rargs = {.callback = wifi_retry_timer_cb, .name = "wifi_retry"};
+    e = esp_timer_create(&rargs, &s_wifi_retry_timer);
+    if (e != ESP_OK) return e;
 
     static const esp_event_base_t *const bases[] = {&ETH_EVENT, &IP_EVENT, &WIFI_EVENT};
     for (size_t i = 0; i < sizeof bases / sizeof bases[0]; i++) {
@@ -456,7 +510,7 @@ esp_err_t netmgr_start(const box_config_t *cfg)
     netmgr_hosted_start(); /* may update the C6 and restart; logs why Wi-Fi is off */
     esp_err_t wifi_err = apply_wifi(cfg, false);
     if (wifi_err != ESP_OK) ESP_LOGE(TAG, "wifi start failed: %s", esp_err_to_name(wifi_err));
-    s_wifi_dirty = wifi_retry_needed(wifi_err);
+    wifi_applied_locked(wifi_err);
     xSemaphoreGive(s_cfg_lock);
 
     refresh("start");
@@ -487,7 +541,7 @@ esp_err_t netmgr_apply(const box_config_t *cfg)
     if (s_wifi_dirty || wifi_changed(&s_cfg, cfg)) {
         /* only a change to the station's own networks starts again from the main one */
         esp_err_t e = apply_wifi(cfg, !s_wifi_dirty && !netpolicy_sta_changed(&s_cfg, cfg));
-        s_wifi_dirty = wifi_retry_needed(e);
+        wifi_applied_locked(e);
         if (e != ESP_OK) {
             ESP_LOGE(TAG, "wifi reconfigure failed: %s", esp_err_to_name(e));
             if (err == ESP_OK) err = e;

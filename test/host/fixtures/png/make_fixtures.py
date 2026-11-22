@@ -6,6 +6,8 @@ as (c * a + 127) // 255, 16-bit samples by their high byte.
 Run it again (Pillow needed) to remake them: python3 make_fixtures.py
 """
 import os
+import struct
+import zlib
 
 from PIL import Image
 
@@ -40,7 +42,41 @@ def save(name, img, rgb, **kw):
         f.write(rgb)
 
 
+def chunk(kind, data):
+    return struct.pack('>I', len(data)) + kind + data + struct.pack('>I', zlib.crc32(kind + data))
+
+
+def raw_png(w, h, depth, colour, interlace, scanlines):
+    """A PNG put together by hand, for what Pillow does not write."""
+    ihdr = struct.pack('>IIBBBBB', w, h, depth, colour, 0, 0, interlace)
+    return (b'\x89PNG\r\n\x1a\n' + chunk(b'IHDR', ihdr) + chunk(b'IDAT', zlib.compress(scanlines, 9)) +
+            chunk(b'IEND', b''))
+
+
+def special():
+    """The two made by hand: the most scanline bytes an image of its size can have (Adam7 interlaced, 16-bit RGBA:
+    the decoder's cap on what it inflates must take it), and one whose data inflates to far more than its header
+    says (8 MB for 16 x 16: refused without the memory being taken; no .rgb)."""
+    w = h = 16
+    px = pattern(w, h)
+    lines = bytearray()
+    for x0, y0, dx, dy in ((0, 0, 8, 8), (4, 0, 8, 8), (0, 4, 4, 8), (2, 0, 4, 4), (0, 2, 2, 4), (1, 0, 2, 2),
+                           (0, 1, 1, 2)):
+        for y in range(y0, h, dy):
+            lines.append(0)  # filter: none
+            for x in range(x0, w, dx):
+                for v in px[y * w + x]:
+                    lines += bytes((v, (v * 31) % 256))  # 16-bit: the high byte is the sample
+    with open(os.path.join(HERE, 'rgba16_adam7.png'), 'wb') as f:
+        f.write(raw_png(w, h, 16, 6, 1, bytes(lines)))
+    with open(os.path.join(HERE, 'rgba16_adam7.rgb'), 'wb') as f:
+        f.write(over_black(px))
+    with open(os.path.join(HERE, 'bomb16.png'), 'wb') as f:
+        f.write(raw_png(w, h, 8, 2, 0, bytes(8 * 1024 * 1024)))
+
+
 def main():
+    special()
     w = h = 16
     px = pattern(w, h)
     opaque = [(r, g, b, 255) for r, g, b, _ in px]

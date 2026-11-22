@@ -16,11 +16,20 @@ bool img_png_decode_rgb(const uint8_t *png, size_t len, int w, int h, uint8_t *r
     lodepng_state_init(&st);
     unsigned iw = 0, ih = 0;
     unsigned err = lodepng_inspect(&iw, &ih, &st, png, len);
-    lodepng_state_cleanup(&st);
-    if (err || iw != (unsigned)w || ih != (unsigned)h) return false;
+    if (err || iw != (unsigned)w || ih != (unsigned)h) {
+        lodepng_state_cleanup(&st);
+        return false;
+    }
 
+    /* What the data may inflate to: no image of this size has more scanline bytes than 16-bit RGBA (8 a pixel) with a
+     * filter byte per row, and Adam7 interlacing has under 2 h + 4 rows in its seven passes. Data that inflates past
+     * it (a few bytes that would grow to gigabytes) is refused there, not when the memory runs out. */
+    st.decoder.zlibsettings.max_output_size = (size_t)h * ((size_t)w * 8 + 2) + 4;
+    st.info_raw.colortype = LCT_RGBA; /* any colour type and depth -> RGBA8; CRCs and Adler checked */
+    st.info_raw.bitdepth = 8;
     unsigned char *rgba = NULL;
-    err = lodepng_decode32(&rgba, &iw, &ih, png, len); /* any colour type and depth -> RGBA8; CRCs and Adler checked */
+    err = lodepng_decode(&rgba, &iw, &ih, &st, png, len);
+    lodepng_state_cleanup(&st);
     if (err || !rgba || iw != (unsigned)w || ih != (unsigned)h) {
         free(rgba);
         return false;

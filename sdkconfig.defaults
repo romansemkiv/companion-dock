@@ -11,8 +11,9 @@ CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y
 
 # Board-wide basics:
 CONFIG_FREERTOS_HZ=1000
-# -O2: the image is far from filling its 4 MB slot; speed matters on the key and image paths and for
-# the PBKDF2 of a settings-password check
+# -O2: speed matters on the key and image paths and for the PBKDF2 of a settings-password check. It costs
+# size, and the image is no longer far from filling its 4 MB slot (3.1 MB, 23% free at 0.2.8): watch the
+# "binary size" line of the build
 CONFIG_COMPILER_OPTIMIZATION_PERF=y
 # PSRAM: large buffers go there so internal RAM stays free (anything over 1 KB; task stacks may too)
 CONFIG_SPIRAM=y

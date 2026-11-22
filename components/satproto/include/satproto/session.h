@@ -51,7 +51,9 @@ void sat_session_reset(sat_session_t *s, uint32_t now_ms);
 void sat_session_on_line(sat_session_t *s, char *line, uint32_t now_ms);
 /* Sends "PING \n" every 1000 ms once BEGIN has been received. */
 void sat_session_tick(sat_session_t *s, uint32_t now_ms);
-/* False after 5000 ms without any received line. */
+/* Bytes came from Companion (a line's end or not): a long line still arriving is not silence. */
+void sat_session_rx(sat_session_t *s, uint32_t now_ms);
+/* False after 5000 ms without anything received (sat_session_rx, a line). */
 bool sat_session_alive(const sat_session_t *s, uint32_t now_ms);
 
 typedef struct {

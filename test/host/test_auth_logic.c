@@ -336,7 +336,8 @@ static void test_lockout_table_full_keeps_locked_clients(void)
 
 /* a guesser cycling through more addresses than the table holds stays locked out: locked clients are never
  * evicted. a newcomer to a table full of locked clients isn't blocked, it is held to the box-wide budget
- * (one try a second for all such newcomers), tracked best effort; its failures evict nobody. */
+ * (one try a second for all such newcomers, and the gap the flood widened), tracked best effort; its
+ * failures evict nobody. */
 static void test_lockout_never_evicts_locked(void)
 {
     auth_lim_t l = {0};
@@ -347,14 +348,18 @@ static void test_lockout_never_evicts_locked(void)
     for (int i = 0; i < AUTH_LIM_MAX; i++) TEST_ASSERT_EQUAL_INT(60, auth_lim_wait_s(&l, ip[i], 1000));
     TEST_ASSERT_EQUAL_INT(0, auth_lim_wait_s(&l, ip[AUTH_LIM_MAX], 1000)); /* not blocked */
     int w = 0;
-    TEST_ASSERT_TRUE(auth_lim_begin(&l, ip[AUTH_LIM_MAX], 1000, &w));
-    TEST_ASSERT_FALSE(auth_lim_fail(&l, ip[AUTH_LIM_MAX], 1100)); /* untracked: no entry to lock */
-    TEST_ASSERT_FALSE(auth_lim_begin(&l, ip[AUTH_LIM_MAX + 1], 1500, &w)); /* another newcomer: the budget */
+    /* the flood that locked them all widened the box-wide gap as far as it goes */
+    TEST_ASSERT_FALSE(auth_lim_begin(&l, ip[AUTH_LIM_MAX], AUTH_BURST_GAP_MAX_MS - 1, &w));
+    const int64_t t = 1000 + AUTH_BURST_GAP_MAX_MS;
+    TEST_ASSERT_TRUE(auth_lim_begin(&l, ip[AUTH_LIM_MAX], t, &w));
+    TEST_ASSERT_FALSE(auth_lim_fail(&l, ip[AUTH_LIM_MAX], t + 100)); /* untracked: no entry to lock */
+    TEST_ASSERT_FALSE(auth_lim_begin(&l, ip[AUTH_LIM_MAX + 1], t + 500, &w)); /* another newcomer: the budget */
     TEST_ASSERT_EQUAL_INT(1, w);
-    TEST_ASSERT_EQUAL_INT(1, auth_lim_wait_s(&l, ip[AUTH_LIM_MAX + 1], 1500));
-    TEST_ASSERT_TRUE(auth_lim_begin(&l, ip[AUTH_LIM_MAX + 1], 2000, &w)); /* a second on */
-    TEST_ASSERT_FALSE(auth_lim_fail(&l, ip[AUTH_LIM_MAX + 1], 2000));
-    for (int i = 0; i < AUTH_LIM_MAX; i++) TEST_ASSERT_TRUE(auth_lim_wait_s(&l, ip[i], 2000) > 0); /* none evicted */
+    TEST_ASSERT_EQUAL_INT(1, auth_lim_wait_s(&l, ip[AUTH_LIM_MAX + 1], t + 500));
+    TEST_ASSERT_FALSE(auth_lim_begin(&l, ip[AUTH_LIM_MAX + 1], t + 1000, &w)); /* a second on: the gap still holds it */
+    TEST_ASSERT_EQUAL_INT(29, w);
+    for (int i = 0; i < AUTH_LIM_MAX; i++) TEST_ASSERT_TRUE(auth_lim_wait_s(&l, ip[i], t + 1000) > 0); /* none evicted */
+    TEST_ASSERT_TRUE(auth_lim_begin(&l, ip[AUTH_LIM_MAX + 1], t + AUTH_BURST_GAP_MAX_MS, &w));
 }
 
 /* the deck is a reserved client: never evicted, never held back by a full table. The scenario:
@@ -472,6 +477,95 @@ static void test_deck_outside_budget(void)
     TEST_ASSERT_TRUE(auth_lim_begin(&l, ip[1], 60, &w)); /* no burst: no gap */
 }
 
+/* a flood that keeps failing under the budget widens its gap: 1 s, 2, 4, 8, 16, then 30 s for good,
+ * whatever addresses it comes from; a right entry waits its turn (never longer than the gap) and
+ * doesn't lift it; the deck stays outside. */
+static void test_box_wide_gap_escalates(void)
+{
+    auth_lim_t l = {0};
+    char ip[24];
+    int n = 0, w = -1;
+    int64_t t = 0;
+    for (int i = 0; i < AUTH_BURST_FAILS; i++, t += 100) { /* five addresses, one wrong guess each */
+        snprintf(ip, sizeof ip, "10.0.5.%d", n++);
+        TEST_ASSERT_TRUE(auth_lim_begin(&l, ip, t, &w));
+        auth_lim_fail(&l, ip, t);
+    }
+    t -= 100; /* the last check */
+    static const int64_t gap[] = {1000, 2000, 4000, 8000, 16000, 30000, 30000, 30000};
+    for (size_t i = 0; i < sizeof gap / sizeof gap[0]; i++) {
+        snprintf(ip, sizeof ip, "10.0.5.%d", n++); /* a new address every time */
+        TEST_ASSERT_FALSE(auth_lim_begin(&l, ip, t + gap[i] - 1, &w));
+        TEST_ASSERT_EQUAL_INT(1, w);
+        TEST_ASSERT_FALSE(auth_lim_begin(&l, ip, t + 1, &w));
+        TEST_ASSERT_EQUAL_INT((int)(gap[i] / 1000), w); /* never more than the gap */
+        t += gap[i];
+        TEST_ASSERT_TRUE(auth_lim_begin(&l, ip, t, &w));
+        auth_lim_fail(&l, ip, t + 50); /* the check takes a moment */
+    }
+    TEST_ASSERT_EQUAL_INT(AUTH_BURST_GAP_MAX_MS, gap[7]);
+    /* a right entry in its slot doesn't lift the gap */
+    t += AUTH_BURST_GAP_MAX_MS;
+    TEST_ASSERT_TRUE(auth_lim_begin(&l, "10.0.6.1", t, &w));
+    auth_lim_ok(&l, "10.0.6.1");
+    TEST_ASSERT_FALSE(auth_lim_begin(&l, "10.0.6.2", t + AUTH_BURST_GAP_MAX_MS - 1, &w));
+    /* the deck: at once, and its wrong entries don't widen the network's gap */
+    TEST_ASSERT_TRUE(auth_lim_begin(&l, AUTH_DECK_CLIENT, t + 1, &w));
+    TEST_ASSERT_EQUAL_INT(0, w);
+    auth_lim_fail(&l, AUTH_DECK_CLIENT, t + 1);
+    TEST_ASSERT_TRUE(auth_lim_begin(&l, AUTH_DECK_CLIENT, t + 2, &w));
+    TEST_ASSERT_TRUE(auth_lim_begin(&l, "10.0.6.2", t + AUTH_BURST_GAP_MAX_MS, &w));
+}
+
+/* the widened gap halves for every AUTH_BURST_QUIET_MS without a wrong entry, down to none; a wrong
+ * entry on the way widens it again from where it is, so pausing buys a guesser nothing. */
+static void test_box_wide_gap_decays(void)
+{
+    auth_lim_t l = {0};
+    char ip[24];
+    int n = 0, w = -1;
+    int64_t t = 0;
+    for (int i = 0; i < AUTH_BURST_FAILS + 6; i++) { /* a flood, up to the 30 s gap */
+        snprintf(ip, sizeof ip, "10.0.7.%d", n++);
+        while (!auth_lim_begin(&l, ip, t, &w)) t += 1000;
+        auth_lim_fail(&l, ip, t);
+    }
+    const int64_t f = t; /* the last wrong entry, and the last check */
+    TEST_ASSERT_FALSE(auth_lim_begin(&l, "10.0.8.1", f + AUTH_BURST_GAP_MAX_MS - 1, &w));
+    TEST_ASSERT_FALSE(auth_lim_begin(&l, "10.0.8.1", f + AUTH_BURST_QUIET_MS - 45001, &w)); /* 15 s: not yet */
+    /* one quiet period: 15 s */
+    TEST_ASSERT_TRUE(auth_lim_begin(&l, "10.0.8.1", f + AUTH_BURST_QUIET_MS, &w));
+    TEST_ASSERT_FALSE(auth_lim_begin(&l, "10.0.8.2", f + AUTH_BURST_QUIET_MS + 14999, &w));
+    TEST_ASSERT_EQUAL_INT(1, w);
+    TEST_ASSERT_TRUE(auth_lim_begin(&l, "10.0.8.2", f + AUTH_BURST_QUIET_MS + 15000, &w));
+    /* a wrong entry now: 30 s again, from that entry */
+    const int64_t g = f + AUTH_BURST_QUIET_MS + 15000;
+    auth_lim_fail(&l, "10.0.8.2", g);
+    TEST_ASSERT_FALSE(auth_lim_begin(&l, "10.0.8.3", g + AUTH_BURST_GAP_MAX_MS - 1, &w));
+    TEST_ASSERT_TRUE(auth_lim_begin(&l, "10.0.8.3", g + AUTH_BURST_GAP_MAX_MS, &w));
+    /* five quiet periods: no gap, and one wrong entry doesn't bring it back */
+    const int64_t q = g + 5 * AUTH_BURST_QUIET_MS;
+    TEST_ASSERT_TRUE(auth_lim_begin(&l, "10.0.8.4", q, &w));
+    TEST_ASSERT_TRUE(auth_lim_begin(&l, "10.0.8.5", q + 1, &w));
+    auth_lim_fail(&l, "10.0.8.5", q + 1);
+    TEST_ASSERT_TRUE(auth_lim_begin(&l, "10.0.8.6", q + 2, &w));
+    TEST_ASSERT_EQUAL_INT(0, w);
+}
+
+/* wrong entries that never make a burst (people mistyping now and then) never widen anything */
+static void test_box_wide_gap_needs_a_burst(void)
+{
+    auth_lim_t l = {0};
+    char ip[24];
+    int w = -1;
+    for (int i = 0; i < 40; i++) { /* one every 3 s: never five within 10 s */
+        snprintf(ip, sizeof ip, "10.0.9.%d", i);
+        TEST_ASSERT_TRUE(auth_lim_begin(&l, ip, i * 3000LL, &w));
+        TEST_ASSERT_EQUAL_INT(0, w);
+        auth_lim_fail(&l, ip, i * 3000LL);
+    }
+}
+
 /* the text password's migration never saves over a stored config that loading keeps. */
 static void test_migrate_plan(void)
 {
@@ -515,6 +609,9 @@ int main(void)
     RUN_TEST(test_lockout_evicts_never_locked_first);
     RUN_TEST(test_box_wide_budget);
     RUN_TEST(test_deck_outside_budget);
+    RUN_TEST(test_box_wide_gap_escalates);
+    RUN_TEST(test_box_wide_gap_decays);
+    RUN_TEST(test_box_wide_gap_needs_a_burst);
     RUN_TEST(test_migrate_plan);
     RUN_TEST(test_auth_wipe);
     return UNITY_END();

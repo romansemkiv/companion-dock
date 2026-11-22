@@ -9,8 +9,9 @@
  * of the Companion client) -> service button -> supervisor -> recovery slot sync (slotsync,
  * a low-priority task that copies this firmware into the other app slot 10 minutes later). Only a
  * broken NVS stops the boot; any other stage that fails is logged and the box goes on with what
- * runs, so the hotspot or Ethernet stays a way in. Afterwards the supervisor task (supervisor.c)
- * runs the box; app_main returns. */
+ * runs, so the hotspot or Ethernet stays a way in (an image not confirmed yet is restarted instead when the
+ * supervisor can't start or isn't running after 3 minutes: ota_backstop_task). Afterwards the supervisor
+ * task (supervisor.c) runs the box; app_main returns. */
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -104,6 +105,37 @@ static bool quickreset_start(void)
     return a == QR_SETUP;
 }
 
+/* ---- an unconfirmed image that never reaches its self-check ----
+ * The supervisor confirms or rolls back the first start after an update, and the task watchdog covers it once it
+ * runs. A boot stage that blocks before it, or a supervisor that can't start, would leave the image pending verify
+ * until a power cycle (uploads refused, no way back). So such an image is restarted: the bootloader takes the
+ * restart of a pending image for a failed start and goes back to the previous one. A task, not an esp_timer:
+ * esp_restart runs the shutdown handlers on its caller, and every other restart here comes from a task too. */
+#define OTA_BACKSTOP_MS (3 * 60 * 1000) /* a start takes seconds; the self-check itself gives up at 2 min */
+#define OTA_BACKSTOP_STACK 4096         /* internal: esp_restart and its log (as c6fw's task) */
+
+static bool image_pending(void)
+{
+    const esp_partition_t *run = esp_ota_get_running_partition();
+    esp_ota_img_states_t st;
+    return run && esp_ota_get_state_partition(run, &st) == ESP_OK && st == ESP_OTA_IMG_PENDING_VERIFY;
+}
+
+static void ota_failed_start(const char *what)
+{
+    ESP_LOGE(TAG, "first start of this image: %s: restarting, the bootloader goes back to the previous image", what);
+    vTaskDelay(pdMS_TO_TICKS(200)); /* let the log line out */
+    breadcrumb_restart(BC_WHY_OTA_ROLLBACK);
+}
+
+static void ota_backstop_task(void *arg)
+{
+    (void)arg;
+    vTaskDelay(pdMS_TO_TICKS(OTA_BACKSTOP_MS));
+    if (!supervisor_running() && image_pending()) ota_failed_start("the supervisor is not running 3 min after the start");
+    vTaskDelete(NULL);
+}
+
 static void nvs_start(void)
 {
     esp_err_t e = nvs_flash_init();
@@ -125,6 +157,9 @@ void app_main(void)
     /* the slot too: after an OTA the box may run ota_1, where idf.py app-flash (ota_0) has no effect */
     ESP_LOGI(TAG, "%s %s on %s", app->project_name, app->version, run ? run->label : "?");
     breadcrumb_boot(); /* the reset reason and the last deliberate restart's, then clears it */
+    const bool pending = image_pending();
+    if (pending && xTaskCreate(ota_backstop_task, "ota_backstop", OTA_BACKSTOP_STACK, NULL, 2, NULL) != pdPASS)
+        ESP_LOGE(TAG, "no memory for the unconfirmed image's backstop: only the self-check watches this start");
     unitrec_load();    /* the unit record, read once: Device.GetInfo reports it */
 
     nvs_start();
@@ -192,7 +227,9 @@ void app_main(void)
     check("service button", svcbtn_start());
     stage("button");
 
-    check("supervisor", supervisor_start());
+    e = supervisor_start();
+    check("supervisor", e);
+    if (e != ESP_OK && pending) ota_failed_start("the supervisor did not start, so no self-check"); /* no return */
     stage("supervisor");
 
     check("recovery slot sync", slotsync_init()); /* without it the box runs on, with no recovery copy */

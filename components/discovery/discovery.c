@@ -3,6 +3,7 @@
 #include <string.h>
 #include "discovery/discovery.h"
 #include "esp_log.h"
+#include "esp_netif.h"
 #include "esp_netif_ip_addr.h"
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
@@ -67,15 +68,21 @@ static const char *txt_get(const mdns_result_t *r, const char *key)
     return NULL;
 }
 
-static bool first_ipv4(const mdns_result_t *r, char *out, size_t cap)
+/* The Companion's address: of its IPv4 ones, the one on the subnet of the interface the answer came in on
+ * (discovery_pick_addr: a PC with several may list one the box can't reach first), else the first. */
+static bool pick_ipv4(const mdns_result_t *r, char *out, size_t cap)
 {
-    for (const mdns_ip_addr_t *a = r->addr; a; a = a->next) {
-        if (a->addr.type == ESP_IPADDR_TYPE_V4) {
-            esp_ip4addr_ntoa(&a->addr.u_addr.ip4, out, cap);
-            return true;
-        }
-    }
-    return false;
+    uint32_t addrs[8];
+    int n = 0;
+    for (const mdns_ip_addr_t *a = r->addr; a && n < 8; a = a->next)
+        if (a->addr.type == ESP_IPADDR_TYPE_V4) addrs[n++] = a->addr.u_addr.ip4.addr;
+    esp_netif_ip_info_t info = {0}; /* stays 0 when the interface can't be read: the first, then */
+    if (r->esp_netif && esp_netif_get_ip_info(r->esp_netif, &info) != ESP_OK) memset(&info, 0, sizeof info);
+    const int i = discovery_pick_addr(addrs, n, info.ip.addr, info.netmask.addr);
+    if (i < 0) return false;
+    const esp_ip4_addr_t ip = {.addr = addrs[i]};
+    esp_ip4addr_ntoa(&ip, out, cap);
+    return true;
 }
 
 static void copy_str(char *dst, size_t cap, const char *src)
@@ -113,7 +120,7 @@ static void browse_once(void)
         const char *id = txt_get(r, "id");
         companion_instance_t in;
         memset(&in, 0, sizeof in);
-        if (!id || id[0] == '\0' || !first_ipv4(r, in.host, sizeof in.host)) continue;
+        if (!id || id[0] == '\0' || !pick_ipv4(r, in.host, sizeof in.host)) continue;
         copy_str(in.id, sizeof in.id, id);
         const char *ver = txt_get(r, "version");
         if (ver) copy_str(in.version, sizeof in.version, ver);

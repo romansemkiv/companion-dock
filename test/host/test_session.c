@@ -188,6 +188,18 @@ static void test_alive_timeout(void)
     TEST_ASSERT_FALSE(sat_session_alive(&S, 5000));
 }
 
+/* A long line still arriving (a big KEY-STATE over a weak link) is data from Companion: the bytes count, not
+ * only the line's end. */
+static void test_alive_on_bytes_of_an_unfinished_line(void)
+{
+    feed("PING x", 0);
+    sat_session_rx(&S, 4000); /* part of a line, no newline yet */
+    TEST_ASSERT_TRUE(sat_session_alive(&S, 5000));
+    TEST_ASSERT_TRUE(sat_session_alive(&S, 8999));
+    TEST_ASSERT_FALSE(sat_session_alive(&S, 9000)); /* then nothing more: dead 5 s after the last bytes */
+    TEST_ASSERT_EQUAL(0, ready_n); /* it marks the time, nothing else */
+}
+
 static void test_key_state_parsed(void)
 {
     handshake(0);
@@ -579,6 +591,7 @@ int main(void)
     RUN_TEST(test_tick_sends_ping_every_second);
     RUN_TEST(test_no_ping_before_begin);
     RUN_TEST(test_alive_timeout);
+    RUN_TEST(test_alive_on_bytes_of_an_unfinished_line);
     RUN_TEST(test_key_state_parsed);
     RUN_TEST(test_key_state_key_fallback);
     RUN_TEST(test_key_state_bad_color_and_missing_ids);

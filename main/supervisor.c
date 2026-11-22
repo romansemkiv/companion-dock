@@ -10,7 +10,8 @@
  * at the first check where the box is healthy: internal free RAM >= OTA_MIN_INTERNAL_FREE, the USB
  * host running, the web server running, the RPC dispatcher answering Sys.GetStatus, and the network path the update came over back (the interface POST
  * /ota recorded has an address, or the hotspot runs; without a record a route or the hotspot:
- * supervisor_logic.h). Still not healthy 2 min after the start (OTA_GIVE_UP_US): marked invalid, and the bootloader
+ * supervisor_logic.h; not Wi-Fi or the hotspot while the C6's update to another major version waits for this
+ * confirmation, c6fw_confirm_first_pending). Still not healthy 2 min after the start (OTA_GIVE_UP_US): marked invalid, and the bootloader
  * goes back to the previous image. Confirming also lets c6fw update the C6 if it was waiting for
  * that. A crash or watchdog reset before then rolls back by itself.
  *
@@ -27,6 +28,7 @@
 #include <string.h>
 
 #include "breadcrumb/breadcrumb.h"
+#include "c6fw/c6fw.h"
 #include "discovery/discovery.h"
 #include "esp_attr.h"
 #include "esp_event.h"
@@ -63,6 +65,7 @@ static StaticSemaphore_t s_cfg_mtx_buf;
 static TaskHandle_t s_task;
 static bool s_dock; /* Network Dock mode (as main read it at boot): no Companion to pick */
 static atomic_bool s_cfg_dirty, s_net_dirty;
+static atomic_bool s_ticked; /* supervisor_running */
 static char s_ap_ssid[33];
 
 /* Supervisor task only. */
@@ -92,6 +95,8 @@ static void wake(void)
     TaskHandle_t t = s_task;
     if (t) xTaskNotifyGive(t);
 }
+
+bool supervisor_running(void) { return atomic_load(&s_ticked); }
 
 void supervisor_config_changed(void)
 {
@@ -270,7 +275,7 @@ static bool healthy(char *why, size_t n)
     netmgr_status_t ns;
     netmgr_get_status(&ns);
     const ota_net_t net = {.via = s_ota_via, .eth_ip = ns.eth_ip, .sta_ip = ns.sta_ip, .ap_on = ns.ap_on,
-                           .routed = ns.route != NET_ROUTE_NONE};
+                           .routed = ns.route != NET_ROUTE_NONE, .c6_waits = c6fw_confirm_first_pending()};
     const char *w = NULL;
     if (!ota_net_ok(&net, &w)) {
         strlcpy(why, w, n);
@@ -308,14 +313,25 @@ static void ota_check(void)
         }
         vTaskDelay(pdMS_TO_TICKS(200)); /* let the log line out */
         breadcrumb_note(BC_WHY_OTA_ROLLBACK); /* the call below restarts inside IDF */
-        esp_ota_mark_app_invalid_rollback_and_reboot(); /* restarts; returns only without a fallback */
+        const esp_err_t rb = esp_ota_mark_app_invalid_rollback_and_reboot(); /* restarts; returns only without a fallback */
         if (reset) supervisor_cfg_unlock(); /* no fallback: webui's restart task erases and restarts on its own */
         breadcrumb_clear();
-        ESP_LOGE(TAG, "no previous image to roll back to: staying on this one");
+        if (rb != ESP_ERR_OTA_ROLLBACK_FAILED) { /* otadata not written: the bootloader rolls back at the next start */
+            ESP_LOGE(TAG, "rolling back failed: %s; staying on this image, still unconfirmed", esp_err_to_name(rb));
+            return;
+        }
+        /* nothing to fall back to: left pending, this image would refuse uploads, never get its recovery copy and be
+         * dropped by the bootloader at the next start, with no other image to start */
+        const esp_err_t ce = esp_ota_mark_app_valid_cancel_rollback();
+        if (ce == ESP_OK) ESP_LOGE(TAG, "no previous image to roll back to: staying on this one, now confirmed");
+        else ESP_LOGE(TAG, "no previous image to roll back to, and confirming this one failed: %s", esp_err_to_name(ce));
         return;
     }
     esp_err_t e = esp_ota_mark_app_valid_cancel_rollback();
-    if (e == ESP_OK)
+    if (e == ESP_OK && c6fw_confirm_first_pending() && s_ota_via != NETMGR_IF_ETH)
+        ESP_LOGW(TAG, "self-check passed at %lld s without Wi-Fi (the C6 is updated now, then the box restarts): "
+                      "image confirmed", (long long)(since / 1000000));
+    else if (e == ESP_OK)
         ESP_LOGI(TAG, "self-check passed at %lld s (uploaded over %s, which is back): image confirmed",
                  (long long)(since / 1000000), via_name(s_ota_via));
     else ESP_LOGE(TAG, "confirming the image failed: %s", esp_err_to_name(e));
@@ -333,7 +349,7 @@ static void c6_watch(void)
     netmgr_status_t ns;
     netmgr_get_status(&ns);
     supervisor_cfg_lock();
-    const bool wanted = s_cfg->wifi_ssid[0] != '\0' || s_cfg->ap_enabled;
+    const bool wanted = c6w_radio_wanted(s_cfg->wifi_enabled, s_cfg->wifi_ssid[0] != '\0', s_cfg->ap_enabled);
     supervisor_cfg_unlock();
     const c6w_in_t in = {.c6_ready = netmgr_c6_ready(), .radio_wanted = wanted, .eth_up = ns.eth_link && ns.eth_ip};
     const uint32_t n = c6w_rec_count(&s_c6_rec);
@@ -410,6 +426,7 @@ static void supervisor_task(void *arg)
     for (;;) {
         esp_task_wdt_reset();
         tick();
+        atomic_store(&s_ticked, true);
         esp_task_wdt_reset();
         ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(TICK_MS));
     }

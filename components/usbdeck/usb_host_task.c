@@ -78,6 +78,13 @@ static void usb_restart_task(void *arg)
     breadcrumb_restart(BC_WHY_USB_POWER);
 }
 
+void usbdeck_restart(void)
+{
+    vTaskDelay(pdMS_TO_TICKS(500)); /* let the log and the problem go out */
+    if (xTaskCreate(usb_restart_task, "usb_restart", RESTART_STACK, NULL, SVC_PRIO, NULL) == pdPASS) return;
+    breadcrumb_restart(BC_WHY_USB_POWER); /* no memory for the task: from here */
+}
+
 /* Service task. USB must never stay off until someone acts: restart if it can't. */
 static void bus_reset_finish(void)
 {
