@@ -777,7 +777,7 @@ or that can cut you off (network changes, the settings password).
 | USB reflash after an OTA or a sync | `idf.py -p PORT flash` or `./build.sh -p PORT`; or `idf.py app-flash`, then **Boot other slot** | the box may run `ota_1` (the boot log's first line and the *Firmware* page name the slot); `app-flash` writes `ota_0` only, so the box keeps running `ota_1` and shows the new image as *Other slot newer*: start it with **Boot other slot**. `flash` also resets otadata, so the box starts `ota_0` |
 | Hung task | nothing to do | the task watchdog (10 s) restarts the box |
 | Wi-Fi chip (C6) lost | nothing to do | with Ethernet up the box goes on over the cable. Without it (no link or no address for 3 minutes in a row) and with Wi-Fi or the hotspot configured, the box restarts, which resets the C6: at most 3 times per power-on, then once every 30 minutes |
-| Wedged deck | nothing to do | the box retries, then resets the USB port (at most every 10 s box-wide). A deck that the reset doesn't cure is quarantined for 10 minutes (doubling up to 60), then retried |
+| Wedged deck | nothing to do | the box retries, then resets the USB port (at most every 10 s box-wide). A deck that the reset doesn't cure is quarantined for 10 minutes (doubling up to 60), then retried. If an unplugged deck leaves its USB port unusable (not freed within 10 s), the problem list says "USB port not freed after a Stream Deck was unplugged — restarting the box" and the box restarts (last reset: `USB power-on failed`) |
 
 > **Settings PIN warning.** If you set a settings PIN and forget it, the web page and the API stay locked,
 > and the page's factory reset needs that PIN too. The ways back are:

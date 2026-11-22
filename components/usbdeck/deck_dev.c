@@ -18,6 +18,8 @@
 
 #define DECK_STACK 4096
 #define DECK_PRIO 6
+#define CLOSE_GRACE_US 10000000LL /* an unplugged deck that won't close: retried this long, then a restart */
+#define CLOSE_RETRY_MS 500
 #define CMD_QUEUE_DEPTH 48
 #define IN_QUEUE_DEPTH 8
 #define IN_REPORT_MAX 64 /* every model's input data fits in the first 64 bytes */
@@ -676,24 +678,45 @@ static void free_deck(usbdeck_t *d)
     free(d);
 }
 
+/* False while the USB stack still holds a transfer of ours: the device stays open then. */
+static bool deck_release(usbdeck_t *d)
+{
+    if (hid_raw_close(&d->hid) != ESP_OK) return false;
+    esp_err_t err = usb_host_device_close(usbdeck_client(), d->link.dev);
+    if (err != ESP_OK) ESP_LOGE(TAG, "deck %u: device close failed: %s", d->link.addr, esp_err_to_name(err));
+    return true;
+}
+
 static void deck_teardown(usbdeck_t *d)
 {
     registry_remove(d);
     deck_cmd_t c;
     while (xQueueReceive(d->cmdq, &c, 0) == pdTRUE) drop_cmd(d, &c);
 
-    const bool released = hid_raw_close(&d->hid) == ESP_OK;
-    if (released) {
-        esp_err_t err = usb_host_device_close(usbdeck_client(), d->link.dev);
-        if (err != ESP_OK) ESP_LOGE(TAG, "deck %u: device close failed: %s", d->link.addr, esp_err_to_name(err));
-    }
+    bool released = deck_release(d);
     ESP_LOGI(TAG, "deck %u (%s) detached", d->link.addr, d->info.serial);
     if (d->attached && s.cb.on_detach) s.cb.on_detach(d);
     /* A raw-passthrough caller blocked on queue space may have queued once the drain above made
      * room; on_detach has waited for it to leave, so this drain is the last. */
     while (xQueueReceive(d->cmdq, &c, 0) == pdTRUE) drop_cmd(d, &c);
+    /* An unplugged deck that couldn't be closed: IDF frees its port only once the device is closed
+     * (USBH_EVENT_DEV_FREE), so nothing would enumerate there again, on the root port no deck at all,
+     * until a restart. The transfer may still retire: ask again for a while, then restart the box
+     * rather than leave USB dead without a word. (d->gone is set for every teardown; the HID's isn't.) */
+    const int64_t t0 = esp_timer_get_time();
+    while (!released && atomic_load(&d->hid.gone) && esp_timer_get_time() - t0 < CLOSE_GRACE_US) {
+        vTaskDelay(pdMS_TO_TICKS(CLOSE_RETRY_MS));
+        released = deck_release(d);
+        if (released) ESP_LOGW(TAG, "deck %u: closed late, its port is free again", d->link.addr);
+    }
     /* If the USB stack still holds a transfer of ours, keep the memory it points into. */
-    if (released) free_deck(d);
+    if (released) {
+        free_deck(d);
+        return;
+    }
+    if (!atomic_load(&d->hid.gone)) return; /* still plugged in: its port isn't waiting for anything */
+    usbdeck_problem("USB port not freed after a Stream Deck was unplugged — restarting the box");
+    usbdeck_restart();
 }
 
 static void deck_task(void *arg)
