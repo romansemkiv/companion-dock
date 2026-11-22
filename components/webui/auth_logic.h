@@ -7,7 +7,7 @@
  * that client for AUTH_LOCK_MS; afterwards it gets AUTH_LOCK_AFTER tries again, and each further lock is
  * twice as long, up to AUTH_LOCK_MAX_MS, until a right entry (a 4-digit PIN is short). Locked clients are
  * never forgotten to make room, and a box-wide budget slows a guesser that spreads over many
- * addresses.
+ * addresses, more the longer it goes on.
  *
  * Times are milliseconds on any monotonic clock (the caller injects them). SHA-256 / PBKDF2 are
  * implemented here so the host tests check exactly the code the box runs. */
@@ -42,6 +42,11 @@ extern "C" {
 #define AUTH_BURST_FAILS 5
 #define AUTH_BURST_WINDOW_MS 10000LL
 #define AUTH_BURST_GAP_MS 1000LL
+/* Each wrong password that still comes under that budget doubles the gap, up to AUTH_BURST_GAP_MAX_MS (a
+ * 4-digit PIN then takes days from any number of addresses, not hours); it halves again for every
+ * AUTH_BURST_QUIET_MS without a wrong password. A right one doesn't lift it, as it doesn't lift the budget. */
+#define AUTH_BURST_GAP_MAX_MS 30000LL
+#define AUTH_BURST_QUIET_MS 60000LL
 
 /* ---- hashing ---- */
 
@@ -129,22 +134,26 @@ typedef struct {
     int64_t recent[AUTH_BURST_FAILS]; /* times of the latest wrong passwords, box-wide (a ring) */
     int n_recent, next;               /* entries in the ring; the oldest (next to overwrite) */
     int64_t last_check_ms;            /* the last password check auth_lim_begin let through */
+    int64_t gap_ms, last_fail_ms;     /* the box-wide gap as the latest wrong password (not the deck's) left it */
     auth_lim_entry_t deck;            /* the decks' own entry (AUTH_DECK_CLIENT), never evicted */
     int64_t untracked_ms;             /* the last check of a newcomer the full table couldn't track */
 } auth_lim_t; /* zero-initialise */
 
 /* Seconds this client still has to wait (rounded up), 0 = it may try. The deck (AUTH_DECK_CLIENT) has its own
  * entry, never evicted or held back by the others. A client the table does not know while every entry
- * holds a locked client is not held back for that, only to one check a second among all such clients. */
+ * holds a locked client is not held back for that, only to one check a second among all such clients (and to
+ * the box-wide budget, auth_lim_begin). */
 int auth_lim_wait_s(const auth_lim_t *l, const char *client, int64_t now_ms);
 /* Right before a password check: false with *wait_s (seconds, rounded up) when the client must
- * wait (auth_lim_wait_s) or the box-wide budget is spent; true lets this check run. The deck is outside the
+ * wait (auth_lim_wait_s) or the box-wide budget is spent (never longer than its gap, AUTH_BURST_GAP_MAX_MS
+ * at most); true lets this check run. The deck is outside the
  * box-wide budget: its own escalation bounds it, its checks and failures never spend the network's. */
 bool auth_lim_begin(auth_lim_t *l, const char *client, int64_t now_ms, int *wait_s);
 /* How long a client's lock lasts after `locks` earlier ones since its last right entry: AUTH_LOCK_MS,
  * doubling each time, at most AUTH_LOCK_MAX_MS. */
 int64_t auth_lock_ms(int locks);
-/* A wrong password: counts box-wide (not the deck's), and the AUTH_LOCK_AFTER-th in a row locks the client
+/* A wrong password: counts box-wide (not the deck's; under the budget it doubles the gap), and the
+ * AUTH_LOCK_AFTER-th in a row locks the client
  * for auth_lock_ms (returns true then). A full table reuses the unlocked entry idle the longest (one that
  * never locked first); when all are locked the failure is not tracked per client (a newcomer is then held to
  * one check a second). */

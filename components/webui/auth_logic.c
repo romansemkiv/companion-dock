@@ -418,14 +418,26 @@ static bool burst(const auth_lim_t *l, int64_t now_ms)
     return l->n_recent == AUTH_BURST_FAILS && now_ms - l->recent[l->next] < AUTH_BURST_WINDOW_MS;
 }
 
+/* The box-wide gap between password checks now, 0 = none: the base gap during a burst; wider once wrong
+ * passwords kept coming under it (auth_lim_fail), halving for every AUTH_BURST_QUIET_MS since the latest. */
+static int64_t box_gap(const auth_lim_t *l, int64_t now_ms)
+{
+    int64_t g = l->gap_ms;
+    for (int64_t quiet = now_ms - l->last_fail_ms; quiet >= AUTH_BURST_QUIET_MS && g > AUTH_BURST_GAP_MS;
+         quiet -= AUTH_BURST_QUIET_MS)
+        g /= 2;
+    if (g > AUTH_BURST_GAP_MS) return g;
+    return burst(l, now_ms) ? AUTH_BURST_GAP_MS : 0;
+}
+
 bool auth_lim_begin(auth_lim_t *l, const char *client, int64_t now_ms, int *wait)
 {
     char key[AUTH_CLIENT_LEN];
     client_key(client, key);
     const bool deck = is_deck(key); /* outside the box-wide budget: its own escalation bounds it */
     int w = auth_lim_wait_s(l, client, now_ms);
-    if (!w && !deck && burst(l, now_ms) && now_ms < l->last_check_ms + AUTH_BURST_GAP_MS)
-        w = wait_s(l->last_check_ms + AUTH_BURST_GAP_MS, now_ms);
+    const int64_t gap = deck ? 0 : box_gap(l, now_ms);
+    if (!w && gap && now_ms < l->last_check_ms + gap) w = wait_s(l->last_check_ms + gap, now_ms);
     if (wait) *wait = w;
     if (w) return false;
     if (deck) return true; /* the network's next slot stays where it was */
@@ -439,6 +451,10 @@ bool auth_lim_fail(auth_lim_t *l, const char *client, int64_t now_ms)
     char key[AUTH_CLIENT_LEN];
     client_key(client, key);
     if (!is_deck(key)) { /* box-wide, whoever it was on the network (the deck is outside the budget) */
+        /* under the budget already (a flood goes on, whatever its addresses): the gap doubles */
+        const int64_t gap = box_gap(l, now_ms);
+        l->gap_ms = !gap ? AUTH_BURST_GAP_MS : gap * 2 < AUTH_BURST_GAP_MAX_MS ? gap * 2 : AUTH_BURST_GAP_MAX_MS;
+        l->last_fail_ms = now_ms;
         l->recent[l->next] = now_ms;
         l->next = (l->next + 1) % AUTH_BURST_FAILS;
         if (l->n_recent < AUTH_BURST_FAILS) l->n_recent++;

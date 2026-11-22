@@ -927,8 +927,11 @@ Companions found and the firmware slots (the copy's progress too) follow the sam
 row from one address lock it for 60 s; each further lock of that address is twice as long (120 s, 240 s, …,
 up to 1 h) until a right entry (a 4-digit PIN is short). The decks count as one more client ("deck")
 with the same rules; its entry is reserved, so the network can never crowd it out or hold it back.
-A box-wide budget slows a flood from many addresses (the decks are outside it: their own lockout bounds them). When the table of 16 addresses is full of locked
-ones, a new address is not refused: it is held to that box-wide budget (about one try a second). Tokens are kept
+A box-wide budget slows a flood from many addresses (the decks are outside it: their own lockout bounds them):
+after five wrong entries within 10 s, from anyone, one sign-in is checked a second and the others get "wait N s";
+each wrong entry that still comes doubles that gap (2 s, 4 s, …, up to 30 s), and it halves again for every
+minute without a wrong entry. A right entry waits its turn like the rest, 30 s at most. When the table of 16 addresses is full of locked
+ones, a new address is not refused: it is held to that box-wide budget (one try a second at best). Tokens are kept
 as SHA-256 hashes in RAM, so a restart signs everyone out. **Firmware:** `POST /ota` with the raw `.bin`
 (the page's *Firmware* page does this). An upload must finish within 30 s plus 1 s per 8 KB, or it is cut
 off (a slow hotspot link can hit this).
