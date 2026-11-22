@@ -36,3 +36,8 @@ c6fw_action_t c6fw_decide(c6ver_t running, bool known, c6ver_t carried, bool pen
 /* Wi-Fi with a C6 that is not on the carried firmware: only when it speaks the
  * same protocol (the same major version). */
 bool c6fw_usable(c6ver_t running, bool known, c6ver_t carried);
+
+/* The image must be confirmed without Wi-Fi: the C6 answered with another major version (Wi-Fi stays off on it)
+ * and its update waits for the confirmation (action: what c6fw_decide said). A self-check that waited for Wi-Fi
+ * would then never pass. Not a C6 that gave no version: this image may be why. */
+bool c6fw_confirm_first(c6ver_t running, bool known, c6ver_t carried, c6fw_action_t action);

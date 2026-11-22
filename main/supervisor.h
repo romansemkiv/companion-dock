@@ -29,6 +29,10 @@ void supervisor_init(box_config_t *cfg, box_surface_mode_t mode);
 /* Starts the task. The last boot stage: the OTA self-check counts its 30 s from here. */
 esp_err_t supervisor_start(void);
 
+/* The task finished its first tick. Any task. (main.c: an unconfirmed image that never gets this far is restarted,
+ * so the bootloader goes back to the previous one.) */
+bool supervisor_running(void);
+
 /* The config was changed and saved (webui): the supervisor applies it within a second.
  * Never blocks; callable from any task, also before supervisor_start (applied on its first tick). */
 void supervisor_config_changed(void);
