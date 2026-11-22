@@ -49,7 +49,9 @@ void c6w_rec_set(c6w_rec_t *r, uint32_t count);
 /* ---- OTA self-check ----
  * A new image is confirmed only once it runs healthy and the network path the update arrived on is
  * back: the interface the upload came in on (recorded by POST /ota before the restart) has an IPv4
- * address (Ethernet, station) or runs (hotspot); without a record, a route or the hotspot. The check
+ * address (Ethernet, station) or runs (hotspot); without a record, a route or the hotspot. One exception: while
+ * the C6 runs another major version its update waits for this confirmation and Wi-Fi for that update, so an
+ * update that came over Wi-Fi or the hotspot (or left no record) is confirmed without them (c6_waits). The check
  * runs OTA_FIRST_CHECK_US after the start and then every OTA_RECHECK_US; an image that still fails
  * it OTA_GIVE_UP_US after the start is rolled back (so a switch rebooting at the same moment doesn't
  * cause a rollback). */
@@ -61,6 +63,7 @@ typedef struct {
     netmgr_if_t via; /* the upload's interface; NETMGR_IF_NONE: no record */
     bool eth_ip, sta_ip, ap_on;
     bool routed;     /* netmgr_status_t.route != NET_ROUTE_NONE */
+    bool c6_waits;   /* Wi-Fi is off until the C6's update, which waits for this confirmation (c6fw) */
 } ota_net_t;
 
 /* The update's network path is back. *why (may be NULL) says what is missing when it isn't. */

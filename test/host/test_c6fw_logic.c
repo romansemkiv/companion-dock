@@ -77,6 +77,20 @@ static void test_usable_same_major_only(void)
     TEST_ASSERT_FALSE(c6fw_usable(carried, false, carried));
 }
 
+/* A C6 on another major version on an unconfirmed image: Wi-Fi is off until the update, and the update waits for the
+ * confirmation, so the self-check must not wait for Wi-Fi. Not a C6 that gives no version (this image may be at fault),
+ * nor one Wi-Fi runs on meanwhile, nor when nothing waits for the confirmation. */
+static void test_confirm_first_only_for_a_known_other_major_that_waits(void)
+{
+    TEST_ASSERT_TRUE(c6fw_confirm_first(other, true, carried, C6FW_WAIT_CONFIRM));
+    TEST_ASSERT_FALSE(c6fw_confirm_first(other, false, carried, C6FW_WAIT_CONFIRM));
+    TEST_ASSERT_FALSE(c6fw_confirm_first(minor, true, carried, C6FW_WAIT_CONFIRM));
+    TEST_ASSERT_FALSE(c6fw_confirm_first(other, true, carried, C6FW_GIVE_UP));
+    TEST_ASSERT_FALSE(c6fw_confirm_first(other, true, carried, C6FW_MISMATCH));
+    TEST_ASSERT_FALSE(c6fw_confirm_first(other, true, carried, C6FW_UPDATE));
+    TEST_ASSERT_FALSE(c6fw_confirm_first(carried, true, carried, C6FW_OK));
+}
+
 int main(void)
 {
     UNITY_BEGIN();
@@ -89,5 +103,6 @@ int main(void)
     RUN_TEST(test_decide_gives_up_after_max_tries);
     RUN_TEST(test_decide_no_image_never_updates);
     RUN_TEST(test_usable_same_major_only);
+    RUN_TEST(test_confirm_first_only_for_a_known_other_major_that_waits);
     return UNITY_END();
 }

@@ -62,15 +62,15 @@ bool ota_net_ok(const ota_net_t *n, const char **why)
         if (!ok) w = "the update came over Ethernet, which has no IPv4 address";
         break;
     case NETMGR_IF_STA:
-        ok = n->sta_ip;
+        ok = n->sta_ip || n->c6_waits;
         if (!ok) w = "the update came over Wi-Fi, whose station has no IPv4 address";
         break;
     case NETMGR_IF_AP:
-        ok = n->ap_on;
+        ok = n->ap_on || n->c6_waits;
         if (!ok) w = "the update came over the hotspot, which is not running";
         break;
     default:
-        ok = n->routed || n->ap_on;
+        ok = n->routed || n->ap_on || n->c6_waits;
         if (!ok) w = "no network route and no hotspot";
         break;
     }

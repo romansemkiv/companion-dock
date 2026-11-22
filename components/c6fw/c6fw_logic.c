@@ -18,3 +18,8 @@ bool c6fw_usable(c6ver_t running, bool known, c6ver_t carried)
 {
     return known && running.major == carried.major;
 }
+
+bool c6fw_confirm_first(c6ver_t running, bool known, c6ver_t carried, c6fw_action_t action)
+{
+    return action == C6FW_WAIT_CONFIRM && known && running.major != carried.major;
+}

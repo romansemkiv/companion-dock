@@ -36,6 +36,11 @@ void c6fw_get_versions(char *running, size_t n1, char *carried, size_t n2);
  * so the copy is never cut short by such a restart. Any task. */
 bool c6fw_updating(void);
 
+/* Wi-Fi is off because the C6 runs another major version, and its update waits (on its task) for this image's
+ * confirmation: the OTA self-check must not wait for Wi-Fi or the hotspot (supervisor.c), or the image is never
+ * confirmed and the C6 never updated. Set once by c6fw_check; false when the C6 gave no version. Any task. */
+bool c6fw_confirm_first_pending(void);
+
 /* For the update that waited for this image's confirmation: restart_pending, a restart is on its way (then it waits
  * for the next start, where it runs at once); restart, how it restarts the P4 once the C6 runs its new firmware
  * (webui_restart_plain, which waits for a firmware upload being written), not at once. NULL, or a restart that can't

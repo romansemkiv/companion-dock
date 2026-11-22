@@ -130,6 +130,31 @@ static void test_ota_without_a_record_needs_a_route_or_the_hotspot(void)
     TEST_ASSERT_FALSE(net(NETMGR_IF_NONE, true, true, false, false));
 }
 
+/* The C6 waits for this image's confirmation before Wi-Fi can run (c6fw): Wi-Fi and the hotspot can't be back, so
+ * they are not asked for. Ethernet does not go through the C6: an update that came over it still needs it. */
+static bool net_c6_waits(netmgr_if_t via, bool eth_ip, bool routed)
+{
+    const ota_net_t n = {.via = via, .eth_ip = eth_ip, .routed = routed, .c6_waits = true};
+    const char *why = NULL;
+    const bool ok = ota_net_ok(&n, &why);
+    TEST_ASSERT_NOT_NULL(why);
+    if (!ok) TEST_ASSERT_TRUE(why[0] != '\0');
+    return ok;
+}
+
+static void test_ota_c6_waiting_for_confirmation_needs_no_wifi(void)
+{
+    TEST_ASSERT_TRUE(net_c6_waits(NETMGR_IF_STA, false, false));
+    TEST_ASSERT_TRUE(net_c6_waits(NETMGR_IF_AP, false, false));
+    TEST_ASSERT_TRUE(net_c6_waits(NETMGR_IF_NONE, false, false));
+    TEST_ASSERT_FALSE(net_c6_waits(NETMGR_IF_ETH, false, false));
+    TEST_ASSERT_TRUE(net_c6_waits(NETMGR_IF_ETH, true, true));
+    /* without that wait nothing changes */
+    TEST_ASSERT_FALSE(net(NETMGR_IF_STA, false, false, false, false));
+    TEST_ASSERT_FALSE(net(NETMGR_IF_AP, false, false, false, false));
+    TEST_ASSERT_FALSE(net(NETMGR_IF_NONE, false, false, false, false));
+}
+
 /* the web page's countdown names the check that rolls back: the one ota_verdict rolls back at, the one before waits */
 static void test_ota_rollback_check(void)
 {
@@ -208,6 +233,7 @@ int main(void)
     RUN_TEST(test_record_round_trip_and_garbage);
     RUN_TEST(test_ota_needs_the_interface_it_came_over);
     RUN_TEST(test_ota_without_a_record_needs_a_route_or_the_hotspot);
+    RUN_TEST(test_ota_c6_waiting_for_confirmation_needs_no_wifi);
     RUN_TEST(test_ota_verdict_waits_up_to_2_min);
     RUN_TEST(test_pin_save_only_when_changed);
     RUN_TEST(test_ota_over_a_forced_hotspot_forces_it_again);
