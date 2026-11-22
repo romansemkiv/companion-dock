@@ -587,6 +587,18 @@ static esp_err_t ws_send_text(httpd_handle_t hd, int fd, const char *text, size_
     return e;
 }
 
+/* Every live WebSocket counted as just used. When the sockets run out (max_open_sockets, lru_purge_enable) httpd
+ * closes the one used longest ago, and for it a socket is used only when a request or a frame comes in on it, never
+ * when a push goes out: a page that mostly listens was the oldest, and lost its WebSocket to a few tabs loading.
+ * Called when a connection opens and when an HTTP request is served, so a plain HTTP socket is always older than any
+ * WebSocket, and there is always one to close (MAX_WS is below max_open_sockets). Server task only; hd, as s_srv is
+ * not set yet when the first connection may open. */
+static void ws_keep(httpd_handle_t hd)
+{
+    for (int i = 0; i < MAX_WS; i++)
+        if (s_ws.s[i].fd && !s_ws.s[i].closing) httpd_sess_update_lru_counter(hd, s_ws.s[i].fd);
+}
+
 /* A frame on a WebSocket that passed ws_pre_handshake. */
 static esp_err_t h_ws(httpd_req_t *req)
 {
@@ -1282,6 +1294,7 @@ static esp_err_t h_captive(httpd_req_t *req) { return redirect_root(req); }
 static esp_err_t h_bounded(httpd_req_t *req)
 {
     const httpd_uri_t *u = req->user_ctx;
+    ws_keep(req->handle);
     /* POST /ota's body is read on its own task (ota_task, with OTA_DRAIN_MAX); on the server only a refused sign-in
      * leaves it, and gets BODY_MAX's time like any other: no client can hold the server task for long */
     return drop_rest(req, u->handler(req), BODY_MAX);
@@ -1290,8 +1303,16 @@ static esp_err_t h_bounded(httpd_req_t *req)
 static esp_err_t h_404(httpd_req_t *req, httpd_err_code_t code)
 {
     (void)code;
+    ws_keep(req->handle);
     const esp_err_t e = req->method == HTTP_GET && on_ap(req) ? redirect_root(req) : send_text(req, "404 Not Found", "Not found");
     return drop_rest(req, e, BODY_MAX);
+}
+
+static esp_err_t on_open(httpd_handle_t hd, int fd)
+{
+    (void)fd;
+    ws_keep(hd);
+    return ESP_OK;
 }
 
 static void on_close(httpd_handle_t hd, int fd)
@@ -1352,6 +1373,7 @@ esp_err_t web_start(void)
     c.lru_purge_enable = true;
     c.recv_wait_timeout = RECV_TIMEOUT_S;
     c.send_wait_timeout = SEND_TIMEOUT_S;
+    c.open_fn = on_open;
     c.close_fn = on_close;
     esp_err_t e = httpd_start(&s_srv, &c);
     if (e != ESP_OK) {
